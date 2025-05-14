@@ -1,6 +1,6 @@
 import books from "../Content/book-list";
-import Navbar from "./Navbar";
-import { Link } from "react-router-dom";
+import Navbar from "../Navbar";
+import { Link } from "next/link";
 
 export default function Library(){
 
@@ -40,7 +40,7 @@ export default function Library(){
     <div id="bookContainer" class="book-container">
         {books.map((book) => {
             return (
-            <Link to ="/readingpal" state = {{bookIndex: book.index}} class="book-wrapper">
+            <Link href ="/readingpal" state = {{bookIndex: book.index}} class="book-wrapper">
                 <img class= "bookImage" src={book.cover} alt={`${book.title} by ${book.author}`}></img>
                 <p class = "book-title" textContent = {book.title}></p>
             </Link>

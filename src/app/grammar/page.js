@@ -1,4 +1,4 @@
-import Navbar from "./Navbar";
+import Navbar from "../Navbar";
 
 export default function Grammar(){
     const quizzes = {
@@ -499,46 +499,46 @@ export default function Grammar(){
         <Navbar />
       <div id="quizList" >
         <h2>Sentence Structure</h2>
-        <a href="javascript:selectedCategory = quizzes.SentenceStructure.subConcepts[0]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Simple Sentences">Simple Sentences</a>
+        <a href="javascript:selectedCategory = quizzes.SentenceStructure.subConcepts[0]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Simple Sentences">Simple Sentences</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.SentenceStructure.subConcepts[1]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Compound Sentences">Compound Sentences</a>
+        <a href="javascript:selectedCategory = quizzes.SentenceStructure.subConcepts[1]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Compound Sentences">Compound Sentences</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.SentenceStructure.subConcepts[2]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Complex Sentences">Complex Sentences</a>
+        <a href="javascript:selectedCategory = quizzes.SentenceStructure.subConcepts[2]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Complex Sentences">Complex Sentences</a>
 
         <h2>Punctuation</h2>
-        <a href="javascript:selectedCategory = quizzes.Punctuation.subConcepts[0]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Commas">Commas</a>
+        <a href="javascript:selectedCategory = quizzes.Punctuation.subConcepts[0]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Commas">Commas</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.Punctuation.subConcepts[1]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Apostrophes">Apostrophes</a>
+        <a href="javascript:selectedCategory = quizzes.Punctuation.subConcepts[1]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Apostrophes">Apostrophes</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.Punctuation.subConcepts[2]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Quotation Marks">Quotation Marks</a>
+        <a href="javascript:selectedCategory = quizzes.Punctuation.subConcepts[2]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Quotation Marks">Quotation Marks</a>
 
         <h2>Common Grammar Mistakes</h2>
-        <a href="javascript:selectedCategory = quizzes.CommonGrammarMistakes.subConcepts[0]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Subject-Verb Agreement">Subject-Verb Agreement</a>
+        <a href="javascript:selectedCategory = quizzes.CommonGrammarMistakes.subConcepts[0]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Subject-Verb Agreement">Subject-Verb Agreement</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.CommonGrammarMistakes.subConcepts[1]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Misplaced Modifiers">Misplaced Modifiers</a>
+        <a href="javascript:selectedCategory = quizzes.CommonGrammarMistakes.subConcepts[1]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Misplaced Modifiers">Misplaced Modifiers</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.CommonGrammarMistakes.subConcepts[2]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Double Negatives">Double Negatives</a>
+        <a href="javascript:selectedCategory = quizzes.CommonGrammarMistakes.subConcepts[2]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Double Negatives">Double Negatives</a>
 
         <h2>Verb Tenses</h2>
-        <a href="javascript:selectedCategory = quizzes.verbTenses.subConcepts[0]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Present Simple vs. Present Continuous">Present Simple vs. Present Continuous</a>
+        <a href="javascript:selectedCategory = quizzes.verbTenses.subConcepts[0]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Present Simple vs. Present Continuous">Present Simple vs. Present Continuous</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.verbTenses.subConcepts[1]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Past Simple vs. Past Continuous">Past Simple vs. Past Continuous</a>
+        <a href="javascript:selectedCategory = quizzes.verbTenses.subConcepts[1]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Past Simple vs. Past Continuous">Past Simple vs. Past Continuous</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.verbTenses.subConcepts[2]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Future Simple vs. Future Continuous">Future Simple vs. Future Continuous</a>
+        <a href="javascript:selectedCategory = quizzes.verbTenses.subConcepts[2]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Future Simple vs. Future Continuous">Future Simple vs. Future Continuous</a>
 
         <h2>Word Usage</h2>
-        <a href="javascript:selectedCategory = quizzes.WordUsage.subConcepts[0]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Homophones">Homophones</a>
+        <a href="javascript:selectedCategory = quizzes.WordUsage.subConcepts[0]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Homophones">Homophones</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.WordUsage.subConcepts[1]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Commonly Confused Words">Commonly Confused Words</a>
+        <a href="javascript:selectedCategory = quizzes.WordUsage.subConcepts[1]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Commonly Confused Words">Commonly Confused Words</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.WordUsage.subConcepts[2]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Synonyms and Antonyms">Synonyms and Antonyms</a>
+        <a href="javascript:selectedCategory = quizzes.WordUsage.subConcepts[2]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Synonyms and Antonyms">Synonyms and Antonyms</a>
 
         <h2>Writing Style</h2>
-        <a href="javascript:selectedCategory = quizzes.WritingStyle.subConcepts[0]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Formal vs. Informal Writing">Formal vs. Informal Writing</a>
+        <a href="javascript:selectedCategory = quizzes.WritingStyle.subConcepts[0]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Formal vs. Informal Writing">Formal vs. Informal Writing</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.WritingStyle.subConcepts[1]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Active vs. Passive Voice">Active vs. Passive Voice</a>
+        <a href="javascript:selectedCategory = quizzes.WritingStyle.subConcepts[1]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Active vs. Passive Voice">Active vs. Passive Voice</a>
         <br />
-        <a href="javascript:selectedCategory = quizzes.WritingStyle.subConcepts[2]; generateQuestion(selectedCategory);" class="subsection-link" data-subsection="Concise vs. Wordy Writing">Concise vs. Wordy Writing</a>
+        <a href="javascript:selectedCategory = quizzes.WritingStyle.subConcepts[2]; generateQuestion(selectedCategory);" className="subsection-link" data-subsection="Concise vs. Wordy Writing">Concise vs. Wordy Writing</a>
       </div>
 
     <div id="textContainer"></div>

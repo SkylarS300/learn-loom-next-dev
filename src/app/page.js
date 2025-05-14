@@ -1,4 +1,4 @@
-import Navbar from "./Components/Navbar";
+import Navbar from "./Navbar.js";
 import demoGif from "./assets/images/videoforindexhtml.gif"
 
 export default function Home(){
@@ -16,7 +16,7 @@ export default function Home(){
     <a href="./login.html" class="cta-button get-started-btn">Get started &rarr;</a>
     
     <div class="gif-container">
-      <img src={demoGif} alt="Demo GIF" class="responsive-gif w-full"></img>
+      <img src={demoGif.src} alt="Demo GIF" class="responsive-gif w-full"></img>
   </div>
 
   </div>

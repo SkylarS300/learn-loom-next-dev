@@ -1,3 +1,5 @@
+"use client";
+
 import { useLocation } from "react-router-dom";
 import books from "../Content/book-content.js";
 import { useEffect, useRef } from "react";
