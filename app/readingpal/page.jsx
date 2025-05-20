@@ -1,8 +1,9 @@
 "use client";
 
-import { useLocation } from "react-router-dom";
-import books from "../Content/book-content.js";
+import { useSearchParams } from "next/navigation";
+import books from "../../public/Content/book-content.js";
 import { useEffect, useRef } from "react";
+
 export default function ReadingPal() {
   let highlightedColor = "yellow";
   let currentBook = null;
@@ -12,8 +13,9 @@ export default function ReadingPal() {
   let wordIndex = 0;
 
     // Parse the react link to get the bookIndex
-  const location = useLocation()
-  const { bookIndex } = location.state
+  const searchParams = useSearchParams();
+  const bookIndex = searchParams.get("bookIndex");
+
 
   // REFERENCES
   const bookTitleRef = useRef(null);
@@ -199,7 +201,7 @@ export default function ReadingPal() {
         Book Title
       </h1>
       <div id="bookPopup">
-        <button class="close-btn" onclick="goBack()">
+        <button className="close-btn" onclick="goBack()">
           &#x2716;
         </button>
         <h2 ref={chapterTitleRef} id="chapterTitle">
@@ -209,19 +211,19 @@ export default function ReadingPal() {
           The chapter text will appear here after selecting a book from the
           library.
         </div>
-        <div class="control-buttons">
+        <div className="control-buttons">
           <button onclick="startReading()">Start Reading</button>
           <button onclick="pauseReading()">Pause</button>
           <button onclick="resumeReading()">Resume</button>
           <button onclick="stopReading()">Stop</button>
         </div>
 
-        <div class="chapter-nav">
+        <div className="chapter-nav">
           <button ref={prevChapterRef} id="prevChapter">
             Previous Chapter
           </button>
 
-          <div class="settings-section">
+          <div className="settings-section">
             <label ref={fontSizeRef} for="fontSize">
               Font Size
             </label>
@@ -234,12 +236,12 @@ export default function ReadingPal() {
             />
 
             <label>Highlight Color</label>
-            <div class="highlight-color">
-              <div class="color red"></div>
-              <div class="color blue"></div>
-              <div class="color green"></div>
-              <div class="color yellow"></div>
-              <div class="color orange"></div>
+            <div className="highlight-color">
+              <div className="color red"></div>
+              <div className="color blue"></div>
+              <div className="color green"></div>
+              <div className="color yellow"></div>
+              <div className="color orange"></div>
             </div>
           </div>
 

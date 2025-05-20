@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import logo from './assets/images/learnloom.png'
+import logo from '../public/assets/images/learnloom.png'
 
 export default function Navbar(){
     return <div className="px-10"> <div id = "navbar" className="w-full flex flex-row justify-between py-1 px-10 shadow-md">
@@ -9,10 +9,10 @@ export default function Navbar(){
 
       <ul className="nav-links flex flex-row gap-8 justify-center items-center">
         <li>
-          <Link href = "/">Home</Link>
+          <Link href = "/"> Home </Link>
         </li>
         <li>
-          <Link href = "/library">Library</Link>
+          <Link href = "/library" >Library</Link>
         </li>
         <li>
           <Link href = "/readingpal" state = {{bookIndex: null}}>ReadingPal</Link>

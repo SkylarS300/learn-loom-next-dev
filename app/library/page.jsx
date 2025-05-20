@@ -1,4 +1,4 @@
-import books from "../Content/book-list";
+import books from "../../public/Content/book-list";
 import Navbar from "../Navbar";
 import { Link } from "next/link";
 
