@@ -1,6 +1,6 @@
 import books from "../../public/Content/book-list";
 import Navbar from "../Navbar";
-import { Link } from "next/link";
+import Link from "next/link";
 
 export default function Library(){
 
