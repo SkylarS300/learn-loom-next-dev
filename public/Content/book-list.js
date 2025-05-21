@@ -22,78 +22,78 @@ import WhCover from './Images/cover_wh.jpg'
 
 
 const books = [
-    {
-            title: "Pride and Prejudice",
-            author: "Jane Austen",
-            cover: PapCover,
-            index: 0
-        },
-        {
-            title: "Metamorphosis",
-            author: "Franz Kafka",
-            cover: MCover,
-            index: 1
-        },
-        {
-            title: "Frankenstein",
-            author: "Mary Shelley",
-            cover: FrankCover,
-            index: 2
-        },
-        {
-            title: "Alice's Adventures in Wonderland",
-            author: "Lewis Carroll",
-            cover: AliceCover,
-            index: 3
-        },
-        {
-            title: "The Wind in the Willows",
-            author: "Kenneth Grahame",
-            cover: WitwCover,
-            index: 4
-        },
-        {
-            title: "Great Expectations",
-            author: "Charles Dickens",
-            cover: GreatExpCover,
-            index: 5
-        },
-        {
-            title: "Jane Eyre",
-            author: "Charlotte Bronte",
-            cover: JaneEyreCover,
-            index: 6
-        },
-        {
-            title: "Dracula",
-            author: "Bram Stoker",
-            cover: DraculaCover,
-            index: 7
-        },
-        {
-            title: "Oliver Twist",
-            author: "Charles Dickens",
-            cover: OliverTwistCover,
-            index: 8
-        },
-        {
-            title: "The Invisible Man",
-            author: "H. G. Wells",
-            cover: TheInvisibleManCover,
-            index: 9
-        },
-        {
-            title: "The Time Machine",
-            author: "H. G. Wells",
-            cover: TheTimeMachineCover,
-            index: 10
-        },
-        {
-            title: "Wuthering Heights",
-            author: "Emily Bronte",
-            cover: WhCover,
-            index: 11
-        },
-    ];
+  {
+    index: 0,
+    title: "Alice’s Adventures in Wonderland",
+    author: "Lewis Carroll",
+    cover: "/Content/Images/cover_alice.jpg",
+  },
+  {
+    index: 1,
+    title: "Dracula",
+    author: "Bram Stoker",
+    cover: "/Content/Images/cover_drac.jpg",
+  },
+  {
+    index: 2,
+    title: "Frankenstein",
+    author: "Mary Shelley",
+    cover: "/Content/Images/cover_frank.jpg",
+  },
+  {
+    index: 3,
+    title: "Great Expectations",
+    author: "Charles Dickens",
+    cover: "/Content/Images/cover_greatexp.jpg",
+  },
+  {
+    index: 4,
+    title: "Jane Eyre",
+    author: "Charlotte Brontë",
+    cover: "/Content/Images/cover_je.jpg",
+  },
+  {
+    index: 5,
+    title: "Metamorphosis",
+    author: "Franz Kafka",
+    cover: "/Content/Images/cover_m.jpg",
+  },
+  {
+    index: 6,
+    title: "Oliver Twist",
+    author: "Charles Dickens",
+    cover: "/Content/Images/cover_ot.jpg",
+  },
+  {
+    index: 7,
+    title: "Pride and Prejudice",
+    author: "Jane Austen",
+    cover: "/Content/Images/cover_pap.jpg",
+  },
+  {
+    index: 8,
+    title: "The Invisible Man",
+    author: "H. G. Wells",
+    cover: "/Content/Images/cover_tim.jpg",
+  },
+  {
+    index: 9,
+    title: "The Time Machine",
+    author: "H. G. Wells",
+    cover: "/Content/Images/cover_ttm.jpg",
+  },
+  {
+    index: 10,
+    title: "Wuthering Heights",
+    author: "Emily Brontë",
+    cover: "/Content/Images/cover_wh.jpg",
+  },
+  {
+    index: 11,
+    title: "The Wind in the Willows",
+    author: "Kenneth Grahame",
+    cover: "/Content/Images/cover_witw.jpg",
+  },
+];
 
 export default books;

@@ -1,29 +1,29 @@
-import Link from 'next/link';
-import logo from '../public/assets/images/learnloom.png'
+"use client";
 
-export default function Navbar(){
-    return <div className="px-10"> <div id = "navbar" className="w-full flex flex-row justify-between py-1 px-10 shadow-md">
-      <a className="logo">
-        <img src={logo.src} alt = "LearnLoom Logo" className="w-20 l-20" />
-      </a>
+import Link from "next/link";
+import logo from "../public/assets/images/learnloom.png";
+import { useState } from 'react';
 
-      <ul className="nav-links flex flex-row gap-8 justify-center items-center">
-        <li>
-          <Link href = "/"> Home </Link>
-        </li>
-        <li>
-          <Link href = "/library" >Library</Link>
-        </li>
-        <li>
-          <Link href = "/readingpal" state = {{bookIndex: null}}>ReadingPal</Link>
-        </li>
-        <li>
-          <Link href = "/grammar">Grammar</Link>
-        </li>
-        <li>Features</li>
-        <li>FAQ</li>
-      </ul>
+export default function Navbar() {
+  return (
+    <header id="navbar">
+      <div className="navbar-inner">
+        <a className="logo" href="/">
+          <img src={logo.src} alt="LearnLoom Logo" className="logo-image" />
+        </a>
 
-      <div className="login-button flex flex-row items-center justify-center">Login</div>
-    </div></div>
+        <ul className="nav-links">
+          <li><Link href="/">Home</Link></li>
+          <li><Link href="/library">Library</Link></li>
+          <li><Link href="/readingpal">Reading Pal</Link></li>
+          <li><Link href="/grammar">Study Grammar</Link></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+
+        <a className="login-button" href="/auth">Login</a>
+      </div>
+    </header>
+  );
 }
+

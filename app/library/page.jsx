@@ -1,50 +1,39 @@
+"use client";
+
 import books from "../../public/Content/book-list";
 import Navbar from "../Navbar";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function Library(){
+export default function Library() {
+  const router = useRouter();
 
-        // function populateBooks() {
-        //     const bookContainer = document.getElementById('bookContainer');
-        //     books.forEach((book) => {
-        //         const bookWrapper = document.createElement('div');
-        //         const bookImage = document.createElement('img');
-        //         bookImage.src = book.cover;
-        //         bookImage.alt = `${book.title} by ${book.author}`;
-        //         bookImage.classList.add('book-cover');
-        //         bookImage.addEventListener('click', () => {
-        //             window.location.href = `readingpal.html?bookIndex=${book.index}`;
-        //         });
+  function handleClick(book) {
+    router.push(`/readingpal?bookIndex=${book.index}`);
+  }
 
-        //         const bookTitle = document.createElement('p');
-        //         bookTitle.textContent = book.title;
-        //         bookTitle.classList.add('book-title');
-
-        //         bookWrapper.appendChild(bookImage);
-        //         bookWrapper.appendChild(bookTitle);
-        //         bookContainer.appendChild(bookWrapper);
-        //     });
-        // }
-
-        // window.onload = populateBooks;
-
-        function onClick(book){
-            window.location.href = `readingpal.html?bookIndex=${book.index}`
-        }
-
-    return <div>
-        <center>
-            <Navbar />
-        <h1>Select a Book to Read:</h1>
-    </center>
-    <div id="bookContainer" class="book-container">
-        {books.map((book) => {
-            return (
-            <Link href ="/readingpal" state = {{bookIndex: book.index}} class="book-wrapper">
-                <img class= "bookImage" src={book.cover} alt={`${book.title} by ${book.author}`}></img>
-                <p class = "book-title" textContent = {book.title}></p>
-            </Link>
-        );})}
-    </div>
-    </div>
+  return (
+    <>
+      <Navbar />
+      <main className="library-wrapper">
+        <h1 className="library-heading">Select a Book to Read:</h1>
+        <div className="book-grid">
+          {books.map((book) => (
+            <div
+              key={book.index}
+              className="book-card"
+              onClick={() => handleClick(book)}
+            >
+              <img
+                className="book-cover"
+                src={book.cover}
+                alt={`${book.title} by ${book.author}`}
+              />
+              <p className="book-title">{book.title}</p>
+              <p className="book-author">{book.author}</p>
+            </div>
+          ))}
+        </div>
+      </main>
+    </>
+  );
 }

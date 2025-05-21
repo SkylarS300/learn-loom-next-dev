@@ -1,4 +1,3 @@
-// app/readingpal/ReadingPalClient.jsx
 "use client";
 
 import { useSearchParams } from "next/navigation";
@@ -6,13 +5,7 @@ import books from "../../public/Content/book-content.js";
 import { useEffect, useRef } from "react";
 
 export default function ReadingPalClient() {
-  let highlightedColor = "yellow";
-  let currentBook = null;
-  let currentChapterIndex = 0;
-  let utterance = null;
-  let isPaused = false;
-  let wordIndex = 0;
-
+  const readingRef = useRef(false);
   const searchParams = useSearchParams();
   const bookIndex = searchParams.get("bookIndex");
 
@@ -22,6 +15,27 @@ export default function ReadingPalClient() {
   const fontSizeRef = useRef(null);
   const prevChapterRef = useRef(null);
   const nextChapterRef = useRef(null);
+  const utteranceRef = useRef(null);
+
+  let highlightedColor = "yellow";
+  let currentBook = null;
+  let currentChapterIndex = 0;
+  let isPaused = false;
+
+  if (!bookIndex) {
+    return (
+      <div className="readingpal-wrapper">
+        <h1 className="readingpal-title">No Book Selected</h1>
+        <img src="/assets/images/empty-book.png" alt="Empty" style={{ maxWidth: "300px", margin: "0 auto" }} />
+        <p style={{ textAlign: "center", color: "#666", maxWidth: "600px", margin: "20px auto" }}>
+          Please go back to the library and select a book to begin reading with your Reading Pal.
+        </p>
+        <div className="control-buttons" style={{ justifyContent: "center" }}>
+          <button onClick={goBack}>Return to Library</button>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (bookTitleRef.current && bookIndex !== null) {
@@ -56,6 +70,14 @@ export default function ReadingPalClient() {
         }
       });
     }
+
+    // Add color picker listeners
+    document.querySelectorAll(".highlight-color .color").forEach((colorElement) => {
+      colorElement.addEventListener("click", function () {
+        const selectedColor = window.getComputedStyle(this).backgroundColor;
+        updateHighlightColor(selectedColor);
+      });
+    });
   }, [bookIndex]);
 
   function displayChapter(book, chapterIndex) {
@@ -65,36 +87,50 @@ export default function ReadingPalClient() {
   }
 
   function readText() {
-    if (utterance) speechSynthesis.cancel();
-    let text = currentBook.chapters[currentChapterIndex].content;
+    speechSynthesis.cancel();
+
+    const text = currentBook.chapters[currentChapterIndex].content;
     let paragraphs = text.split(/\n\s*\n|\n/);
     if (paragraphs.length === 1) {
       paragraphs = text.match(/(.{1,500})(\s|$)/g);
     }
+
     let paragraphIndex = 0;
 
-    function speakNextParagraph() {
-      if (paragraphIndex < paragraphs.length) {
-        const paragraphText = paragraphs[paragraphIndex];
-        const words = paragraphText.split(/\s+/);
-        let wordIndex = 0;
-        const utterance = new SpeechSynthesisUtterance(paragraphText);
+    readingRef.current = true;
 
-        utterance.onboundary = (event) => {
-          if (event.name === "word" && wordIndex < words.length) {
-            highlightWord(wordIndex, words);
-            wordIndex++;
-          }
-        };
+function speakNextParagraph() {
+  if (!readingRef.current) return; // 🛑 Stop if reading was cancelled
 
-        utterance.onend = () => {
-          paragraphIndex++;
-          setTimeout(speakNextParagraph, 50);
-        };
+  if (paragraphIndex < paragraphs.length) {
+    const paragraphText = paragraphs[paragraphIndex];
+    const words = paragraphText.split(/\s+/);
+    let wordIndex = 0;
 
-        speechSynthesis.speak(utterance);
+    utteranceRef.current = new SpeechSynthesisUtterance(paragraphText);
+    const utterance = utteranceRef.current;
+
+    utterance.onboundary = (event) => {
+      if (event.name === "word" && wordIndex < words.length) {
+        highlightWord(wordIndex, words);
+        wordIndex++;
       }
-    }
+    };
+
+    utterance.onend = () => {
+      utteranceRef.current = null;
+
+      // ✅ Only advance if reading wasn't stopped
+      if (readingRef.current) {
+        paragraphIndex++;
+        setTimeout(speakNextParagraph, 50);
+      }
+    };
+
+    speechSynthesis.speak(utterance);
+  }
+}
+
 
     speakNextParagraph();
   }
@@ -106,10 +142,10 @@ export default function ReadingPalClient() {
 
   function highlightWord(wordIndex, words) {
     const paragraphElement = textRef.current;
-    const paragraphText = words.join(" ");
     if (!paragraphElement) return;
 
     paragraphElement.innerHTML = "";
+
     const beforeWord = words.slice(0, wordIndex).join(" ") + " ";
     const currentWord = words[wordIndex];
     const afterWord = " " + words.slice(wordIndex + 1).join(" ");
@@ -144,10 +180,12 @@ export default function ReadingPalClient() {
   }
 
   function stopReading() {
-    if (!isPaused || utterance) {
-      speechSynthesis.cancel();
-    }
+    readingRef.current = false;  // stops loop
+    speechSynthesis.cancel();
+    utteranceRef.current = null;
+    isPaused = false;
   }
+
 
   function goBack() {
     stopReading();
@@ -155,43 +193,41 @@ export default function ReadingPalClient() {
   }
 
   return (
-    <div>
-      <h1 ref={bookTitleRef} id="bookTitle">Book Title</h1>
-      <div id="bookPopup">
+    <div className="readingpal-wrapper">
+      <h1 className="readingpal-title" ref={bookTitleRef}>Book Title</h1>
+      <div>
         <button className="close-btn" onClick={goBack}>&#x2716;</button>
-        <h2 ref={chapterTitleRef} id="chapterTitle">Chapter Title</h2>
-        <div ref={textRef} id="text">
+        <h2 className="readingpal-chapter" ref={chapterTitleRef}>Chapter Title</h2>
+        <div id="text" ref={textRef}>
           The chapter text will appear here after selecting a book from the library.
         </div>
-        <div className="control-buttons">
-          <button onClick={startReading}>Start Reading</button>
-          <button onClick={pauseReading}>Pause</button>
-          <button onClick={resumeReading}>Resume</button>
-          <button onClick={stopReading}>Stop</button>
-        </div>
+      </div>
 
-        <div className="chapter-nav">
-          <button ref={prevChapterRef} id="prevChapter">Previous Chapter</button>
+      <div className="control-buttons">
+        <button onClick={startReading}>Start Reading</button>
+        <button onClick={pauseReading}>Pause</button>
+        <button onClick={resumeReading}>Resume</button>
+        <button onClick={stopReading}>Stop</button>
+      </div>
 
-          <div className="settings-section">
-            <label htmlFor="fontSize">Font Size</label>
-            <input type="range" id="fontSize" name="fontSize" min="10" max="40" ref={fontSizeRef} />
+    <div className="chapter-nav-row">
+      <button ref={prevChapterRef} className="chapter-btn">Previous Chapter</button>
 
-            <label>Highlight Color</label>
-            <div className="highlight-color">
-              {["red", "blue", "green", "yellow", "orange"].map((color) => (
-                <div
-                  key={color}
-                  className={`color ${color}`}
-                  onClick={() => updateHighlightColor(color)}
-                ></div>
-              ))}
-            </div>
-          </div>
-
-          <button ref={nextChapterRef} id="nextChapter">Next Chapter</button>
+      <div className="settings-section">
+        <label htmlFor="fontSize">Font Size</label>
+        <input ref={fontSizeRef} type="range" id="fontSize" min="10" max="40" />
+        <label>Highlight Color</label>
+        <div className="highlight-color">
+          <div className="color" style={{ backgroundColor: "red" }}></div>
+          <div className="color" style={{ backgroundColor: "blue" }}></div>
+          <div className="color" style={{ backgroundColor: "green" }}></div>
+          <div className="color" style={{ backgroundColor: "yellow" }}></div>
+          <div className="color" style={{ backgroundColor: "orange" }}></div>
         </div>
       </div>
+
+      <button ref={nextChapterRef} className="chapter-btn">Next Chapter</button>
+    </div>
     </div>
   );
 }
