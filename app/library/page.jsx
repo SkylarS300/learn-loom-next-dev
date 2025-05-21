@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 export default function Library() {
   const router = useRouter();
 
-  function handleClick(book) {
-    router.push(`/readingpal?bookIndex=${book.index}`);
+  function handleClick(index) {
+    router.push(`/readingpal?bookIndex=${index}`);
   }
 
   return (
@@ -17,11 +17,11 @@ export default function Library() {
       <main className="library-wrapper">
         <h1 className="library-heading">Select a Book to Read:</h1>
         <div className="book-grid">
-          {books.map((book) => (
+          {books.map((book, index) => (
             <div
-              key={book.index}
+              key={index}
               className="book-card"
-              onClick={() => handleClick(book)}
+              onClick={() => handleClick(index)}
             >
               <img
                 className="book-cover"
