@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model assignment {
+  id          Int              @id @default(autoincrement())
+  classroomId Int
+  title       String
+  description String
+  type        assignment_type
+  dueDate     DateTime?
+  createdAt   DateTime         @default(now())
+
+  completions assignmentcompletion[]
+  classroom   classroom        @relation(fields: [classroomId], references: [id]) // ✅ ADD THIS
+
+  @@index([classroomId], map: "Assignment_classroomId_fkey")
+}
+
+
+
+model bookcontent {
+  id              Int     @id @default(autoincrement())
+  chapters        Int
+  chapterContents String
+  chapterTitle    String?
+}
+
+model booklist {
+  index  Int    @id @default(autoincrement())
+  title  String
+  author String
+  cover  String
+}
+
+model classroom {
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String   @unique(map: "Classroom_code_key")
+  teacherId Int
+  createdAt DateTime @default(now())
+  
+  assignments assignment[]  // ✅ back-reference for the relation
+
+  @@index([teacherId], map: "Classroom_teacherId_fkey")
+}
+
+model grammarprogress {
+  id        Int      @id @default(autoincrement())
+  osis      Int
+  concept   String
+  subTopic  String
+  score     Int
+  createdAt DateTime @default(now())
+}
+
+model quizprogress {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  category  String
+  subtopic  String
+  score     Int
+  createdAt DateTime @default(now())
+
+  @@index([userId], map: "QuizProgress_userId_fkey")
+}
+
+model studentclassroom {
+  id          Int @id @default(autoincrement())
+  studentId   Int
+  classroomId Int
+
+  @@index([classroomId], map: "StudentClassroom_classroomId_fkey")
+  @@index([studentId], map: "StudentClassroom_studentId_fkey")
+}
+
+model uploadedtext {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId], map: "UploadedText_userId_fkey")
+}
+
+model user {
+  id        Int                  @id @default(autoincrement())
+  email     String               @unique(map: "User_email_key")
+  password  String
+  firstName String
+  lastName  String
+  grade     Int
+  createdAt DateTime             @default(now())
+  role      user_role            @default(STUDENT)
+
+  completions assignmentcompletion[]  // <- ADD THIS LINE
+}
+
+enum assignment_type {
+  BOOK
+  QUIZ
+  UPLOAD
+}
+
+enum user_role {
+  STUDENT
+  TEACHER
+}
+
+model assignmentcompletion {
+  id           Int       @id @default(autoincrement())
+  assignmentId Int
+  userId       Int
+  completedAt  DateTime?
+  quizScore    Int?
+
+  assignment   assignment @relation(fields: [assignmentId], references: [id])
+  user         user       @relation(fields: [userId], references: [id])
+
+  @@index([assignmentId])
+  @@index([userId])
+}

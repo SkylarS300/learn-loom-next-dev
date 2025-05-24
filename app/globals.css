@@ -767,7 +767,107 @@ a:hover {
   text-align: center;
 }
 
-
 html {
   scroll-behavior: smooth;
 }
+
+ 
+/* === DASHBOARD PAGE STYLING === */
+
+.dashboard-wrapper {
+  max-width: 1000px;
+  margin: 60px auto;
+  padding: 40px 30px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  font-family: 'Poppins', sans-serif;
+  text-align: center;
+}
+
+.dashboard-wrapper h1 {
+  font-size: 30px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.dashboard-wrapper p {
+  font-size: 18px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.input {
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 300px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.divider {
+  margin: 40px 0;
+  height: 1px;
+  background-color: #eee;
+}
+
+.classroom-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 15px;
+}
+
+.classroom-card {
+  background-color: #f5f6ff;
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin-bottom: 10px;
+  font-family: 'Poppins', sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+
+/* === DASHBOARD HEADER === */
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f6f7fb;
+  padding: 16px 30px;
+  border-bottom: 1px solid #ddd;
+  font-family: 'Poppins', sans-serif;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #738afd;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.logout-button {
+  background-color: #f05d5e;
+  color: white;
+  border: none;
+  padding: 8px 18px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.logout-button:hover {
+  background-color: #d34748;
+}
+
