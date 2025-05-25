@@ -8,21 +8,19 @@ datasource db {
 }
 
 model assignment {
-  id          Int              @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   classroomId Int
   title       String
   description String
   type        assignment_type
   dueDate     DateTime?
-  createdAt   DateTime         @default(now())
+  createdAt   DateTime        @default(now())
 
   completions assignmentcompletion[]
-  classroom   classroom        @relation(fields: [classroomId], references: [id]) // ✅ ADD THIS
+  classroom   classroom              @relation(fields: [classroomId], references: [id]) // ✅ ADD THIS
 
   @@index([classroomId], map: "Assignment_classroomId_fkey")
 }
-
-
 
 model bookcontent {
   id              Int     @id @default(autoincrement())
@@ -44,8 +42,9 @@ model classroom {
   code      String   @unique(map: "Classroom_code_key")
   teacherId Int
   createdAt DateTime @default(now())
-  
-  assignments assignment[]  // ✅ back-reference for the relation
+
+  assignments assignment[] // ✅ back-reference for the relation
+  students    studentclassroom[]
 
   @@index([teacherId], map: "Classroom_teacherId_fkey")
 }
@@ -75,6 +74,9 @@ model studentclassroom {
   studentId   Int
   classroomId Int
 
+  student   user      @relation(fields: [studentId], references: [id])
+  classroom classroom @relation(fields: [classroomId], references: [id])
+
   @@index([classroomId], map: "StudentClassroom_classroomId_fkey")
   @@index([studentId], map: "StudentClassroom_studentId_fkey")
 }
@@ -90,16 +92,18 @@ model uploadedtext {
 }
 
 model user {
-  id        Int                  @id @default(autoincrement())
-  email     String               @unique(map: "User_email_key")
+  id        Int       @id @default(autoincrement())
+  email     String    @unique(map: "User_email_key")
   password  String
   firstName String
   lastName  String
   grade     Int
-  createdAt DateTime             @default(now())
-  role      user_role            @default(STUDENT)
+  createdAt DateTime  @default(now())
+  role      user_role @default(STUDENT)
 
-  completions assignmentcompletion[]  // <- ADD THIS LINE
+  completions     assignmentcompletion[]
+  studentClasses  studentclassroom[]
+  readingprogress readingprogress[]
 }
 
 enum assignment_type {
@@ -120,9 +124,22 @@ model assignmentcompletion {
   completedAt  DateTime?
   quizScore    Int?
 
-  assignment   assignment @relation(fields: [assignmentId], references: [id])
-  user         user       @relation(fields: [userId], references: [id])
+  assignment assignment @relation(fields: [assignmentId], references: [id])
+  user       user       @relation(fields: [userId], references: [id])
 
   @@index([assignmentId])
   @@index([userId])
+}
+
+model readingprogress {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  bookIndex    Int
+  chapterIndex Int
+  completedAt  DateTime @default(now())
+
+  user user @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([bookIndex, chapterIndex])
 }

@@ -20,12 +20,12 @@ export async function POST(request) {
 
     // Auto-create completion rows for grammar quiz assignments
     if (type === "QUIZ") {
-      const students = await prisma.studentClassroom.findMany({
+      const students = await prisma.studentclassroom.findMany({
         where: { classroomId: parseInt(classroomId) },
         select: { studentId: true },
       });
 
-      await prisma.assignmentCompletion.createMany({
+      await prisma.assignmentcompletion.createMany({
         data: students.map((s) => ({
           userId: s.studentId,
           assignmentId: assignment.id,

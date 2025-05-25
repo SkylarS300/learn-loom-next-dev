@@ -16,7 +16,7 @@ export async function POST(request) {
       return new Response("Classroom not found", { status: 404 });
     }
 
-    const existingLink = await prisma.studentClassroom.findFirst({
+    const existingLink = await prisma.studentclassroom.findFirst({
       where: {
         classroomId: classroom.id,
         studentId: Number(studentId),
@@ -27,7 +27,7 @@ export async function POST(request) {
       return new Response("Already joined", { status: 409 });
     }
 
-    await prisma.studentClassroom.create({
+    await prisma.studentclassroom.create({
       data: {
         classroomId: classroom.id,
         studentId: Number(studentId),
@@ -49,7 +49,7 @@ export async function GET(request) {
     return new Response("Missing studentId", { status: 400 });
   }
 
-  const data = await prisma.studentClassroom.findMany({
+  const data = await prisma.studentclassroom.findMany({
     where: { studentId: Number(studentId) },
     select: {
       classroom: true,

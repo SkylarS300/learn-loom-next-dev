@@ -2,39 +2,40 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 
 export default function StudentDashboard() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: session, status } = useSession();
   const [joinCode, setJoinCode] = useState("");
   const [classrooms, setClassrooms] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
+  const userId = session?.user?.id;
+  const role = session?.user?.role;
+
   useEffect(() => {
-    const role = localStorage.getItem("role");
-    const userId = localStorage.getItem("userId");
+    if (status === "loading") return;
 
     if (!userId || role !== "STUDENT") {
-      router.push("/auth");
+      router.push("/login");
     } else {
       fetchStudentClassrooms(userId);
       fetchStudentAssignments(userId);
     }
-  }, []);
+  }, [status]);
 
   async function fetchStudentClassrooms(userId) {
     const res = await fetch(`/api/studentClassrooms?studentId=${userId}`);
     if (res.ok) {
       const data = await res.json();
 
-      // remove duplicates based on classroom ID
       const unique = data.filter(
         (cls, index, self) => index === self.findIndex(c => c.id === cls.id)
       );
 
       setClassrooms(unique);
     }
-    setIsLoading(false);
   }
 
   async function fetchStudentAssignments(userId) {
@@ -46,9 +47,8 @@ export default function StudentDashboard() {
   }
 
   async function handleJoinClassroom() {
-    const userId = localStorage.getItem("userId");
     const trimmedCode = joinCode.trim();
-    if (!trimmedCode) return;
+    if (!trimmedCode || !userId) return;
 
     const res = await fetch("/api/studentClassrooms", {
       method: "POST",
@@ -77,13 +77,25 @@ export default function StudentDashboard() {
     }
   }
 
+  async function handleMarkComplete(assignmentId) {
+    const res = await fetch("/api/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignmentId, studentId: userId }),
+    });
 
-  function handleLogout() {
-    localStorage.clear();
-    router.push("/auth");
+    if (res.ok) {
+      fetchStudentAssignments(userId);
+    } else {
+      alert("Failed to mark as complete.");
+    }
   }
 
-  if (isLoading) return <p>Loading...</p>;
+  function handleLogout() {
+    signOut({ callbackUrl: "/login" });
+  }
+
+  if (status === "loading") return <p>Loading...</p>;
 
   return (
     <div>
@@ -136,6 +148,17 @@ export default function StudentDashboard() {
                   <strong>{a.title}</strong> — {a.type}
                   {a.dueDate && (
                     <span> | Due: {new Date(a.dueDate).toLocaleDateString()}</span>
+                  )}
+                  <br />
+                  {a.completedAt ? (
+                    <span style={{ color: "green" }}>✅ Completed</span>
+                  ) : (
+                    <button
+                      className="cta-button small"
+                      onClick={() => handleMarkComplete(a.id)}
+                    >
+                      Mark as Complete
+                    </button>
                   )}
                 </li>
               ))}

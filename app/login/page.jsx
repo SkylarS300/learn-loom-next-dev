@@ -1,24 +1,55 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter();
+  const [error, setError] = useState("");
 
-  function handleLogin(role) {
-    const fakeUserId = role === "TEACHER" ? 1 : 2; // replace with real ID logic later
-    localStorage.setItem("role", role);
-    localStorage.setItem("userId", fakeUserId.toString());
-    router.push("/dashboard");
+  async function handleLogin(e) {
+    e.preventDefault();
+    const res = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
+
+    if (res?.ok) {
+      router.push("/dashboard");
+    } else {
+      setError("Invalid email or password.");
+    }
   }
 
-
   return (
-    <div style={{ padding: "60px", textAlign: "center" }}>
-      <h1>Login (TEMP PAGE)</h1>
-      <p>This is a placeholder. Select a role to simulate login:</p>
-      <button onClick={() => handleLogin("TEACHER")} style={{ margin: "10px" }}>Log in as Teacher</button>
-      <button onClick={() => handleLogin("STUDENT")}>Log in as Student</button>
+    <div className="auth-wrapper">
+      <div className="auth-box">
+        <h2>Welcome Back</h2>
+        <p className="subtext">Log in to access LearnLoom</p>
+
+        <form className="auth-form" onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="Email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && <p style={{ color: "red" }}>{error}</p>}
+          <button type="submit">Log In</button>
+        </form>
+      </div>
     </div>
   );
 }
