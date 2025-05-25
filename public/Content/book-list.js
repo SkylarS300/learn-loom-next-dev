@@ -1,26 +1,3 @@
-import PapCover from './Images/cover_pap.jpg'
-import MCover from './Images/cover_m.jpg'
-import FrankCover from './Images/cover_frank.jpg'
-import AliceCover from './Images/cover_alice.jpg'
-import WitwCover from './Images/cover_witw.jpg'
-import GreatExpCover from './Images/cover_greatexp.jpg'
-import JaneEyreCover from './Images/cover_je.jpg'
-import DraculaCover from './Images/cover_drac.jpg'
-import OliverTwistCover from './Images/cover_ot.jpg'
-import TheInvisibleManCover from './Images/cover_tim.jpg'
-import TheTimeMachineCover from './Images/cover_ttm.jpg'
-import WhCover from './Images/cover_wh.jpg'
-
-
-
-
-
-
-
-
-
-
-
 const books = [
   {
     title: "Pride and Prejudice",
