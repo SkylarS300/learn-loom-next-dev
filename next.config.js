@@ -1,8 +1,12 @@
-/** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
   experimental: {
-    serverActions: {},
+    serverActions: {}
+  },
+  compiler: {
+    removeConsole: false, // optional
+  },
+  images: {
+    unoptimized: true // disables sharp
   }
 };
 
