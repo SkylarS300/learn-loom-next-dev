@@ -1,6 +1,7 @@
 "use client";
 
 import quizzes from "../../public/Content/quizzes.js";
+import logo from '@/public/assets/images/learnloom.png';
 import Navbar from "../Navbar";
 import { useEffect } from "react";
 
