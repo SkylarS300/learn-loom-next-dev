@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import logo from "../public/assets/images/learnloom.png";
+<img src="/assets/images/learnloom.png" alt="LearnLoom Logo" />
 import { useState } from 'react';
 
 export default function Navbar() {
