@@ -19,12 +19,10 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     if (status === "loading") return;
-
     if (!teacherId || role !== "TEACHER") {
       router.push("/auth");
       return;
     }
-
     fetchClassroomsWithAssignments(teacherId);
   }, [status]);
 
@@ -125,7 +123,79 @@ export default function TeacherDashboard() {
       <div className="dashboard-wrapper">
         <h1>Welcome, Teacher!</h1>
         <p>You can manage classrooms, assign readings, and track progress here.</p>
-        {/* The rest of your teacher dashboard content */}
+
+        {/* ✅ Classroom Creation Form */}
+        <form onSubmit={handleCreateClassroom}>
+          <h3>Create a New Classroom</h3>
+          <input name="classroomName" placeholder="Classroom Name" required className="input" />
+          <button type="submit" className="cta-button">Create Classroom</button>
+        </form>
+
+        <div className="divider"></div>
+
+        {/* ✅ Assignment Creation Form */}
+        <form onSubmit={handleCreateAssignment}>
+          <h3>Create Assignment</h3>
+          <select name="classroomId" required className="input">
+            <option value="">Select Classroom</option>
+            {classrooms.map((cls) => (
+              <option key={cls.id} value={cls.id}>
+                {cls.name}
+              </option>
+            ))}
+          </select>
+          <input name="title" placeholder="Assignment Title" required className="input" />
+          <textarea name="description" placeholder="Description" required className="input"></textarea>
+          <select name="type" required className="input">
+            <option value="BOOK">Book</option>
+            <option value="QUIZ">Grammar Quiz</option>
+            <option value="UPLOAD">Upload Work</option>
+          </select>
+          <input name="dueDate" type="date" className="input" />
+          <button type="submit" className="cta-button">Assign</button>
+        </form>
+
+        <div className="divider"></div>
+
+        {/* ✅ View Progress Section */}
+        <div>
+          <h3>View Student Progress</h3>
+          {classrooms.map((cls) => (
+            <div key={cls.id} className="classroom-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong>{cls.name}</strong> <br />
+                  <span style={{ fontSize: "0.9rem", color: "#555" }}>
+                    Code: <code>{cls.code}</code>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(cls.code)}
+                      style={{ marginLeft: "10px", fontSize: "0.8rem" }}
+                    >
+                      📋 Copy
+                    </button>
+                  </span>
+                </div>
+                <button onClick={() => handleViewProgress(cls.id)} className="cta-button">
+                  View Progress
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {activeClassroomId && (
+            <div>
+              <h4>Progress for Classroom ID: {activeClassroomId}</h4>
+              <ul>
+                {progressData.map((entry, idx) => (
+                  <li key={idx}>
+                    {entry.studentName || entry.userId} — {entry.assignmentTitle} —{" "}
+                    {entry.completed ? "✅ Done" : "❌ Not done"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

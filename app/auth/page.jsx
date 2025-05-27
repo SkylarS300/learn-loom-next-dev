@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 
 export default function AuthPage() {
   const [isSignup, setIsSignup] = useState(false);
@@ -23,9 +23,11 @@ export default function AuthPage() {
       payload.grade = parseInt(form.grade.value);
       payload.role = role.toUpperCase();
     }
-    // ...
+
+    let res;
+
     if (isSignup) {
-      const res = await fetch("/api/users", {
+      res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -36,7 +38,7 @@ export default function AuthPage() {
         return;
       }
     } else {
-      const res = await signIn("credentials", {
+      res = await signIn("credentials", {
         redirect: false,
         email: payload.email,
         password: payload.password,
@@ -47,19 +49,24 @@ export default function AuthPage() {
         return;
       }
     }
-    router.refresh(); // Refresh session
-    router.push(role === "teacher" ? "/dashboard/teacher" : "/dashboard/student");
 
+    router.refresh();
 
-    if (res.ok) {
-      const data = await res.json();
-      localStorage.setItem("userId", data.id);
-      localStorage.setItem("role", data.role);
+    const session = await getSession();
+    console.log("✅ SESSION:", session);
 
-      if (data.role === "TEACHER") router.push("/dashboard/teacher");
-      else router.push("/dashboard/student");
+    if (session?.user) {
+      const { id, role } = session.user;
+      localStorage.setItem("userId", id);
+      localStorage.setItem("role", role);
+
+      if (role === "TEACHER") {
+        router.push("/dashboard/teacher");
+      } else {
+        router.push("/dashboard/student");
+      }
     } else {
-      alert("Something went wrong. Try again.");
+      alert("Login succeeded but session could not be loaded.");
     }
   }
 
