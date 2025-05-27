@@ -19,6 +19,9 @@ model assignment {
   completions assignmentcompletion[]
   classroom   classroom              @relation(fields: [classroomId], references: [id]) // ✅ ADD THIS
 
+  category String?  // e.g., “Subject-Verb Agreement”
+  subtopic String?  // optional specificity
+
   @@index([classroomId], map: "Assignment_classroomId_fkey")
 }
 

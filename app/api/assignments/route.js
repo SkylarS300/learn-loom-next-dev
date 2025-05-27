@@ -1,8 +1,16 @@
-import prisma from "@/lib/prisma";
+import prisma from "../../../lib/prisma";
 
 export async function POST(request) {
   try {
-    const { title, description, type, dueDate, classroomId } = await request.json();
+    const {
+      title,
+      description,
+      type,
+      dueDate,
+      classroomId,
+      category,
+      subtopic,
+    } = await request.json();
 
     if (!title || !type || !classroomId) {
       return new Response("Missing required fields", { status: 400 });
@@ -15,6 +23,8 @@ export async function POST(request) {
         type,
         dueDate: dueDate ? new Date(dueDate) : null,
         classroomId: parseInt(classroomId),
+        category: category || null,
+        subtopic: subtopic || null,
       },
     });
 
@@ -33,7 +43,6 @@ export async function POST(request) {
         skipDuplicates: true,
       });
     }
-
 
     return Response.json(assignment);
   } catch (error) {

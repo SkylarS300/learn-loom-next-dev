@@ -1,5 +1,5 @@
 // app/api/users/route.js
-import prisma from "@/lib/prisma";
+import prisma from "../../../lib/prisma";
 import bcrypt from "bcryptjs";
 
 

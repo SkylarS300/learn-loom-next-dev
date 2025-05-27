@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-<img src="/assets/images/learnloom.png" alt="LearnLoom Logo" />
-import { useState } from 'react';
+import { useState } from "react";
 
 export default function Navbar() {
   return (
     <header id="navbar">
       <div className="navbar-inner">
         <a className="logo" href="/">
-          <img src={logo.src} alt="LearnLoom Logo" className="logo-image" />
+          <img src="/assets/images/learnloom.png" alt="LearnLoom Logo" className="logo-image" />
         </a>
 
         <ul className="nav-links">
@@ -26,4 +25,3 @@ export default function Navbar() {
     </header>
   );
 }
-

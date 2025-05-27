@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function AuthPage() {
   const [isSignup, setIsSignup] = useState(false);
@@ -22,13 +23,33 @@ export default function AuthPage() {
       payload.grade = parseInt(form.grade.value);
       payload.role = role.toUpperCase();
     }
+    // ...
+    if (isSignup) {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    const endpoint = isSignup ? "/api/users" : "/api/login";
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      if (!res.ok) {
+        alert("Signup failed.");
+        return;
+      }
+    } else {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: payload.email,
+        password: payload.password,
+      });
+
+      if (res.error) {
+        alert("Login failed.");
+        return;
+      }
+    }
+    router.refresh(); // Refresh session
+    router.push(role === "teacher" ? "/dashboard/teacher" : "/dashboard/student");
+
 
     if (res.ok) {
       const data = await res.json();
