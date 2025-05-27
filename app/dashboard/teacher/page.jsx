@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import '@/app/globals.css';
+import Link from "next/link";
+import "@/app/globals.css";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function TeacherDashboard() {
     if (status === "loading") return;
 
     if (!teacherId || role !== "TEACHER") {
-      router.push("/login");
+      router.push("/auth");
       return;
     }
 
@@ -103,7 +104,7 @@ export default function TeacherDashboard() {
   }
 
   function handleLogout() {
-    signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: "/auth" });
   }
 
   if (isLoading || status === "loading") return <p>Loading...</p>;
@@ -113,14 +114,18 @@ export default function TeacherDashboard() {
       <header className="dashboard-header">
         <h2 className="logo">LearnLoom</h2>
         <span className="header-title">Teacher Dashboard</span>
+        <nav>
+          <Link href="/library">Library</Link> |{" "}
+          <Link href="/readingpal">Reading Pal</Link> |{" "}
+          <Link href="/grammar">Grammar</Link>
+        </nav>
         <button className="logout-button" onClick={handleLogout}>Logout</button>
       </header>
 
       <div className="dashboard-wrapper">
         <h1>Welcome, Teacher!</h1>
         <p>You can manage classrooms, assign readings, and track progress here.</p>
-
-        {/* The rest of your component stays unchanged */}
+        {/* The rest of your teacher dashboard content */}
       </div>
     </div>
   );

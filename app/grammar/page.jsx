@@ -1,6 +1,6 @@
 "use client";
 
-import quizzes from "@/content/quizzes.js";
+import quizzes from "@/src/content/quizzes.js";
 import Navbar from "../Navbar";
 import { useEffect } from "react";
 

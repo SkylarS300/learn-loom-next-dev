@@ -143,6 +143,8 @@ model readingprogress {
 
   user user @relation(fields: [userId], references: [id])
 
-  @@index([userId])
+  @@index([userId])  // ✅ keep this
   @@index([bookIndex, chapterIndex])
+  @@unique([userId, bookIndex, chapterIndex])  // ✅ add this
 }
+

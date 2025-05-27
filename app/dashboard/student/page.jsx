@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -102,7 +103,12 @@ export default function StudentDashboard() {
       <header className="dashboard-header">
         <h2 className="logo">LearnLoom</h2>
         <span className="header-title">Student Dashboard</span>
-        <button className="logout-button" onClick={handleLogout}>Logout</button>
+        <nav className="dashboard-nav">
+          <Link href="/library">Library</Link>
+          <Link href="/readingpal">Reading Pal</Link>
+          <Link href="/grammar">Grammar</Link>
+          <button className="logout-button" onClick={handleLogout}>Logout</button>
+        </nav>
       </header>
 
       <div className="dashboard-wrapper">

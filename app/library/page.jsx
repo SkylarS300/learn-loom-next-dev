@@ -1,6 +1,6 @@
 "use client";
 
-import books from "../../public/Content/book-list";
+import books from "../../src/content/book-list";
 import Navbar from "../Navbar";
 import { useRouter } from "next/navigation";
 
