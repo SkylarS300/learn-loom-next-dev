@@ -91,6 +91,7 @@ export default function TeacherDashboard() {
   }
 
   async function handleViewProgress(classroomId) {
+    setProgressData([]); // 🔧 Clear old data
     const res = await fetch(`/api/completions/mark?classroomId=${classroomId}`);
     if (res.ok) {
       const data = await res.json();
@@ -104,6 +105,24 @@ export default function TeacherDashboard() {
   function handleLogout() {
     signOut({ callbackUrl: "/auth" });
   }
+
+  const groupedByStudent = progressData.reduce((acc, entry) => {
+    const key = entry.userId || "unknown";
+    if (!acc[key]) {
+      acc[key] = {
+        studentName: entry.studentName || key,
+        assignments: [],
+      };
+    }
+    acc[key].assignments.push({
+      assignmentTitle: entry.assignmentTitle,
+      completed: entry.completed,
+      completedAt: entry.completedAt,
+      quizScore: entry.quizScore,
+      type: entry.assignmentType,
+    });
+    return acc;
+  }, {});
 
   if (isLoading || status === "loading") return <p>Loading...</p>;
 
@@ -124,7 +143,6 @@ export default function TeacherDashboard() {
         <h1>Welcome, Teacher!</h1>
         <p>You can manage classrooms, assign readings, and track progress here.</p>
 
-        {/* ✅ Classroom Creation Form */}
         <form onSubmit={handleCreateClassroom}>
           <h3>Create a New Classroom</h3>
           <input name="classroomName" placeholder="Classroom Name" required className="input" />
@@ -133,21 +151,18 @@ export default function TeacherDashboard() {
 
         <div className="divider"></div>
 
-        {/* ✅ Assignment Creation Form */}
         <form onSubmit={handleCreateAssignment}>
           <h3>Create Assignment</h3>
           <select name="classroomId" required className="input">
             <option value="">Select Classroom</option>
             {classrooms.map((cls) => (
-              <option key={cls.id} value={cls.id}>
-                {cls.name}
-              </option>
+              <option key={cls.id} value={cls.id}>{cls.name}</option>
             ))}
           </select>
           <input name="title" placeholder="Assignment Title" required className="input" />
           <textarea name="description" placeholder="Description" required className="input"></textarea>
           <select name="type" required className="input">
-            <option value="BOOK">Book</option>
+            <option value="READING">Reading</option>
             <option value="QUIZ">Grammar Quiz</option>
             <option value="UPLOAD">Upload Work</option>
           </select>
@@ -157,42 +172,36 @@ export default function TeacherDashboard() {
 
         <div className="divider"></div>
 
-        {/* ✅ View Progress Section */}
         <div>
           <h3>View Student Progress</h3>
           {classrooms.map((cls) => (
             <div key={cls.id} className="classroom-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <strong>{cls.name}</strong> <br />
-                  <span style={{ fontSize: "0.9rem", color: "#555" }}>
-                    Code: <code>{cls.code}</code>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(cls.code)}
-                      style={{ marginLeft: "10px", fontSize: "0.8rem" }}
-                    >
-                      📋 Copy
-                    </button>
-                  </span>
-                </div>
-                <button onClick={() => handleViewProgress(cls.id)} className="cta-button">
-                  View Progress
-                </button>
-              </div>
+              <button onClick={() => handleViewProgress(cls.id)} className="cta-button">
+                View Progress for {cls.name}
+              </button>
             </div>
           ))}
 
           {activeClassroomId && (
             <div>
               <h4>Progress for Classroom ID: {activeClassroomId}</h4>
-              <ul>
-                {progressData.map((entry, idx) => (
-                  <li key={idx}>
-                    {entry.studentName || entry.userId} — {entry.assignmentTitle} —{" "}
-                    {entry.completed ? "✅ Done" : "❌ Not done"}
-                  </li>
-                ))}
-              </ul>
+              {Object.entries(groupedByStudent).map(([key, student], i) => (
+                <details key={i} style={{ marginBottom: "1rem" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: "bold" }}>{student.studentName}</summary>
+                  <ul style={{ marginTop: "0.5rem", paddingLeft: "1rem" }}>
+                    {student.assignments.map((a, j) => {
+                      const icon = a.type === "READING" ? "📖" : a.type === "QUIZ" ? "🧪" : "⬆️";
+                      const date = a.completedAt ? new Date(a.completedAt).toLocaleDateString() : "—";
+                      const score = a.quizScore !== undefined && a.quizScore !== null ? `Score: ${a.quizScore}%` : "";
+                      return (
+                        <li key={j}>
+                          {icon} <strong>{a.assignmentTitle}</strong> — {a.completed ? "✅ Done" : "❌ Not done"} {score && `• ${score}`} • {date}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              ))}
             </div>
           )}
         </div>

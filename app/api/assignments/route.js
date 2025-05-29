@@ -1,66 +1,113 @@
-import prisma from "../../../lib/prisma";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(request) {
   try {
-    const {
-      title,
-      description,
-      type,
-      dueDate,
-      classroomId,
-      category,
-      subtopic,
-    } = await request.json();
+    const session = await getServerSession(authOptions);
+    const { assignmentId, completedAt } = await request.json();
 
-    console.log("Received payload:", {
-    title,
-    type,
-    classroomId,
-    dueDate,
-    description,
-    category,
-    subtopic,
-  });
+    const userId = Number(session?.user?.id);
+    const aId = Number(assignmentId);
+    const now = completedAt ? new Date(completedAt) : new Date();
 
-    if (!title || !type || !classroomId) {
-      return new Response("Missing required fields", { status: 400 });
+    if (!aId || !userId) {
+      return new Response("Missing assignmentId or user session", { status: 400 });
     }
 
-    const allowedTypes = ["BOOK", "QUIZ", "UPLOAD"];
-    if (!allowedTypes.includes(type)) {
-      return new Response("Invalid assignment type", { status: 400 });
+    const assignment = await prisma.assignment.findUnique({ where: { id: aId } });
+
+    let score = null;
+    if (assignment?.type === "QUIZ") {
+      const latest = await prisma.grammarprogress.findFirst({
+        where: { osis: userId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (latest) {
+        score = latest.score ?? null;
+      }
     }
 
-    const assignment = await prisma.assignment.create({
+    const existing = await prisma.assignmentcompletion.findFirst({
+      where: { assignmentId: aId, userId },
+    });
+
+    if (existing) {
+      await prisma.assignmentcompletion.update({
+        where: { id: existing.id },
+        data: {
+          completedAt: existing.completedAt || now,
+          quizScore: score,
+        },
+      });
+      return Response.json({ updated: true });
+    }
+
+    const newCompletion = await prisma.assignmentcompletion.create({
       data: {
-        title,
-        description: description || "",
-        type, // validated now
-        dueDate: dueDate ? new Date(dueDate) : null,
-        classroomId: parseInt(classroomId),
-        category: category || null,
-        subtopic: subtopic || null,
+        assignmentId: aId,
+        userId,
+        completedAt: now,
+        quizScore: score,
       },
     });
 
-    if (type === "QUIZ") {
-      const students = await prisma.studentclassroom.findMany({
-        where: { classroomId: parseInt(classroomId) },
-        select: { studentId: true },
-      });
+    return Response.json(newCompletion);
+  } catch (error) {
+    console.error("Completion error:", error);
+    return new Response("Internal server error", { status: 500 });
+  }
+}
 
-      await prisma.assignmentcompletion.createMany({
-        data: students.map((s) => ({
-          userId: s.studentId,
-          assignmentId: assignment.id,
-        })),
-        skipDuplicates: true,
-      });
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const classroomId = Number(searchParams.get("classroomId"));
+
+    if (!classroomId) {
+      return new Response("Missing classroomId", { status: 400 });
     }
 
-    return Response.json(assignment);
+    const assignments = await prisma.assignment.findMany({
+      where: { classroomId },
+      select: { id: true, title: true },
+    });
+
+    const enrollments = await prisma.studentclassroom.findMany({
+      where: { classroomId },
+      include: { student: true },
+    });
+
+    const completions = await prisma.assignmentcompletion.findMany({
+      where: {
+        assignmentId: { in: assignments.map((a) => a.id) },
+        userId: { in: enrollments.map((e) => e.studentId) },
+      },
+    });
+
+    const groupedByStudent = enrollments.map((enrollment) => {
+      const { studentId, student } = enrollment;
+      const assignmentProgress = assignments.map((assignment) => {
+        const match = completions.find(
+          (c) => c.assignmentId === assignment.id && c.userId === studentId
+        );
+        return {
+          assignmentId: assignment.id,
+          assignmentTitle: assignment.title,
+          completed: Boolean(match?.completedAt),
+        };
+      });
+
+      return {
+        studentId,
+        studentName: `${student.firstName} ${student.lastName}`,
+        progress: assignmentProgress,
+      };
+    });
+
+    return Response.json(groupedByStudent);
   } catch (error) {
-    console.error("Assignment creation error:", error);
+    console.error("Fetch classroom progress error:", error);
     return new Response("Internal server error", { status: 500 });
   }
 }

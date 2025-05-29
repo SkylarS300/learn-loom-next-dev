@@ -15,9 +15,7 @@ export async function POST(request) {
       return new Response("Missing assignmentId or user session", { status: 400 });
     }
 
-    const assignment = await prisma.assignment.findUnique({
-      where: { id: aId },
-    });
+    const assignment = await prisma.assignment.findUnique({ where: { id: aId } });
 
     let score = null;
     if (assignment?.type === "QUIZ") {
@@ -31,10 +29,7 @@ export async function POST(request) {
     }
 
     const existing = await prisma.assignmentcompletion.findFirst({
-      where: {
-        assignmentId: aId,
-        userId,
-      },
+      where: { assignmentId: aId, userId },
     });
 
     if (existing) {
@@ -60,6 +55,79 @@ export async function POST(request) {
     return Response.json(newCompletion);
   } catch (error) {
     console.error("Completion error:", error);
+    return new Response("Internal server error", { status: 500 });
+  }
+}
+
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const classroomId = Number(searchParams.get("classroomId"));
+
+    if (!classroomId) {
+      return new Response("Missing classroomId", { status: 400 });
+    }
+
+    // Get all assignments for the classroom
+    const assignments = await prisma.assignment.findMany({
+      where: { classroomId },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+
+    // Get all enrolled students (if any)
+    const enrollments = await prisma.studentclassroom.findMany({
+      where: { classroomId },
+      include: { student: true },
+    });
+
+    // If no students enrolled, still return assignment list with placeholder progress
+    if (enrollments.length === 0) {
+      if (assignments.length === 0) {
+        return Response.json([]);
+      }
+
+      const fallback = assignments.map((assignment) => ({
+        assignmentId: assignment.id,
+        assignmentTitle: assignment.title,
+        userId: null,
+        studentName: "No students enrolled",
+        completed: false,
+      }));
+      return Response.json(fallback);
+    }
+
+
+    const completions = await prisma.assignmentcompletion.findMany({
+      where: {
+        assignmentId: { in: assignments.map((a) => a.id) },
+        userId: { in: enrollments.map((e) => e.studentId) },
+      },
+    });
+
+    // Combine into unified list
+    const result = [];
+    for (const student of enrollments) {
+      for (const assignment of assignments) {
+        const match = completions.find(
+          (c) => c.assignmentId === assignment.id && c.userId === student.studentId
+        );
+
+        result.push({
+          assignmentId: assignment.id,
+          assignmentTitle: assignment.title,
+          userId: student.studentId,
+          studentName: `${student.student.firstName} ${student.student.lastName}`,
+          completed: Boolean(match?.completedAt),
+        });
+      }
+    }
+
+    return Response.json(result);
+  } catch (error) {
+    console.error("Fetch classroom progress error:", error);
     return new Response("Internal server error", { status: 500 });
   }
 }
