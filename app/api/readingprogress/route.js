@@ -48,7 +48,7 @@ export async function POST(req) {
     const matchingAssignments = await prisma.assignment.findMany({
       where: {
         type: "BOOK",
-        bookIndex,
+        bookId: bookIndex, // Assuming bookIndex corresponds to bookId
         chapterIndex,
         classroomId: { in: classroomIds },
       },
@@ -57,23 +57,21 @@ export async function POST(req) {
 
     const assignmentIds = matchingAssignments.map((a) => a.id);
 
-    if (assignmentIds.length > 0) {
-      // ✅ 4. Update assignmentcompletion
-      await Promise.all(
-        assignmentIds.map((assignmentId) =>
-          prisma.assignmentcompletion.updateMany({
-            where: {
-              userId,
-              assignmentId,
-              completedAt: null, // prevent overwriting
-            },
-            data: {
-              completedAt: new Date(),
-            },
-          })
-        )
-      );
-    }
+    // ✅ 4. POST to /api/completions/mark for each matching assignment
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+    await Promise.all(
+      assignmentIds.map(async (assignmentId) => {
+        await fetch(`${baseUrl}/api/completions/mark`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: req.headers.get("cookie") || "", // carry session if needed
+          },
+          body: JSON.stringify({ assignmentId }),
+        });
+      })
+    );
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },

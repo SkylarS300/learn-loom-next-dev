@@ -131,3 +131,36 @@ export async function GET(request) {
     return new Response("Internal server error", { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const session = await getServerSession(authOptions);
+    const { assignmentId } = await request.json();
+
+    const userId = Number(session?.user?.id);
+    const aId = Number(assignmentId);
+
+    if (!aId || !userId) {
+      return new Response("Missing assignmentId or user session", { status: 400 });
+    }
+
+    const existing = await prisma.assignmentcompletion.findFirst({
+      where: { assignmentId: aId, userId },
+    });
+
+    if (!existing || !existing.completedAt) {
+      return new Response("Nothing to unmark", { status: 400 });
+    }
+
+    await prisma.assignmentcompletion.update({
+      where: { id: existing.id },
+      data: { completedAt: null, quizScore: null },
+    });
+
+    return Response.json({ unmarked: true });
+  } catch (error) {
+    console.error("Unmark error:", error);
+    return new Response("Internal server error", { status: 500 });
+  }
+}
+

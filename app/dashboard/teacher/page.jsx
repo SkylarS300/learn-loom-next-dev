@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import books from "/src/content/book-content.js"
 import Link from "next/link";
 import "@/app/globals.css";
 
@@ -13,6 +14,10 @@ export default function TeacherDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [progressData, setProgressData] = useState([]);
   const [activeClassroomId, setActiveClassroomId] = useState(null);
+
+  const [assignmentType, setAssignmentType] = useState("BOOK");
+  const [bookIndex, setBookIndex] = useState(null);
+  const [chapterIndex, setChapterIndex] = useState(null);
 
   const teacherId = session?.user?.id;
   const role = session?.user?.role;
@@ -74,6 +79,15 @@ export default function TeacherDashboard() {
       classroomId: Number(classroomId),
     };
 
+    if (payload.type === "BOOK") {
+      if (bookIndex === null || chapterIndex === null) {
+        alert("Please select a book and chapter.");
+        return;
+      }
+      payload.bookIndex = parseInt(bookIndex);
+      payload.chapterIndex = parseInt(chapterIndex);
+    }
+
     const result = await fetch("/api/assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -83,6 +97,8 @@ export default function TeacherDashboard() {
     if (result.ok) {
       alert("Assignment created!");
       form.reset();
+      setBookIndex(null);
+      setChapterIndex(null);
       fetchClassroomsWithAssignments(teacherId);
     } else {
       const text = await result.text();
@@ -91,7 +107,7 @@ export default function TeacherDashboard() {
   }
 
   async function handleViewProgress(classroomId) {
-    setProgressData([]); // 🔧 Clear old data
+    setProgressData([]);
     const res = await fetch(`/api/completions/mark?classroomId=${classroomId}`);
     if (res.ok) {
       const data = await res.json();
@@ -156,16 +172,52 @@ export default function TeacherDashboard() {
           <select name="classroomId" required className="input">
             <option value="">Select Classroom</option>
             {classrooms.map((cls) => (
-              <option key={cls.id} value={cls.id}>{cls.name}</option>
+              <option key={cls.id} value={cls.id}>{cls.name} — Code: {cls.code}</option>
             ))}
           </select>
           <input name="title" placeholder="Assignment Title" required className="input" />
           <textarea name="description" placeholder="Description" required className="input"></textarea>
-          <select name="type" required className="input">
-            <option value="READING">Reading</option>
+          <select name="type" required className="input" value={assignmentType} onChange={(e) => setAssignmentType(e.target.value)}>
+            <option value="BOOK">Reading</option>
             <option value="QUIZ">Grammar Quiz</option>
             <option value="UPLOAD">Upload Work</option>
           </select>
+
+          {assignmentType === "BOOK" && (
+            <>
+              <label>Select Book:</label>
+              <select
+                value={bookIndex ?? ""}
+                onChange={(e) => {
+                  setBookIndex(e.target.value);
+                  setChapterIndex(null);
+                }}
+                className="input"
+              >
+                <option value="" disabled>Select a book</option>
+                {books.map((book, index) => (
+                  <option key={index} value={index}>{book.title}</option>
+                ))}
+              </select>
+
+              {bookIndex !== null && (
+                <>
+                  <label>Select Chapter:</label>
+                  <select
+                    value={chapterIndex ?? ""}
+                    onChange={(e) => setChapterIndex(parseInt(e.target.value))}
+                    className="input"
+                  >
+                    <option value="" disabled>Select a chapter</option>
+                    {books[bookIndex]?.chapters.map((chapter, idx) => (
+                      <option key={idx} value={idx}>{chapter.chapterTitle}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </>
+          )}
+
           <input name="dueDate" type="date" className="input" />
           <button type="submit" className="cta-button">Assign</button>
         </form>
@@ -176,8 +228,9 @@ export default function TeacherDashboard() {
           <h3>View Student Progress</h3>
           {classrooms.map((cls) => (
             <div key={cls.id} className="classroom-card">
+              <p><strong>{cls.name}</strong> — <code>Code: {cls.code}</code></p>
               <button onClick={() => handleViewProgress(cls.id)} className="cta-button">
-                View Progress for {cls.name}
+                View Progress
               </button>
             </div>
           ))}
@@ -190,7 +243,7 @@ export default function TeacherDashboard() {
                   <summary style={{ cursor: "pointer", fontWeight: "bold" }}>{student.studentName}</summary>
                   <ul style={{ marginTop: "0.5rem", paddingLeft: "1rem" }}>
                     {student.assignments.map((a, j) => {
-                      const icon = a.type === "READING" ? "📖" : a.type === "QUIZ" ? "🧪" : "⬆️";
+                      const icon = a.type === "BOOK" ? "📖" : a.type === "QUIZ" ? "🧪" : "⬆️";
                       const date = a.completedAt ? new Date(a.completedAt).toLocaleDateString() : "—";
                       const score = a.quizScore !== undefined && a.quizScore !== null ? `Score: ${a.quizScore}%` : "";
                       return (

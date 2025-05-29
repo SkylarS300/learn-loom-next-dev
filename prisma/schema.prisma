@@ -17,13 +17,15 @@ model assignment {
   createdAt   DateTime        @default(now())
 
   completions assignmentcompletion[]
-  classroom   classroom              @relation(fields: [classroomId], references: [id]) // ✅ ADD THIS
+  classroom   classroom              @relation(fields: [classroomId], references: [id])
 
-  category String?  // e.g., “Subject-Verb Agreement”
-  subtopic String?  // optional specificity
+  category String?       // for quizzes
+  subtopic String?       // for quizzes
 
-  @@index([classroomId], map: "Assignment_classroomId_fkey")
+  bookId    Int?         // for reading assignments: refers to index in book-content
+  chapterIndex Int?      // for reading assignments: refers to chapter in book
 }
+
 
 model bookcontent {
   id              Int     @id @default(autoincrement())

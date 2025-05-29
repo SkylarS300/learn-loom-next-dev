@@ -78,9 +78,10 @@ export default function StudentDashboard() {
     }
   }
 
-  async function handleMarkComplete(assignmentId) {
-    const res = await fetch("/api/completions", {
-      method: "POST",
+  async function handleToggleComplete(assignmentId, completed) {
+    const method = completed ? "DELETE" : "POST";
+    const res = await fetch("/api/completions/mark", {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assignmentId, studentId: userId }),
     });
@@ -88,7 +89,7 @@ export default function StudentDashboard() {
     if (res.ok) {
       fetchStudentAssignments(userId);
     } else {
-      alert("Failed to mark as complete.");
+      alert(`Failed to ${completed ? "unmark" : "mark"} as complete.`);
     }
   }
 
@@ -134,8 +135,8 @@ export default function StudentDashboard() {
           <h3>Your Classrooms</h3>
           <ul className="classroom-list">
             {classrooms.map((cls) => (
-              <li key={`${cls.id}-${cls.code}`} className="classroom-card">
-                {cls.name} — <code>{cls.code}</code>
+              <li key={cls.id} className="classroom-card">
+                {cls.name}
               </li>
             ))}
           </ul>
@@ -157,11 +158,19 @@ export default function StudentDashboard() {
                   )}
                   <br />
                   {a.completedAt ? (
-                    <span style={{ color: "green" }}>✅ Completed</span>
+                    <>
+                      <span style={{ color: "green" }}>✅ Completed</span>
+                      <button
+                        className="cta-button small"
+                        onClick={() => handleToggleComplete(a.id, true)}
+                      >
+                        Undo
+                      </button>
+                    </>
                   ) : (
                     <button
                       className="cta-button small"
-                      onClick={() => handleMarkComplete(a.id)}
+                      onClick={() => handleToggleComplete(a.id, false)}
                     >
                       Mark as Complete
                     </button>

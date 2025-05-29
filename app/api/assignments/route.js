@@ -5,56 +5,54 @@ import { authOptions } from "@/lib/auth";
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    const { assignmentId, completedAt } = await request.json();
+    const {
+      classroomId,
+      type,
+      title,
+      description,
+      dueDate,
+      bookId,
+      chapterIndex,
+      quizCategory,
+      quizSubtopic,
+    } = await request.json();
 
-    const userId = Number(session?.user?.id);
-    const aId = Number(assignmentId);
-    const now = completedAt ? new Date(completedAt) : new Date();
-
-    if (!aId || !userId) {
-      return new Response("Missing assignmentId or user session", { status: 400 });
+    if (!session?.user?.id || !classroomId || !type || !title || !description) {
+      return new Response("Missing required fields", { status: 400 });
     }
 
-    const assignment = await prisma.assignment.findUnique({ where: { id: aId } });
-
-    let score = null;
-    if (assignment?.type === "QUIZ") {
-      const latest = await prisma.grammarprogress.findFirst({
-        where: { osis: userId },
-        orderBy: { createdAt: "desc" },
-      });
-      if (latest) {
-        score = latest.score ?? null;
-      }
-    }
-
-    const existing = await prisma.assignmentcompletion.findFirst({
-      where: { assignmentId: aId, userId },
-    });
-
-    if (existing) {
-      await prisma.assignmentcompletion.update({
-        where: { id: existing.id },
-        data: {
-          completedAt: existing.completedAt || now,
-          quizScore: score,
-        },
-      });
-      return Response.json({ updated: true });
-    }
-
-    const newCompletion = await prisma.assignmentcompletion.create({
+    const assignment = await prisma.assignment.create({
       data: {
-        assignmentId: aId,
-        userId,
-        completedAt: now,
-        quizScore: score,
+        classroomId: Number(classroomId),
+        type, // should match the enum: "BOOK", "QUIZ", "UPLOAD"
+        title,
+        description,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        bookId: type === "BOOK" ? bookId : undefined,
+        chapterIndex: type === "BOOK" ? chapterIndex : undefined,
+        quizCategory: type === "QUIZ" ? quizCategory : undefined,
+        quizSubtopic: type === "QUIZ" ? quizSubtopic : undefined,
       },
     });
 
-    return Response.json(newCompletion);
+    const students = await prisma.studentclassroom.findMany({
+      where: { classroomId: Number(classroomId) },
+    });
+
+    await Promise.all(
+      students.map((student) =>
+        prisma.assignmentcompletion.create({
+          data: {
+            assignmentId: assignment.id,
+            userId: student.studentId,
+          },
+        })
+      )
+    );
+
+    return Response.json(assignment);
   } catch (error) {
-    console.error("Completion error:", error);
+    console.error("Assignment creation error:", error);
     return new Response("Internal server error", { status: 500 });
   }
 }

@@ -88,6 +88,7 @@ export default function ReadingPalClient() {
     if (textRef.current) textRef.current.innerText = chapter.content;
 
     if (session?.user?.id) {
+      console.log("Posting reading progress:", bookIndex, chapterIndex);
       await fetch("/api/readingprogress", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
