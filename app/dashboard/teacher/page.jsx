@@ -12,6 +12,8 @@ export default function TeacherDashboard() {
   const { data: session, status } = useSession();
   const [classrooms, setClassrooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState("ALL");
+  const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [progressData, setProgressData] = useState([]);
   const [activeClassroomId, setActiveClassroomId] = useState(null);
 
@@ -107,7 +109,13 @@ export default function TeacherDashboard() {
   }
 
   async function handleViewProgress(classroomId) {
-    setProgressData([]);
+    if (activeClassroomId === classroomId) {
+      // If already active, toggle closed
+      setActiveClassroomId(null);
+      setProgressData([]);
+      return;
+    }
+
     const res = await fetch(`/api/completions/mark?classroomId=${classroomId}`);
     if (res.ok) {
       const data = await res.json();
@@ -118,11 +126,21 @@ export default function TeacherDashboard() {
     }
   }
 
+
   function handleLogout() {
     signOut({ callbackUrl: "/auth" });
   }
 
-  const groupedByStudent = progressData.reduce((acc, entry) => {
+  const filteredData = progressData.filter((entry) => {
+    const typeMatch = selectedType === "ALL" || entry.assignmentType === selectedType;
+    const statusMatch =
+      selectedStatus === "ALL" ||
+      (selectedStatus === "COMPLETED" && entry.completed) ||
+      (selectedStatus === "INCOMPLETE" && !entry.completed);
+    return typeMatch && statusMatch;
+  });
+
+  const groupedByStudent = filteredData.reduce((acc, entry) => {
     const key = entry.userId || "unknown";
     if (!acc[key]) {
       acc[key] = {
@@ -159,15 +177,13 @@ export default function TeacherDashboard() {
         <h1>Welcome, Teacher!</h1>
         <p>You can manage classrooms, assign readings, and track progress here.</p>
 
-        <form onSubmit={handleCreateClassroom}>
+        <form onSubmit={handleCreateClassroom} style={{ marginBottom: "2rem" }}>
           <h3>Create a New Classroom</h3>
           <input name="classroomName" placeholder="Classroom Name" required className="input" />
           <button type="submit" className="cta-button">Create Classroom</button>
         </form>
 
-        <div className="divider"></div>
-
-        <form onSubmit={handleCreateAssignment}>
+        <form onSubmit={handleCreateAssignment} style={{ marginBottom: "2rem" }}>
           <h3>Create Assignment</h3>
           <select name="classroomId" required className="input">
             <option value="">Select Classroom</option>
@@ -222,8 +238,6 @@ export default function TeacherDashboard() {
           <button type="submit" className="cta-button">Assign</button>
         </form>
 
-        <div className="divider"></div>
-
         <div>
           <h3>View Student Progress</h3>
           {classrooms.map((cls) => (
@@ -236,11 +250,32 @@ export default function TeacherDashboard() {
           ))}
 
           {activeClassroomId && (
-            <div>
-              <h4>Progress for Classroom ID: {activeClassroomId}</h4>
+            <div style={{ marginTop: "1rem" }}>
+              <h4>Progress for {classrooms.find(c => c.id === activeClassroomId)?.name}</h4>
+              <div className="progress-filter-bar">
+                <label>
+                  Type:
+                  <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+                    <option value="ALL">All</option>
+                    <option value="BOOK">Reading</option>
+                    <option value="QUIZ">Grammar Quiz</option>
+                    <option value="UPLOAD">Upload</option>
+                  </select>
+                </label>
+
+                <label>
+                  Completion:
+                  <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+                    <option value="ALL">All</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="INCOMPLETE">Not Completed</option>
+                  </select>
+                </label>
+              </div>
+
               {Object.entries(groupedByStudent).map(([key, student], i) => (
                 <details key={i} style={{ marginBottom: "1rem" }}>
-                  <summary style={{ cursor: "pointer", fontWeight: "bold" }}>{student.studentName}</summary>
+                  <summary className="student-summary">{student.studentName}</summary>
                   <ul style={{ marginTop: "0.5rem", paddingLeft: "1rem" }}>
                     {student.assignments.map((a, j) => {
                       const icon = a.type === "BOOK" ? "📖" : a.type === "QUIZ" ? "🧪" : "⬆️";

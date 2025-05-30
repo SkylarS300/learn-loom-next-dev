@@ -871,3 +871,37 @@ html {
   background-color: #d34748;
 }
 
+/* === TEACHER TOOLS STYLING === */
+
+.progress-filter-bar {
+  background-color: #f9f9ff;
+  padding: 1rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+details summary {
+  padding: 0.5rem 1rem;
+  background-color: #f0f4ff;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  margin-bottom: 0.5rem;
+  width: fit-content;
+  transition: background 0.2s;
+}
+
+details summary:hover {
+  background-color: #e0e8ff;
+}
+
+.divider {
+  margin: 2rem 0;
+  border-top: 1px solid #ddd;
+}
+
