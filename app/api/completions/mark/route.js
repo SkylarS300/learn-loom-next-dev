@@ -17,12 +17,29 @@ export async function POST(request) {
 
     const assignment = await prisma.assignment.findUnique({ where: { id: aId } });
 
+    if (!assignment) {
+      return new Response("Assignment not found", { status: 404 });
+    }
+
     let score = null;
-    if (assignment?.type === "QUIZ") {
+
+    if (assignment.type === "QUIZ") {
+      const category = assignment.category;
+      const subtopic = assignment.subtopic;
+
+      if (!category || !subtopic) {
+        return new Response("Missing quiz category or subtopic on assignment", { status: 400 });
+      }
+
       const latest = await prisma.grammarprogress.findFirst({
-        where: { osis: userId },
+        where: {
+          osis: userId,
+          concept: category,
+          subTopic: subtopic,
+        },
         orderBy: { createdAt: "desc" },
       });
+
       if (latest) {
         score = latest.score ?? null;
       }
@@ -54,7 +71,7 @@ export async function POST(request) {
 
     return Response.json(newCompletion);
   } catch (error) {
-    console.error("Completion error:", error);
+    console.error("❌ Completion POST error:", error);
     return new Response("Internal server error", { status: 500 });
   }
 }
@@ -68,27 +85,27 @@ export async function GET(request) {
       return new Response("Missing classroomId", { status: 400 });
     }
 
-    // Get all assignments for the classroom
     const assignments = await prisma.assignment.findMany({
       where: { classroomId },
       select: {
         id: true,
         title: true,
+        type: true,
+        dueDate: true,
+        category: true,
+        subtopic: true,
+        bookId: true,
+        chapterIndex: true,
       },
     });
 
-    // Get all enrolled students (if any)
+
     const enrollments = await prisma.studentclassroom.findMany({
       where: { classroomId },
       include: { student: true },
     });
 
-    // If no students enrolled, still return assignment list with placeholder progress
     if (enrollments.length === 0) {
-      if (assignments.length === 0) {
-        return Response.json([]);
-      }
-
       const fallback = assignments.map((assignment) => ({
         assignmentId: assignment.id,
         assignmentTitle: assignment.title,
@@ -99,7 +116,6 @@ export async function GET(request) {
       return Response.json(fallback);
     }
 
-
     const completions = await prisma.assignmentcompletion.findMany({
       where: {
         assignmentId: { in: assignments.map((a) => a.id) },
@@ -107,8 +123,8 @@ export async function GET(request) {
       },
     });
 
-    // Combine into unified list
     const result = [];
+
     for (const student of enrollments) {
       for (const assignment of assignments) {
         const match = completions.find(
@@ -121,6 +137,7 @@ export async function GET(request) {
           userId: student.studentId,
           studentName: `${student.student.firstName} ${student.student.lastName}`,
           completed: Boolean(match?.completedAt),
+          quizScore: match?.quizScore ?? null,
         });
       }
     }
@@ -163,4 +180,3 @@ export async function DELETE(request) {
     return new Response("Internal server error", { status: 500 });
   }
 }
-

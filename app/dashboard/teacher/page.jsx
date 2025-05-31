@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import books from "/src/content/book-content.js"
+import books from "/src/content/book-content.js";
+import quizzes from "/src/content/quizzes.js";
 import Link from "next/link";
 import "@/app/globals.css";
 
@@ -20,6 +21,8 @@ export default function TeacherDashboard() {
   const [assignmentType, setAssignmentType] = useState("BOOK");
   const [bookIndex, setBookIndex] = useState(null);
   const [chapterIndex, setChapterIndex] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubtopic, setSelectedSubtopic] = useState("");
 
   const teacherId = session?.user?.id;
   const role = session?.user?.role;
@@ -86,8 +89,18 @@ export default function TeacherDashboard() {
         alert("Please select a book and chapter.");
         return;
       }
-      payload.bookIndex = parseInt(bookIndex);
+      payload.bookId = parseInt(bookIndex); // ✅ FIX — use `bookId`, not `bookIndex`
       payload.chapterIndex = parseInt(chapterIndex);
+    }
+
+
+    if (payload.type === "QUIZ") {
+      if (!selectedCategory || !selectedSubtopic) {
+        alert("Please select both a category and subtopic for the quiz.");
+        return;
+      }
+      payload.category = selectedCategory;
+      payload.subtopic = selectedSubtopic;
     }
 
     const result = await fetch("/api/assignments", {
@@ -101,6 +114,8 @@ export default function TeacherDashboard() {
       form.reset();
       setBookIndex(null);
       setChapterIndex(null);
+      setSelectedCategory("");
+      setSelectedSubtopic("");
       fetchClassroomsWithAssignments(teacherId);
     } else {
       const text = await result.text();
@@ -110,7 +125,6 @@ export default function TeacherDashboard() {
 
   async function handleViewProgress(classroomId) {
     if (activeClassroomId === classroomId) {
-      // If already active, toggle closed
       setActiveClassroomId(null);
       setProgressData([]);
       return;
@@ -125,7 +139,6 @@ export default function TeacherDashboard() {
       alert("Failed to fetch classroom progress.");
     }
   }
-
 
   function handleLogout() {
     signOut({ callbackUrl: "/auth" });
@@ -166,9 +179,7 @@ export default function TeacherDashboard() {
         <h2 className="logo">LearnLoom</h2>
         <span className="header-title">Teacher Dashboard</span>
         <nav>
-          <Link href="/library">Library</Link> |{" "}
-          <Link href="/readingpal">Reading Pal</Link> |{" "}
-          <Link href="/grammar">Grammar</Link>
+          <Link href="/library">Library</Link> | <Link href="/readingpal">Reading Pal</Link> | <Link href="/grammar">Grammar</Link>
         </nav>
         <button className="logout-button" onClick={handleLogout}>Logout</button>
       </header>
@@ -227,6 +238,42 @@ export default function TeacherDashboard() {
                     <option value="" disabled>Select a chapter</option>
                     {books[bookIndex]?.chapters.map((chapter, idx) => (
                       <option key={idx} value={idx}>{chapter.chapterTitle}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </>
+          )}
+
+          {assignmentType === "QUIZ" && (
+            <>
+              <label>Select Category:</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setSelectedSubtopic(""); // reset subtopic
+                }}
+              >
+                <option value="">Select a category</option>
+                {Object.keys(quizzes).map((category) => (
+                  <option key={category} value={category}>
+                    {quizzes[category].title}
+                  </option>
+                ))}
+              </select>
+
+              {selectedCategory && quizzes[selectedCategory]?.subConcepts && (
+                <>
+                  <label>Select Subtopic:</label>
+                  <select
+                    value={selectedSubtopic}
+                    onChange={(e) => setSelectedSubtopic(e.target.value)}
+                    className="input"
+                  >
+                    <option value="" disabled>Select a subtopic</option>
+                    {quizzes[selectedCategory].subConcepts.map((sub, idx) => (
+                      <option key={idx} value={sub.subConcept}>{sub.subConcept}</option>
                     ))}
                   </select>
                 </>

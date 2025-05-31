@@ -2,71 +2,71 @@
 
 import quizzes from "@/src/content/quizzes.js";
 import Navbar from "../Navbar";
+import logo from "@/public/assets/images/learnloom.png";
 import { useEffect } from "react";
 
 export default function Grammar() {
   let selectedCategory = null;
   let userAnswers = {};
 
-function checkQuestions(event) {
-  event.preventDefault();
-  const questions = selectedCategory.questions;
-  let allCorrect = true;
+  function checkQuestions(event) {
+    event.preventDefault();
+    const questions = selectedCategory.questions;
+    let allCorrect = true;
 
-  questions.forEach((question, index) => {
-    const explanationDiv = document.getElementById(`explanation-${index}`);
-    let userAnswer;
+    questions.forEach((question, index) => {
+      const explanationDiv = document.getElementById(`explanation-${index}`);
+      let userAnswer;
 
-    if (question.type === "multiple-choice") {
-      const userAnswerElement = document.querySelector(`input[name="q${index}"]:checked`);
+      if (question.type === "multiple-choice") {
+        const userAnswerElement = document.querySelector(`input[name="q${index}"]:checked`);
 
-      if (userAnswerElement) {
-        userAnswer = parseInt(userAnswerElement.value);
-        userAnswers[`q${index}`] = userAnswer;
-        const correctAnswer = question.correctAnswer;
+        if (userAnswerElement) {
+          userAnswer = parseInt(userAnswerElement.value);
+          userAnswers[`q${index}`] = userAnswer;
+          const correctAnswer = question.correctAnswer;
 
-        if (userAnswer === correctAnswer) {
-          explanationDiv.textContent = "Correct!";
-          explanationDiv.className = "correct";
+          if (userAnswer === correctAnswer) {
+            explanationDiv.textContent = "Correct!";
+            explanationDiv.className = "correct";
+          } else {
+            allCorrect = false;
+            explanationDiv.textContent = `Incorrect: ${question.explanation}`;
+            explanationDiv.className = "incorrect";
+          }
         } else {
           allCorrect = false;
-          explanationDiv.textContent = `Incorrect: ${question.explanation}`;
-          explanationDiv.className = "incorrect";
+          explanationDiv.textContent = "Please provide an answer!";
+          explanationDiv.className = "warning";
         }
-      } else {
-        allCorrect = false;
-        explanationDiv.textContent = "Please provide an answer!";
-        explanationDiv.className = "warning";
-      }
-    } else if (question.type === "short-response") {
-      const userAnswerElement = document.querySelector(`input[name="q${index}"]`);
+      } else if (question.type === "short-response") {
+        const userAnswerElement = document.querySelector(`input[name="q${index}"]`);
 
-      if (userAnswerElement) {
-        userAnswer = userAnswerElement.value.trim();
-        userAnswers[`q${index}`] = userAnswer;
-        const correctAnswer = question.correctAnswer;
+        if (userAnswerElement) {
+          userAnswer = userAnswerElement.value.trim();
+          userAnswers[`q${index}`] = userAnswer;
+          const correctAnswer = question.correctAnswer;
 
-        if (userAnswer === correctAnswer) {
-          explanationDiv.textContent = "Correct!";
-          explanationDiv.className = "correct";
+          if (userAnswer === correctAnswer) {
+            explanationDiv.textContent = "Correct!";
+            explanationDiv.className = "correct";
+          } else {
+            allCorrect = false;
+            explanationDiv.textContent = `Incorrect: ${question.explanation}`;
+            explanationDiv.className = "incorrect";
+          }
         } else {
           allCorrect = false;
-          explanationDiv.textContent = `Incorrect: ${question.explanation}`;
-          explanationDiv.className = "incorrect";
+          explanationDiv.textContent = "Please provide a response!";
+          explanationDiv.className = "warning";
         }
-      } else {
-        allCorrect = false;
-        explanationDiv.textContent = "Please provide a response!";
-        explanationDiv.className = "warning";
       }
+    });
+
+    if (allCorrect) {
+      alert("Congratulations! All your answers are correct!");
     }
-  });
-
-  if (allCorrect) {
-    alert("Congratulations! All your answers are correct!");
   }
-}
-
 
   function generateQuestion(category) {
     selectedCategory = category;
@@ -181,3 +181,4 @@ function checkQuestions(event) {
     </div>
   );
 }
+
