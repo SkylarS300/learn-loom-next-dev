@@ -1,31 +1,32 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import prisma from "../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const cookieStore = cookies();
+    const anonId = cookieStore.get("learnloomId")?.value;
     const body = await request.json();
 
-    const userId = Number(session?.user?.id);
-    const role = session?.user?.role;
+    if (!anonId) {
+      return new Response("Missing anonId", { status: 401 });
+    }
 
-    // Quiz progress logging (from /grammar)
+    // === QUIZ PROGRESS LOGGING ===
     if (body.score !== undefined) {
       const { category, subtopic, score } = body;
 
-      if (!userId || !category || !subtopic || score == null) {
+      if (!category || !subtopic || score == null) {
         return new Response("Missing quiz progress fields", { status: 400 });
       }
 
       // 1. Log quiz progress
       await prisma.quizprogress.create({
-        data: { userId, category, subtopic, score },
+        data: { anonId, category, subtopic, score },
       });
 
-      // 2. Find all matching assignments (QUIZ) in student classrooms
+      // 2. Get joined classrooms
       const classrooms = await prisma.studentclassroom.findMany({
-        where: { studentId: userId },
+        where: { anonId },
         select: { classroomId: true },
       });
 
@@ -34,8 +35,8 @@ export async function POST(request) {
       const matchingAssignments = await prisma.assignment.findMany({
         where: {
           type: "QUIZ",
-          quizCategory: category,
-          quizSubtopic: subtopic,
+          category,
+          subtopic,
           classroomId: { in: classroomIds },
         },
         select: { id: true },
@@ -46,7 +47,7 @@ export async function POST(request) {
       await Promise.all(
         assignmentIds.map(async (assignmentId) => {
           const existing = await prisma.assignmentcompletion.findFirst({
-            where: { userId, assignmentId },
+            where: { anonId, assignmentId },
           });
 
           if (existing) {
@@ -59,8 +60,8 @@ export async function POST(request) {
           } else {
             await prisma.assignmentcompletion.create({
               data: {
-                userId,
                 assignmentId,
+                anonId,
                 completedAt: new Date(),
                 quizScore: score,
               },
@@ -72,7 +73,7 @@ export async function POST(request) {
       return new Response("Quiz progress logged", { status: 200 });
     }
 
-    // Assignment creation (by TEACHER)
+    // === ASSIGNMENT CREATION ===
     const {
       title,
       description,
@@ -85,11 +86,10 @@ export async function POST(request) {
       subtopic,
     } = body;
 
-    if (!userId || role !== "TEACHER" || !title || !description || !type || !classroomId) {
+    if (!title || !description || !type || !classroomId) {
       return new Response("Missing required fields for assignment creation", { status: 400 });
     }
 
-    // Create assignment
     const newAssignment = await prisma.assignment.create({
       data: {
         title,
@@ -104,18 +104,18 @@ export async function POST(request) {
       },
     });
 
-    // Auto-create blank completions for enrolled students
+    // Auto-create blank completions for existing joined users
     const students = await prisma.studentclassroom.findMany({
       where: { classroomId },
-      select: { studentId: true },
+      select: { anonId: true },
     });
 
     await Promise.all(
-      students.map(({ studentId }) =>
+      students.map(({ anonId }) =>
         prisma.assignmentcompletion.create({
           data: {
             assignmentId: newAssignment.id,
-            userId: studentId,
+            anonId,
           },
         })
       )

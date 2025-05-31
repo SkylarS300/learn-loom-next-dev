@@ -1,52 +1,53 @@
-import prisma from "../../../lib/prisma";
-console.log("Prisma import test:", prisma);
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
+export async function GET() {
+  const cookieStore = cookies();
+  const anonId = cookieStore.get("learnloomId")?.value;
 
-  const studentId = searchParams.get("studentId");
-
-  if (!studentId) {
-    return new Response("Missing studentId", { status: 400 });
+  if (!anonId) {
+    return new Response("Missing anonId", { status: 400 });
   }
 
-  try {
-      const links = await prisma.studentclassroom.findMany({
-      where: { studentId: Number(studentId) },
-      select: { classroomId: true },
-    });
+  const joined = await prisma.studentclassroom.findMany({
+    where: { anonId },
+    select: { classroomId: true },
+  });
 
-    const classroomIds = links.map(link => link.classroomId);
+  const classroomIds = joined.map((entry) => entry.classroomId);
 
-    const assignments = await prisma.assignment.findMany({
-      where: { classroomId: { in: classroomIds } },
-      orderBy: { dueDate: "asc" },
-      include: {
-        completions: {
-          where: { userId: Number(studentId) },
-          select: { completedAt: true, quizScore: true },
-        },
-        classroom: {
-          select: { id: true, name: true, code: true },
-        },
-      },
-    });
-
-    const response = assignments.map((a) => ({
-      id: a.id,
-      title: a.title,
-      type: a.type,
-      dueDate: a.dueDate,
-      classroom: a.classroom,
-      completedAt: a.completions[0]?.completedAt || null,
-      quizScore: a.completions[0]?.quizScore ?? null,
-    }));
-
-    return new Response(JSON.stringify(response), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Fetch assignments error:", error.message);
-    return new Response("Internal server error", { status: 500 });
+  if (classroomIds.length === 0) {
+    return Response.json([]);
   }
+
+  const assignments = await prisma.assignment.findMany({
+    where: {
+      classroomId: { in: classroomIds },
+    },
+    orderBy: { dueDate: "asc" },
+  });
+
+  const completions = await prisma.assignmentcompletion.findMany({
+    where: { anonId },
+    select: {
+      assignmentId: true,
+      completedAt: true,
+      quizScore: true,
+    },
+  });
+
+  const completionMap = new Map(
+    completions.map((c) => [c.assignmentId, { completedAt: c.completedAt, quizScore: c.quizScore }])
+  );
+
+  const result = assignments.map((a) => {
+    const completion = completionMap.get(a.id);
+    return {
+      ...a,
+      completedAt: completion?.completedAt ?? null,
+      quizScore: completion?.quizScore ?? null,
+    };
+  });
+
+  return Response.json(result);
 }

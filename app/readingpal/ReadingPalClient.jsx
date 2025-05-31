@@ -1,12 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
 import books from "../../src/content/book-content.js";
 import { useEffect, useRef } from "react";
 
 export default function ReadingPalClient() {
-  const { data: session, status } = useSession();
   const readingRef = useRef(false);
   const searchParams = useSearchParams();
   const bookIndex = searchParams.get("bookIndex");
@@ -23,6 +21,14 @@ export default function ReadingPalClient() {
   let currentBook = null;
   let currentChapterIndex = 0;
   let isPaused = false;
+
+  // ✅ Get anonId from cookie
+  function getAnonId() {
+    const match = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("learnloomId="));
+    return match?.split("=")[1];
+  }
 
   if (!bookIndex) {
     return (
@@ -87,7 +93,8 @@ export default function ReadingPalClient() {
     if (chapterTitleRef.current) chapterTitleRef.current.innerText = chapter.chapterTitle;
     if (textRef.current) textRef.current.innerText = chapter.content;
 
-    if (session?.user?.id) {
+    const anonId = getAnonId();
+    if (anonId) {
       console.log("Posting reading progress:", bookIndex, chapterIndex);
       await fetch("/api/readingprogress", {
         method: "POST",
@@ -99,6 +106,7 @@ export default function ReadingPalClient() {
       });
     }
   }
+
 
   function readText() {
     speechSynthesis.cancel();
