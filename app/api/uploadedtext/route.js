@@ -10,11 +10,12 @@ export async function GET() {
   const uploads = await prisma.uploadedtext.findMany({
     where: { anonId },
     orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-      password: true,
+    include: {
+      uploadview: {
+        where: { anonId },
+        orderBy: { viewedAt: "desc" },
+        take: 1,
+      },
     },
   });
 
@@ -24,6 +25,7 @@ export async function GET() {
       title: u.title,
       createdAt: u.createdAt,
       locked: !!u.password,
+      viewedAt: u.uploadview[0]?.viewedAt || null,
     }))
   );
 }
@@ -70,7 +72,11 @@ export async function DELETE(req) {
     return new Response("Not found or not authorized", { status: 403 });
   }
 
-  await prisma.uploadedtext.delete({ where: { id } });
+  await prisma.$transaction([
+    prisma.uploadview.deleteMany({ where: { uploadId: id } }),
+    prisma.uploadunlock.deleteMany({ where: { uploadId: id } }),
+    prisma.uploadedtext.delete({ where: { id } }),
+  ]);
 
   return new Response("Deleted", { status: 200 });
 }

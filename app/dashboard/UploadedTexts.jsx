@@ -44,11 +44,14 @@ export default function UploadedTexts() {
         <ul className="upload-list">
           {texts.map((text) => (
             <li key={text.id} className="upload-row">
-              <Link href={`/upload/${text.id}`}>
+              <Link href={`/uploads/${text.id}`}>
                 <strong>{text.title}</strong>
               </Link>
-              <span style={{ fontSize: "0.9rem", marginLeft: "1rem" }}>
-                {new Date(text.createdAt).toLocaleDateString()}
+              <span style={{ fontSize: "0.85rem", marginLeft: "1rem" }}>
+                Created {new Date(text.createdAt).toLocaleDateString()}
+                {text.viewedAt && (
+                  <> • Last viewed {new Date(text.viewedAt).toLocaleDateString()}</>
+                )}
                 {text.locked && <> 🔒</>}
               </span>
               <button
@@ -64,7 +67,7 @@ export default function UploadedTexts() {
       )}
 
       <div style={{ marginTop: "1rem" }}>
-        <Link href="/upload/new" className="cta-button">
+        <Link href="/uploads/new" className="cta-button">
           + Upload New Text
         </Link>
       </div>

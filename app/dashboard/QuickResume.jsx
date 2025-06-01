@@ -21,7 +21,10 @@ export default function QuickResume() {
   const { latestRead, latestUpload, latestQuiz } = resumeData;
 
   return (
-    <section className="dashboard-section" style={{ background: "#f9f9f9", padding: "1rem", borderRadius: "8px" }}>
+    <section
+      className="dashboard-section"
+      style={{ background: "#f9f9f9", padding: "1rem", borderRadius: "8px" }}
+    >
       <h3>⚡ Quick Resume</h3>
       <ul className="quick-resume-list">
         {latestRead && (
@@ -45,6 +48,26 @@ export default function QuickResume() {
             🧪 Practice more grammar —
             <Link href="/grammar">
               {latestQuiz.concept} — {latestQuiz.subTopic}
+            </Link>
+            {"  "}
+            <Link
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (typeof window !== "undefined") {
+                  window.localStorage.setItem(
+                    "resumeGrammarQuiz",
+                    JSON.stringify({
+                      concept: latestQuiz.concept,
+                      subTopic: latestQuiz.subTopic,
+                    })
+                  );
+                  window.location.href = "/grammar";
+                }
+              }}
+              style={{ marginLeft: "1rem", fontSize: "0.9rem", color: "#0070f3" }}
+            >
+              ↩️ Resume
             </Link>
           </li>
         )}

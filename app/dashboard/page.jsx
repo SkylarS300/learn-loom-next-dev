@@ -9,6 +9,7 @@ import ReadingProgressChecklist from "./ReadingProgressChecklist";
 import ReadingProgressChart from "./ReadingProgressChart";
 import GrammarScoreChart from "./GrammarScoreChart";
 import QuickResume from "./QuickResume";
+import CollapsibleSection from "./CollapsibleSection";
 
 function ResumeLastUpload() {
   const [upload, setUpload] = useState(null);
@@ -36,8 +37,6 @@ function ResumeLastUpload() {
   );
 }
 
-
-// 🔐 Progress Code Display
 function ProgressCodeBadge() {
   const [anonId, setAnonId] = useState("");
 
@@ -89,15 +88,25 @@ export default function UnifiedDashboard() {
 
         <hr className="divider" />
 
-        {/* ✅ Call it here */}
         <ResumeLastUpload />
-
         <QuickResume />
         <UploadedTexts />
-        <GrammarQuizHistory />
-        <ReadingProgressChecklist />
-        <ReadingProgressChart />
-        <GrammarScoreChart />
+
+        <CollapsibleSection title="🧪 Grammar Quiz History">
+          <GrammarQuizHistory />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="📚 Reading Progress Checklist">
+          <ReadingProgressChecklist />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="📊 Reading Progress by Book">
+          <ReadingProgressChart />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="📈 Grammar Score Trends">
+          <GrammarScoreChart />
+        </CollapsibleSection>
       </div>
     </div>
   );

@@ -905,3 +905,109 @@ details summary:hover {
   border-top: 1px solid #ddd;
 }
 
+.grammar-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.grammar-columns {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.grammar-sidebar {
+  min-width: 250px;
+  padding: 1rem;
+  background: #f3f3f3;
+  border-radius: 8px;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.grammar-sidebar h2 {
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  color: #444;
+}
+
+.subsection-link {
+  cursor: pointer;
+  color: #0070f3;
+  text-decoration: underline;
+  display: inline-block;
+  margin-bottom: 0.3rem;
+}
+
+.subsection-link:hover {
+  text-decoration: none;
+}
+
+.grammar-content {
+  flex-grow: 1;
+  background: #fff;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.1);
+  font-size: 1rem;
+}
+
+.grammar-content form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.grammar-content label {
+  font-weight: 500;
+  margin-right: 0.5rem;
+}
+
+.correct {
+  color: green;
+  font-weight: bold;
+}
+
+.incorrect {
+  color: red;
+  font-weight: bold;
+}
+
+.warning {
+  color: orange;
+  font-weight: bold;
+}
+
+.upload-dashboard h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.cta-button {
+  background: #0070f3;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.cta-button:hover {
+  background: #005ecb;
+}
+
+.upload-dashboard ul li {
+  transition: box-shadow 0.2s ease;
+}
+
+.upload-dashboard ul li:hover {
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.08);
+}
+
+.upload-dashboard button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
