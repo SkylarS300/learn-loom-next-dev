@@ -1,10 +1,9 @@
-// /app/api/uploads/[id]/route.js
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 
 export async function GET(request, context) {
   const { params } = context;
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const anonId = cookieStore.get("learnloomId")?.value;
   const id = parseInt(params.id);
 
@@ -25,7 +24,7 @@ export async function GET(request, context) {
 
   const upload = await prisma.uploadedtext.findUnique({
     where: { id },
-    select: { content: true },
+    select: { title: true, content: true },
   });
 
   if (!upload) return new Response("Not found", { status: 404 });

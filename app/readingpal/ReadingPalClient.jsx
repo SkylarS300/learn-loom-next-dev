@@ -1,14 +1,23 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import books from "../../src/content/book-content.js";
-import { useEffect, useRef } from "react";
 
 export default function ReadingPalClient() {
-  const readingRef = useRef(false);
   const searchParams = useSearchParams();
+  const uploadId = searchParams.get("upload");
   const bookIndex = searchParams.get("bookIndex");
 
+  const [uploadData, setUploadData] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [uploads, setUploads] = useState([]);
+
+  const currentBookRef = useRef(null);
+  const chapterIndexRef = useRef(0);
+  const readingRef = useRef(false);
+  const isPausedRef = useRef(false);
   const bookTitleRef = useRef(null);
   const chapterTitleRef = useRef(null);
   const textRef = useRef(null);
@@ -18,11 +27,36 @@ export default function ReadingPalClient() {
   const utteranceRef = useRef(null);
 
   let highlightedColor = "yellow";
-  let currentBook = null;
-  let currentChapterIndex = 0;
-  let isPaused = false;
+  let scrollTimeout;
 
-  // ✅ Get anonId from cookie
+  function showScrollResumeToast() {
+    const toast = document.createElement("div");
+    toast.textContent = "Resumed from last scroll position";
+    toast.style.position = "fixed";
+    toast.style.bottom = "20px";
+    toast.style.left = "50%";
+    toast.style.transform = "translateX(-50%)";
+    toast.style.backgroundColor = "#333";
+    toast.style.color = "white";
+    toast.style.padding = "10px 20px";
+    toast.style.borderRadius = "8px";
+    toast.style.zIndex = "9999";
+    toast.style.fontSize = "14px";
+    toast.style.opacity = "0.9";
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+
+  function throttledScrollSave(key, container) {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      if (container) {
+        localStorage.setItem(key, container.scrollTop);
+      }
+    }, 200);
+  }
+
+
   function getAnonId() {
     const match = document.cookie
       .split("; ")
@@ -30,27 +64,57 @@ export default function ReadingPalClient() {
     return match?.split("=")[1];
   }
 
-  if (!bookIndex) {
-    return (
-      <div className="readingpal-wrapper">
-        <h1 className="readingpal-title">No Book Selected</h1>
-        <img src="/assets/images/empty-book.png" alt="Empty" style={{ maxWidth: "300px", margin: "0 auto" }} />
-        <p style={{ textAlign: "center", color: "#666", maxWidth: "600px", margin: "20px auto" }}>
-          Please go back to the library and select a book to begin reading with your Reading Pal.
-        </p>
-        <div className="control-buttons" style={{ justifyContent: "center" }}>
-          <button onClick={goBack}>Return to Library</button>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    function loadVoices() {
+      const loadedVoices = speechSynthesis.getVoices();
+      if (loadedVoices.length > 0) {
+        setVoices(loadedVoices);
+        setSelectedVoice(
+          loadedVoices.find((v) => v.lang.startsWith("en") && v.name.includes("Female")) || loadedVoices[0]
+        );
+      }
+    }
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   useEffect(() => {
-    if (bookTitleRef.current && bookIndex !== null) {
-      currentBook = books[parseInt(bookIndex)];
-      bookTitleRef.current.innerText = `${currentBook.title} by ${currentBook.author}`;
-      displayChapter(currentBook, currentChapterIndex);
+    if (uploadId) {
+      fetch(`/api/uploads/${uploadId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setUploadData(data);
+          if (bookTitleRef.current) bookTitleRef.current.innerText = data.title;
+          if (chapterTitleRef.current) chapterTitleRef.current.innerText = "Uploaded Text";
+          if (textRef.current) {
+            textRef.current.innerText = data.content;
+
+            const key = `scroll_book_${bookIndex}_${chapterIndex}`;
+            const handler = () => throttledScrollSave(key, textRef.current);
+
+            textRef.current.addEventListener("scroll", handler);
+
+            setTimeout(() => {
+              const saved = localStorage.getItem(key);
+              if (saved && textRef.current) {
+                textRef.current.scrollTop = parseInt(saved);
+                showScrollResumeToast();
+              }
+            }, 100);
+
+            return () => textRef.current?.removeEventListener("scroll", handler);
+          }
+
+        });
+    } else if (bookIndex !== null && bookTitleRef.current) {
+      currentBookRef.current = books[parseInt(bookIndex)];
+      bookTitleRef.current.innerText = `${currentBookRef.current.title} by ${currentBookRef.current.author}`;
+      displayChapter(currentBookRef.current, chapterIndexRef.current);
     }
+
+    fetch("/api/uploadedtext")
+      .then((res) => res.json())
+      .then((data) => setUploads(data));
 
     if (fontSizeRef.current) {
       fontSizeRef.current.addEventListener("input", function () {
@@ -61,152 +125,194 @@ export default function ReadingPalClient() {
 
     if (prevChapterRef.current) {
       prevChapterRef.current.addEventListener("click", () => {
-        if (currentChapterIndex > 0) {
+        if (chapterIndexRef.current > 0 && currentBookRef.current) {
           stopReading();
-          currentChapterIndex--;
-          displayChapter(currentBook, currentChapterIndex);
+          chapterIndexRef.current--;
+          displayChapter(currentBookRef.current, chapterIndexRef.current);
         }
       });
     }
 
     if (nextChapterRef.current) {
       nextChapterRef.current.addEventListener("click", () => {
-        if (currentChapterIndex < currentBook.chapters.length - 1) {
+        if (currentBookRef.current && chapterIndexRef.current < currentBookRef.current.chapters.length - 1) {
           stopReading();
-          currentChapterIndex++;
-          displayChapter(currentBook, currentChapterIndex);
+          chapterIndexRef.current++;
+          displayChapter(currentBookRef.current, chapterIndexRef.current);
         }
       });
     }
 
-    // Add color picker listeners
-    document.querySelectorAll(".highlight-color .color").forEach((colorElement) => {
-      colorElement.addEventListener("click", function () {
-        const selectedColor = window.getComputedStyle(this).backgroundColor;
-        updateHighlightColor(selectedColor);
+    document.querySelectorAll(".highlight-color .color").forEach((el) => {
+      el.addEventListener("click", function () {
+        const color = window.getComputedStyle(this).backgroundColor;
+        highlightedColor = color;
       });
     });
-  }, [bookIndex]);
+  }, [bookIndex, uploadId]);
 
   async function displayChapter(book, chapterIndex) {
     const chapter = book.chapters[chapterIndex];
     if (chapterTitleRef.current) chapterTitleRef.current.innerText = chapter.chapterTitle;
-    if (textRef.current) textRef.current.innerText = chapter.content;
+    if (textRef.current) {
+      textRef.current.innerText = chapter.content;
+
+      const key = `scroll_book_${bookIndex}_${chapterIndex}`;
+      const handler = () => throttledScrollSave(key, textRef.current);
+
+      textRef.current.addEventListener("scroll", handler);
+
+      setTimeout(() => {
+        const saved = localStorage.getItem(key);
+        if (saved && textRef.current) {
+          textRef.current.scrollTop = parseInt(saved);
+          showScrollResumeToast();
+        }
+      }, 100);
+
+      return () => textRef.current?.removeEventListener("scroll", handler);
+    }
 
     const anonId = getAnonId();
     if (anonId) {
-      console.log("Posting reading progress:", bookIndex, chapterIndex);
       await fetch("/api/readingprogress", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookIndex: parseInt(bookIndex),
-          chapterIndex,
-        }),
+        body: JSON.stringify({ bookIndex: parseInt(bookIndex), chapterIndex }),
       });
     }
   }
 
+  // ... rest unchanged
+
+
+  function loadUploadById(id) {
+    stopReading();
+    fetch(`/api/uploads/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setUploadData(data);
+        currentBookRef.current = null;
+        chapterTitleRef.current.innerText = "Uploaded Text";
+        bookTitleRef.current.innerText = data.title;
+        textRef.current.innerText = data.content;
+      });
+  }
 
   function readText() {
     speechSynthesis.cancel();
-
-    const text = currentBook.chapters[currentChapterIndex].content;
+    const text = uploadData?.content || currentBookRef.current?.chapters?.[chapterIndexRef.current]?.content;
+    if (!text) return;
     let paragraphs = text.split(/\n\s*\n|\n/);
-    if (paragraphs.length === 1) {
-      paragraphs = text.match(/(.{1,500})(\s|$)/g);
-    }
-
+    if (paragraphs.length === 1) paragraphs = text.match(/(.{1,500})(\s|$)/g);
     let paragraphIndex = 0;
-
     readingRef.current = true;
 
-    function speakNextParagraph() {
-      if (!readingRef.current) return;
+    function speakNext() {
+      if (!readingRef.current || paragraphIndex >= paragraphs.length) return;
 
-      if (paragraphIndex < paragraphs.length) {
-        const paragraphText = paragraphs[paragraphIndex];
-        const words = paragraphText.split(/\s+/);
-        let wordIndex = 0;
+      const text = paragraphs[paragraphIndex];
+      const words = text.split(/\s+/);
+      let wordIndex = 0;
 
-        utteranceRef.current = new SpeechSynthesisUtterance(paragraphText);
-        const utterance = utteranceRef.current;
+      const utterance = new SpeechSynthesisUtterance(text);
+      if (selectedVoice) utterance.voice = selectedVoice;
 
-        utterance.onboundary = (event) => {
-          if (event.name === "word" && wordIndex < words.length) {
-            highlightWord(wordIndex, words);
-            wordIndex++;
+      utterance.onboundary = (event) => {
+        if (event.name === "word" && wordIndex < words.length) {
+          highlightWord(wordIndex, words);
+          wordIndex++;
+        }
+      };
+
+      utterance.onend = () => {
+        utteranceRef.current = null;
+        paragraphIndex++;
+
+        if (paragraphIndex < paragraphs.length) {
+          setTimeout(speakNext, 50);
+        } else {
+          if (!isPausedRef.current && currentBookRef.current) {
+            const next = chapterIndexRef.current + 1;
+            const hasNext = currentBookRef.current.chapters[next];
+            if (hasNext) {
+              chapterIndexRef.current = next;
+              displayChapter(currentBookRef.current, next);
+              setTimeout(() => readText(), 500);
+            }
           }
-        };
+        }
+      };
 
-        utterance.onend = () => {
-          utteranceRef.current = null;
-          if (readingRef.current) {
-            paragraphIndex++;
-            setTimeout(speakNextParagraph, 50);
-          }
-        };
-
-        speechSynthesis.speak(utterance);
-      }
+      utteranceRef.current = utterance;
+      speechSynthesis.speak(utterance);
     }
 
-    speakNextParagraph();
+    speakNext();
   }
 
-  function updateHighlightColor(color) {
-    highlightedColor = color;
-  }
+  function highlightWord(index, words) {
+    const container = textRef.current;
+    if (!container) return;
 
-  function highlightWord(wordIndex, words) {
-    const paragraphElement = textRef.current;
-    if (!paragraphElement) return;
+    container.innerHTML = "";
+    const key = uploadId
+      ? `scroll_upload_${uploadId}`
+      : `scroll_book_${bookIndex}_${chapterIndexRef.current}`;
 
-    paragraphElement.innerHTML = "";
+    setTimeout(() => {
+      const saved = localStorage.getItem(key);
+      if (saved && container) {
+        container.scrollTop = parseInt(saved);
+      }
+    }, 100);
 
-    const beforeWord = words.slice(0, wordIndex).join(" ") + " ";
-    const currentWord = words[wordIndex];
-    const afterWord = " " + words.slice(wordIndex + 1).join(" ");
+    const before = words.slice(0, index).join(" ") + " ";
+    const current = words[index];
+    const after = " " + words.slice(index + 1).join(" ");
 
-    const beforeSpan = document.createTextNode(beforeWord);
-    const highlightSpan = document.createElement("span");
-    highlightSpan.textContent = currentWord;
-    highlightSpan.style.backgroundColor = highlightedColor;
-    const afterSpan = document.createTextNode(afterWord);
-
-    paragraphElement.appendChild(beforeSpan);
-    paragraphElement.appendChild(highlightSpan);
-    paragraphElement.appendChild(afterSpan);
+    container.appendChild(document.createTextNode(before));
+    const span = document.createElement("span");
+    span.textContent = current;
+    span.style.backgroundColor = highlightedColor;
+    container.appendChild(span);
+    container.appendChild(document.createTextNode(after));
   }
 
   function startReading() {
-    if (currentBook) readText();
+    isPausedRef.current = false;
+    readText();
   }
-
   function pauseReading() {
-    if (!isPaused && speechSynthesis.speaking) {
+    if (!isPausedRef.current && speechSynthesis.speaking) {
       speechSynthesis.pause();
-      isPaused = true;
+      isPausedRef.current = true;
     }
   }
-
   function resumeReading() {
-    if (isPaused && speechSynthesis.paused) {
+    if (isPausedRef.current && speechSynthesis.paused) {
       speechSynthesis.resume();
-      isPaused = false;
+      isPausedRef.current = false;
     }
   }
-
   function stopReading() {
     readingRef.current = false;
     speechSynthesis.cancel();
     utteranceRef.current = null;
-    isPaused = false;
+    isPausedRef.current = false;
   }
 
   function goBack() {
     stopReading();
     window.location.href = "/library";
+  }
+
+  function restartReading() {
+    stopReading();
+    if (textRef.current) {
+      textRef.current.scrollTop = 0;
+    }
+    readText();
   }
 
   return (
@@ -215,16 +321,14 @@ export default function ReadingPalClient() {
       <div>
         <button className="close-btn" onClick={goBack}>&#x2716;</button>
         <h2 className="readingpal-chapter" ref={chapterTitleRef}>Chapter Title</h2>
-        <div id="text" ref={textRef}>
-          The chapter text will appear here after selecting a book from the library.
-        </div>
+        <div id="text" ref={textRef}>The chapter text will appear here after selecting a book from the library.</div>
       </div>
 
       <div className="control-buttons">
         <button onClick={startReading}>Start Reading</button>
         <button onClick={pauseReading}>Pause</button>
         <button onClick={resumeReading}>Resume</button>
-        <button onClick={stopReading}>Stop</button>
+        <button onClick={restartReading}>Restart</button>
       </div>
 
       <div className="chapter-nav-row">
@@ -232,6 +336,44 @@ export default function ReadingPalClient() {
         <div className="settings-section">
           <label htmlFor="fontSize">Font Size</label>
           <input ref={fontSizeRef} type="range" id="fontSize" min="10" max="40" />
+
+          <label htmlFor="voiceSelect">Voice</label>
+          <select
+            id="voiceSelect"
+            value={selectedVoice?.name || ""}
+            onChange={(e) => {
+              const voice = voices.find(v => v.name === e.target.value);
+              setSelectedVoice(voice);
+            }}>
+            {voices.map((v) => (
+              <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
+            ))}
+          </select>
+
+          <div className="setting-group">
+            <label htmlFor="uploadPicker" style={{ fontWeight: "bold", display: "block", marginBottom: "4px" }}>
+              📤 Uploaded Texts
+            </label>
+            <select
+              id="uploadPicker"
+              onChange={(e) => loadUploadById(e.target.value)}
+              defaultValue=""
+              style={{
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                fontSize: "14px",
+                width: "100%",
+                maxWidth: "250px",
+              }}
+            >
+              <option value="" disabled>Select an upload</option>
+              {uploads.map((u) => (
+                <option key={u.id} value={u.id}>{u.title}</option>
+              ))}
+            </select>
+          </div>
+
           <label>Highlight Color</label>
           <div className="highlight-color">
             <div className="color" style={{ backgroundColor: "red" }}></div>
