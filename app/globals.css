@@ -395,6 +395,24 @@ a:hover {
   margin-bottom: 30px;
 }
 
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.settings-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+
 .control-buttons button,
 .chapter-nav button {
   background-color: #788cfc;

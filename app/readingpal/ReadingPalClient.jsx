@@ -4,6 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import books from "../../src/content/book-content.js";
 
+function saveBookmark({ type, id, chapterIndex, scrollY }) {
+  const key = `bookmark-${type}-${id}`;
+  const value = {
+    type,
+    id,
+    chapterIndex,
+    scrollY,
+    timestamp: Date.now(),
+  };
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getBookmark(type, id) {
+  const key = `bookmark-${type}-${id}`;
+  const raw = localStorage.getItem(key);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function clearBookmark(type, id) {
+  const key = `bookmark-${type}-${id}`;
+  localStorage.removeItem(key);
+}
+
 export default function ReadingPalClient() {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("upload");
@@ -13,10 +36,15 @@ export default function ReadingPalClient() {
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [uploads, setUploads] = useState([]);
+  const [bookmark, setBookmark] = useState(null);
+  const [showBookmarkButton, setShowBookmarkButton] = useState(false);
+  const [lastSentence, setLastSentence] = useState("");
+
 
   const currentBookRef = useRef(null);
   const chapterIndexRef = useRef(0);
   const readingRef = useRef(false);
+  const paragraphIndexRef = useRef(0);
   const isPausedRef = useRef(false);
   const bookTitleRef = useRef(null);
   const chapterTitleRef = useRef(null);
@@ -65,6 +93,7 @@ export default function ReadingPalClient() {
   }
 
   useEffect(() => {
+    setLastSentence("");
     function loadVoices() {
       const loadedVoices = speechSynthesis.getVoices();
       if (loadedVoices.length > 0) {
@@ -105,11 +134,28 @@ export default function ReadingPalClient() {
             return () => textRef.current?.removeEventListener("scroll", handler);
           }
 
+          // ✅ MOVE BOOKMARK LOGIC INSIDE fetch().then() — after upload loads
+          const type = "upload";
+          const id = uploadId;
+          const found = getBookmark(type, id);
+          if (found) {
+            setBookmark(found);
+            setShowBookmarkButton(true);
+          }
         });
     } else if (bookIndex !== null && bookTitleRef.current) {
       currentBookRef.current = books[parseInt(bookIndex)];
       bookTitleRef.current.innerText = `${currentBookRef.current.title} by ${currentBookRef.current.author}`;
       displayChapter(currentBookRef.current, chapterIndexRef.current);
+
+      // ✅ BOOKMARK LOGIC FOR BOOKS
+      const type = "book";
+      const id = bookIndex;
+      const found = getBookmark(type, id);
+      if (found) {
+        setBookmark(found);
+        setShowBookmarkButton(true);
+      }
     }
 
     fetch("/api/uploadedtext")
@@ -205,16 +251,28 @@ export default function ReadingPalClient() {
     if (!text) return;
     let paragraphs = text.split(/\n\s*\n|\n/);
     if (paragraphs.length === 1) paragraphs = text.match(/(.{1,500})(\s|$)/g);
-    let paragraphIndex = 0;
+    paragraphIndexRef.current = 0;
     readingRef.current = true;
 
     function speakNext() {
-      if (!readingRef.current || paragraphIndex >= paragraphs.length) return;
+      if (!readingRef.current || paragraphIndexRef.current >= paragraphs.length) {
+        return;
+      }
 
-      const text = paragraphs[paragraphIndex];
+      const text = paragraphs[paragraphIndexRef.current];
+      console.log("Speaking paragraph index:", paragraphIndexRef.current);
+      console.log("Text:", paragraphs[paragraphIndexRef.current]);
+      const sentences = text
+        .replace(/([^.])\.(\s|$)/g, "$1¶$2") // mark sentence endings
+        .replace(/(Mr|Mrs|Dr|Ms|St|Jr|Sr|vs|etc)\s?¶/g, "$1.") // undo false breaks
+        .split("¶")
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      const last = sentences?.[sentences.length - 1]?.trim();
+      if (last) setLastSentence(last);
       const words = text.split(/\s+/);
       let wordIndex = 0;
-
       const utterance = new SpeechSynthesisUtterance(text);
       if (selectedVoice) utterance.voice = selectedVoice;
 
@@ -227,9 +285,9 @@ export default function ReadingPalClient() {
 
       utterance.onend = () => {
         utteranceRef.current = null;
-        paragraphIndex++;
 
-        if (paragraphIndex < paragraphs.length) {
+        paragraphIndexRef.current++;
+        if (paragraphIndexRef.current < paragraphs.length) {
           setTimeout(speakNext, 50);
         } else {
           if (!isPausedRef.current && currentBookRef.current) {
@@ -281,6 +339,7 @@ export default function ReadingPalClient() {
 
   function startReading() {
     isPausedRef.current = false;
+    setLastSentence(""); // 🧽 clear the replay buffer
     readText();
   }
   function pauseReading() {
@@ -321,22 +380,71 @@ export default function ReadingPalClient() {
       <div>
         <button className="close-btn" onClick={goBack}>&#x2716;</button>
         <h2 className="readingpal-chapter" ref={chapterTitleRef}>Chapter Title</h2>
-        <div id="text" ref={textRef}>The chapter text will appear here after selecting a book from the library.</div>
+        <div id="text" ref={textRef}>
+          The chapter text will appear here after selecting a book from the library.
+        </div>
       </div>
 
-      <div className="control-buttons">
-        <button onClick={startReading}>Start Reading</button>
-        <button onClick={pauseReading}>Pause</button>
-        <button onClick={resumeReading}>Resume</button>
-        <button onClick={restartReading}>Restart</button>
+      {/* === PRIMARY READING CONTROLS === */}
+      <div className="control-row">
+        <button onClick={startReading}>▶️ Start</button>
+        <button onClick={pauseReading}>⏸ Pause</button>
+        <button onClick={resumeReading}>🔁 Resume</button>
+        <button onClick={restartReading}>🔄 Restart</button>
       </div>
 
-      <div className="chapter-nav-row">
-        <button ref={prevChapterRef} className="chapter-btn">Previous Chapter</button>
-        <div className="settings-section">
+      {/* === BOOKMARK & REPLAY TOOLS === */}
+      <details className="control-tools" style={{ marginTop: "1rem" }}>
+        <summary>🔖 Bookmarks & Tools</summary>
+        <div className="control-row" style={{ marginTop: "0.5rem" }}>
+          <button onClick={() => {
+            const scrollY = textRef.current?.scrollTop || 0;
+            saveBookmark({
+              type: uploadId ? "upload" : "book",
+              id: uploadId || bookIndex,
+              chapterIndex: uploadId ? undefined : chapterIndexRef.current,
+              scrollY
+            });
+            alert("🔖 Bookmark saved!");
+          }}>🔖 Save</button>
+
+          {bookmark && (
+            <>
+              <button onClick={() => {
+                textRef.current?.scrollTo(0, bookmark.scrollY);
+                showScrollResumeToast();
+              }}>↩ Resume</button>
+
+              <button onClick={() => {
+                clearBookmark(uploadId ? "upload" : "book", uploadId || bookIndex);
+                setBookmark(null);
+                setShowBookmarkButton(false);
+              }}>🗑 Clear</button>
+
+              <p style={{ fontSize: "12px", color: "#666" }}>
+                Saved at: {new Date(bookmark.timestamp).toLocaleString()}
+              </p>
+            </>
+          )}
+
+          <button onClick={() => {
+            if (!lastSentence) return;
+            stopReading();
+            const utterance = new SpeechSynthesisUtterance(lastSentence);
+            if (selectedVoice) utterance.voice = selectedVoice;
+            speechSynthesis.speak(utterance);
+          }}>🔁 Replay</button>
+        </div>
+      </details>
+
+      {/* === SETTINGS PANEL === */}
+      <div className="settings-section">
+        <div>
           <label htmlFor="fontSize">Font Size</label>
           <input ref={fontSizeRef} type="range" id="fontSize" min="10" max="40" />
+        </div>
 
+        <div>
           <label htmlFor="voiceSelect">Voice</label>
           <select
             id="voiceSelect"
@@ -349,31 +457,33 @@ export default function ReadingPalClient() {
               <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
             ))}
           </select>
+        </div>
 
-          <div className="setting-group">
-            <label htmlFor="uploadPicker" style={{ fontWeight: "bold", display: "block", marginBottom: "4px" }}>
-              📤 Uploaded Texts
-            </label>
-            <select
-              id="uploadPicker"
-              onChange={(e) => loadUploadById(e.target.value)}
-              defaultValue=""
-              style={{
-                padding: "6px 10px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-                fontSize: "14px",
-                width: "100%",
-                maxWidth: "250px",
-              }}
-            >
-              <option value="" disabled>Select an upload</option>
-              {uploads.map((u) => (
-                <option key={u.id} value={u.id}>{u.title}</option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label htmlFor="uploadPicker" style={{ fontWeight: "bold", display: "block", marginBottom: "4px" }}>
+            📤 Uploaded Texts
+          </label>
+          <select
+            id="uploadPicker"
+            onChange={(e) => loadUploadById(e.target.value)}
+            defaultValue=""
+            style={{
+              padding: "6px 10px",
+              borderRadius: "6px",
+              border: "1px solid #ccc",
+              fontSize: "14px",
+              width: "100%",
+              maxWidth: "250px",
+            }}
+          >
+            <option value="" disabled>Select an upload</option>
+            {uploads.map((u) => (
+              <option key={u.id} value={u.id}>{u.title}</option>
+            ))}
+          </select>
+        </div>
 
+        <div>
           <label>Highlight Color</label>
           <div className="highlight-color">
             <div className="color" style={{ backgroundColor: "red" }}></div>
@@ -383,7 +493,12 @@ export default function ReadingPalClient() {
             <div className="color" style={{ backgroundColor: "orange" }}></div>
           </div>
         </div>
-        <button ref={nextChapterRef} className="chapter-btn">Next Chapter</button>
+      </div>
+
+      {/* === CHAPTER NAVIGATION === */}
+      <div className="control-row" style={{ marginTop: "2rem" }}>
+        <button ref={prevChapterRef} className="chapter-btn">⬅ Previous Chapter</button>
+        <button ref={nextChapterRef} className="chapter-btn">Next Chapter ➡</button>
       </div>
     </div>
   );
