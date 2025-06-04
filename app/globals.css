@@ -1,46 +1,68 @@
+/* =============================================================================
+   globals.css
+   -----------------------------------------------------------------------------
+   Cleaned and reorganized CSS with comments and removed redundancies.
+   ============================================================================= */
+
+/* =============================================================================
+   1. IMPORTS & CSS VARIABLES / THEME
+   -----------------------------------------------------------------------------
+   - Import Tailwind
+   - Define color and font variables
+   ============================================================================= */
 @import "tailwindcss";
 
 :root {
+  /* Core Colors */
   --background: #ffffff;
   --foreground: #171717;
-}
+  --color-periwinkle: #788cfc;
 
-@theme inline {
+  /* Theme Mapping (inline) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* =============================================================================
+   2. GLOBAL ELEMENT STYLES
+   -----------------------------------------------------------------------------
+   - Base styles for body, headings, paragraphs, links, scroll behavior
+   ============================================================================= */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), 'Roboto', sans-serif;
+  font-size: 17px;
   margin: 0;
   padding: 0 30px;
 }
 
-body {
-  font-size: 17px;
-}
-
 h1 {
   font-size: 40px;
+  margin: 0;
 }
 
 h2 {
   font-size: 28px;
+  margin: 0;
 }
 
 h3 {
   font-size: 20px;
+  margin: 0;
 }
-
 
 p {
   font-size: 16px;
   color: #666;
   line-height: 1.6;
+  margin: 0 0 1em 0;
 }
 
 a {
@@ -52,137 +74,152 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Disable dark mode until styled manually */
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --color-periwinkle: #788cfc;
-}
+/* =============================================================================
+   3. UTILITY CLASSES
+   -----------------------------------------------------------------------------
+   - Reusable utility classes for margins, padding, text-reset, etc.
+   ============================================================================= */
+/* (You can extend Tailwind instead of repeating utilities here) */
 
-/* Remove or comment out the dark mode override */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* --background: #0a0a0a;
-    --foreground: #ededed; */
-  }
-}
-
-.site-footer {
+.text-center {
   text-align: center;
-  font-size: 14px;
-  color: #666;
-  padding: 40px 20px;
-  background-color: #f9f9f9;
-  font-family: 'Roboto', sans-serif;
 }
 
+.mt-0 {
+  margin-top: 0;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.mb-1 {
+  margin-bottom: 1rem;
+}
+
+.mb-2 {
+  margin-bottom: 2rem;
+}
+
+.p-0 {
+  padding: 0;
+}
+
+.p-1 {
+  padding: 1rem;
+}
+
+.rounded-6 {
+  border-radius: 6px;
+}
+
+.rounded-8 {
+  border-radius: 8px;
+}
+
+.rounded-10 {
+  border-radius: 10px;
+}
+
+.shadow-light {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* =============================================================================
+   4. BUTTON STYLES
+   -----------------------------------------------------------------------------
+   - Primary call-to-action and utility buttons
+   ============================================================================= */
 .cta-button {
   background-color: #738afd;
   color: white;
-  font-weight: 600;
   font-family: 'Poppins', sans-serif;
+  font-weight: 600;
   font-size: 16px;
   padding: 12px 24px;
+  border: none;
   border-radius: 12px;
   display: inline-block;
-  transition: background-color 0.3s ease;
   text-decoration: none;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
 }
 
 .cta-button:hover {
   background-color: #5c6ee0;
 }
 
-.gif-container img {
-  max-width: 80%;
-  height: auto;
-  border-radius: 10px;
-  margin-top: 20px;
-}
-
-.gif-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 30px;
-  width: 100%;
-}
-
-.responsive-gif {
-  max-width: 750px;
-  width: 100%;
-  border-radius: 12px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-}
-
-#steps-section {
-  background-color: #1f1f2e;
-  color: #ffffff;
-  padding: 60px 30px;
-  border-radius: 16px;
-  margin-top: 60px;
-}
-
-.step {
-  max-width: 300px;
-  margin: 0 20px;
-}
-
-.step-number {
-  background-color: #738afd;
-  color: white;
-  font-weight: bold;
-  font-size: 20px;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 12px auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.step h3 {
-  font-size: 18px;
-  margin-bottom: 10px;
-}
-
-.step p {
-  font-size: 15px;
-  color: #ccc;
-}
-
-.faq-button {
-  display: inline-block;
-  background-color: #eaeaff;
-  color: #738afd;
+.faq-button,
+.features-button {
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   font-weight: 700;
   padding: 6px 18px;
   border-radius: 9999px;
-  font-family: 'Poppins', sans-serif;
-  letter-spacing: 0.5px;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.faq-button {
+  background-color: #eaeaff;
+  color: #738afd;
   margin-bottom: 10px;
 }
 
 .features-button {
   background-color: #e8e8ff;
   color: #738afd;
-  font-weight: 600;
-  font-family: 'Poppins', sans-serif;
-  font-size: 13px;
-  padding: 6px 18px;
-  border-radius: 9999px;
   display: inline-block;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   margin: 0 auto;
 }
 
+.faq-button:hover {
+  background-color: #d8d4ff;
+}
 
+.features-button:hover {
+  background-color: #d8d4ff;
+}
 
-/* === NAVBAR CLEAN STYLES === */
+.login-button,
+.logout-button {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
 
+.login-button {
+  background-color: #738afd;
+  color: white;
+}
+
+.login-button:hover {
+  background-color: #5c6ee0;
+}
+
+.logout-button {
+  background-color: #f05d5e;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.logout-button:hover {
+  background-color: #d34748;
+}
+
+/* =============================================================================
+   5. NAVBAR STYLES
+   -----------------------------------------------------------------------------
+   - Desktop and mobile nav layout
+   ============================================================================= */
 #navbar {
   width: 100%;
   background-color: #fff;
@@ -210,38 +247,22 @@ a:hover {
   gap: 40px;
   justify-content: center;
   flex: 1;
+  margin: 0;
+  padding: 0;
 }
 
 .nav-links li a {
-  text-decoration: none;
-  font-weight: 600;
   font-family: 'Poppins', sans-serif;
+  font-weight: 600;
   font-size: 17px;
   color: #333;
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .nav-links li a:hover {
   color: #788cfc;
 }
-
-.login-button {
-  margin-left: auto;
-  background-color: #738afd;
-  color: white;
-  font-weight: 600;
-  padding: 10px 24px;
-  border-radius: 10px;
-  font-family: 'Poppins', sans-serif;
-  font-size: 16px;
-  transition: background-color 0.3s ease;
-}
-
-.login-button:hover {
-  background-color: #5c6ee0;
-}
-
-
-/* === MOBILE NAVIGATION === */
 
 .hamburger {
   display: none;
@@ -257,6 +278,7 @@ a:hover {
   transition: 0.3s ease;
 }
 
+/* Mobile Navigation */
 @media (max-width: 768px) {
   .hamburger {
     display: flex;
@@ -273,7 +295,7 @@ a:hover {
     gap: 20px;
     padding: 20px 0;
     display: none;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 
   .nav-links.open {
@@ -289,8 +311,11 @@ a:hover {
   }
 }
 
-/* === LIBRARY PAGE STYLING === */
-
+/* =============================================================================
+   6. LIBRARY PAGE STYLES
+   -----------------------------------------------------------------------------
+   - Grid and card styles for book library
+   ============================================================================= */
 .library-wrapper {
   max-width: 1000px;
   margin: 60px auto;
@@ -333,8 +358,8 @@ a:hover {
 
 .book-title {
   margin-top: 12px;
-  font-weight: 600;
   font-family: 'Poppins', sans-serif;
+  font-weight: 600;
   font-size: 16px;
   color: #333;
 }
@@ -346,8 +371,11 @@ a:hover {
   margin-top: 4px;
 }
 
-/* === READING PAL PAGE STYLING === */
-
+/* =============================================================================
+   7. READING PAL PAGE STYLES
+   -----------------------------------------------------------------------------
+   - Container, controls, text box, highlights
+   ============================================================================= */
 .readingpal-wrapper {
   max-width: 1000px;
   margin: 60px auto;
@@ -360,20 +388,23 @@ a:hover {
 
 .readingpal-title {
   text-align: center;
+  font-family: 'Poppins', sans-serif;
   font-size: 28px;
   font-weight: 600;
   margin-bottom: 20px;
-  font-family: 'Poppins', sans-serif;
+  color: #333;
 }
 
 .readingpal-chapter {
   text-align: center;
+  font-family: 'Poppins', sans-serif;
   font-size: 20px;
   font-weight: 500;
   margin-bottom: 20px;
-  font-family: 'Poppins', sans-serif;
+  color: #333;
 }
 
+/* Text container for chapter or upload */
 #text {
   background: #f8f8f8;
   padding: 20px;
@@ -384,17 +415,24 @@ a:hover {
   line-height: 1.6;
   color: #333;
   margin-bottom: 30px;
+  cursor: pointer;          /* Indicate clickability */
+  white-space: pre-wrap;    /* Preserve line breaks */
+  transition: background-color 0.2s ease;
 }
 
-.control-buttons,
-.chapter-nav {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 30px;
+/* Only highlight the single word under the mouse, not the entire container */
+.word:hover {
+  background-color: rgba(255, 255, 0, 0.2);
+  cursor: pointer;
 }
 
+
+.highlighted-word {
+  background-color: yellow; /* Default, will be overridden inline */
+  transition: background-color 0.2s ease;
+}
+
+/* Control rows */
 .control-row {
   display: flex;
   flex-wrap: wrap;
@@ -403,45 +441,37 @@ a:hover {
   margin-top: 1rem;
 }
 
-.settings-section {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  margin-top: 2rem;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-
-.control-buttons button,
-.chapter-nav button {
+/* Buttons under reading controls */
+.control-row button {
   background-color: #788cfc;
   color: white;
+  font-family: 'Poppins', sans-serif;
   font-weight: 600;
   padding: 12px 24px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-family: 'Poppins', sans-serif;
   transition: background-color 0.3s ease;
 }
 
-.control-buttons button:hover,
-.chapter-nav button:hover {
+.control-row button:hover {
   background-color: #5f78d4;
 }
 
+/* Settings panel (font slider, voice selector, upload picker, highlight color) */
 .settings-section {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 2rem;
   justify-content: center;
-  gap: 20px;
-  margin-bottom: 30px;
+  align-items: flex-start;
 }
 
 .highlight-color {
   display: flex;
   gap: 10px;
+  margin-top: 8px;
 }
 
 .highlight-color .color {
@@ -451,37 +481,12 @@ a:hover {
   cursor: pointer;
 }
 
-@media (max-width: 768px) {
-  .readingpal-wrapper {
-    padding: 20px;
-  }
-
-  .control-buttons,
-  .chapter-nav,
-  .settings-section {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  #text {
-    max-height: 300px;
-  }
-}
-
-.chapter-nav-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  margin-top: 30px;
-  flex-wrap: wrap;
-}
-
+/* Previous / Next chapter buttons */
 .chapter-btn {
   background-color: #788cfc;
   color: white;
-  font-weight: 600;
   font-family: 'Poppins', sans-serif;
+  font-weight: 600;
   border: none;
   padding: 15px 25px;
   border-radius: 10px;
@@ -493,27 +498,54 @@ a:hover {
   background-color: #5c6ee0;
 }
 
-.settings-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* Mobile adjustments for readingpal */
+@media (max-width: 768px) {
+  .readingpal-wrapper {
+    padding: 20px;
+  }
+
+  .control-row,
+  .settings-section {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #text {
+    max-height: 300px;
+  }
 }
 
-.highlight-color {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
+/* =============================================================================
+   ReadingPal Specific Styles (for sentence hover & highlight)
+   ============================================================================= */
+
+/* Sentence spans: default state */
+.sentence {
+  cursor: pointer;           /* Show pointer on hover */
+  transition: background-color 0.2s ease;
 }
 
-.highlight-color .color {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  cursor: pointer;
+/* Hover‐over a sentence: light yellow background */
+.sentence:hover {
+  background-color: rgba(255, 255, 0, 0.2);
 }
 
-/* === GRAMMAR PAGE LAYOUT === */
+/* Currently highlighted (click‐or‐being‐read) sentence */
+.highlighted-sentence {
+  background-color: yellow;  /* Or your chosen highlightColor */
+}
 
+/* Remove any #text:hover rule if you added one earlier that shaded the entire container */
+#text:hover {
+  background-color: transparent !important;
+}
+
+
+/* =============================================================================
+   8. GRAMMAR PAGE STYLES
+   -----------------------------------------------------------------------------
+   - Two-column layout: sidebar and content
+   ============================================================================= */
 .grammar-columns {
   display: flex;
   max-width: 1200px;
@@ -538,6 +570,7 @@ a:hover {
 
 .subsection-link {
   display: block;
+  font-family: 'Poppins', sans-serif;
   font-size: 15px;
   margin-bottom: 6px;
   color: #5b6def;
@@ -558,22 +591,16 @@ a:hover {
   border-radius: 14px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
   font-family: 'Roboto', sans-serif;
-
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.grammar-content form {
-  width: 100%;
-  max-width: 650px;
-}
-
 .grammar-content h1 {
+  font-family: 'Poppins', sans-serif;
   font-size: 26px;
   font-weight: 600;
   margin-bottom: 10px;
-  font-family: 'Poppins', sans-serif;
   color: #333;
   text-align: center;
 }
@@ -586,15 +613,12 @@ a:hover {
   text-align: center;
 }
 
-.grammar-content form > div {
-  margin-bottom: 24px;
-  transition: background-color 0.2s ease;
-  padding: 10px 8px;
-  border-radius: 8px;
-}
-
-.grammar-content form > div:hover {
-  background-color: #f9f9ff;
+.grammar-content form {
+  width: 100%;
+  max-width: 650px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
 }
 
 .grammar-content label {
@@ -605,12 +629,6 @@ a:hover {
   margin: 4px 0;
 }
 
-.grammar-content input[type="radio"],
-.grammar-content input[type="text"] {
-  margin-top: 10px;
-  margin-bottom: 8px;
-}
-
 .grammar-content input[type="text"] {
   padding: 8px 12px;
   font-size: 14px;
@@ -618,6 +636,14 @@ a:hover {
   border: 1px solid #ccc;
   width: 100%;
   box-sizing: border-box;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  font-family: 'Roboto', sans-serif;
+}
+
+.grammar-content input[type="radio"] {
+  margin-top: 10px;
+  margin-bottom: 8px;
 }
 
 .grammar-content input[type="submit"] {
@@ -638,29 +664,28 @@ a:hover {
   background-color: #5c6ee0;
 }
 
-#textContainer .correct {
+.correct {
   color: #28a745; /* softer green */
   font-weight: 600;
   margin-top: 6px;
   transition: all 0.3s ease;
 }
 
-#textContainer .incorrect {
+.incorrect {
   color: #dc3545; /* softer red */
   font-weight: 600;
   margin-top: 6px;
   transition: all 0.3s ease;
 }
 
-#textContainer .warning {
+.warning {
   color: #ff9800; /* stronger orange */
   font-weight: 600;
   margin-top: 6px;
   transition: all 0.3s ease;
 }
 
-
-/* === MOBILE STYLING === */
+/* Mobile adjustments for grammar page */
 @media (max-width: 768px) {
   .grammar-columns {
     flex-direction: column;
@@ -677,7 +702,7 @@ a:hover {
     width: 100%;
     padding: 24px;
     border-radius: 10px;
-    box-shadow: 0 0 0 transparent;
+    box-shadow: none;
   }
 
   .grammar-content input[type="submit"] {
@@ -686,8 +711,11 @@ a:hover {
   }
 }
 
-/* === LOGIN/SIGNUP STYLING === */
-
+/* =============================================================================
+   9. LOGIN / SIGNUP PAGE STYLES
+   -----------------------------------------------------------------------------
+   - Centered auth form container with input styling
+   ============================================================================= */
 .auth-wrapper {
   display: flex;
   justify-content: center;
@@ -708,8 +736,8 @@ a:hover {
 }
 
 .auth-box h2 {
-  font-size: 26px;
   font-family: 'Poppins', sans-serif;
+  font-size: 26px;
   margin-bottom: 8px;
 }
 
@@ -785,13 +813,11 @@ a:hover {
   text-align: center;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
- 
-/* === DASHBOARD PAGE STYLING === */
-
+/* =============================================================================
+   10. DASHBOARD PAGE STYLES
+   -----------------------------------------------------------------------------
+   - Teacher/student dashboard container and header
+   ============================================================================= */
 .dashboard-wrapper {
   max-width: 1000px;
   margin: 60px auto;
@@ -845,12 +871,10 @@ html {
   padding: 12px 20px;
   margin-bottom: 10px;
   font-family: 'Poppins', sans-serif;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-
-/* === DASHBOARD HEADER === */
-
+/* Dashboard Header */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
@@ -873,24 +897,11 @@ html {
   color: #333;
 }
 
-.logout-button {
-  background-color: #f05d5e;
-  color: white;
-  border: none;
-  padding: 8px 18px;
-  font-size: 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-}
-
-.logout-button:hover {
-  background-color: #d34748;
-}
-
-/* === TEACHER TOOLS STYLING === */
-
+/* =============================================================================
+   11. TEACHER TOOLS / PROJECT-SPECIFIC STYLES
+   -----------------------------------------------------------------------------
+   - Progress filter bar, details/summary, etc.
+   ============================================================================= */
 .progress-filter-bar {
   background-color: #f9f9ff;
   padding: 1rem;
@@ -918,114 +929,27 @@ details summary:hover {
   background-color: #e0e8ff;
 }
 
-.divider {
-  margin: 2rem 0;
-  border-top: 1px solid #ddd;
-}
+/* =============================================================================
+   12. RESPONSIVE / MOBILE STYLES (GENERAL)
+   -----------------------------------------------------------------------------
+   - Override or adjust layouts on smaller screens
+   ============================================================================= */
+@media (max-width: 768px) {
+  /* Adjust global padding */
+  body {
+    padding: 0 15px;
+  }
 
-.grammar-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-}
+  /* ReadingPal adjustments handled above */
 
-.grammar-columns {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
-}
+  /* Dashboard adjustments (if needed) */
+  .dashboard-wrapper {
+    padding: 20px 15px;
+  }
 
-.grammar-sidebar {
-  min-width: 250px;
-  padding: 1rem;
-  background: #f3f3f3;
-  border-radius: 8px;
-  line-height: 1.6;
-  font-size: 0.95rem;
-}
-
-.grammar-sidebar h2 {
-  font-size: 1.1rem;
-  margin-top: 1rem;
-  color: #444;
-}
-
-.subsection-link {
-  cursor: pointer;
-  color: #0070f3;
-  text-decoration: underline;
-  display: inline-block;
-  margin-bottom: 0.3rem;
-}
-
-.subsection-link:hover {
-  text-decoration: none;
-}
-
-.grammar-content {
-  flex-grow: 1;
-  background: #fff;
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  box-shadow: 0 0 4px rgba(0,0,0,0.1);
-  font-size: 1rem;
-}
-
-.grammar-content form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-
-.grammar-content label {
-  font-weight: 500;
-  margin-right: 0.5rem;
-}
-
-.correct {
-  color: green;
-  font-weight: bold;
-}
-
-.incorrect {
-  color: red;
-  font-weight: bold;
-}
-
-.warning {
-  color: orange;
-  font-weight: bold;
-}
-
-.upload-dashboard h1 {
-  font-size: 1.8rem;
-  margin-bottom: 1rem;
-}
-
-.cta-button {
-  background: #0070f3;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-
-.cta-button:hover {
-  background: #005ecb;
-}
-
-.upload-dashboard ul li {
-  transition: box-shadow 0.2s ease;
-}
-
-.upload-dashboard ul li:hover {
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.08);
-}
-
-.upload-dashboard button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  /* Library adjustments */
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+  }
 }
