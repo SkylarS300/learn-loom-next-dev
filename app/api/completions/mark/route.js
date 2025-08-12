@@ -134,9 +134,11 @@ export async function GET(request) {
         result.push({
           assignmentId: assignment.id,
           assignmentTitle: assignment.title,
+          assignmentType: assignment.type,
           userId: student.studentId,
           studentName: `${student.student.firstName} ${student.student.lastName}`,
           completed: Boolean(match?.completedAt),
+          completedAt: match?.completedAt ?? null,
           quizScore: match?.quizScore ?? null,
         });
       }
