@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 
 export async function POST(req) {
   try {
@@ -12,22 +12,14 @@ export async function POST(req) {
     const { bookIndex, chapterIndex } = await req.json();
     const userId = Number(session.user.id);
 
-    // ✅ 1. Save reading progress (upsert)
-    await prisma.readingprogress.upsert({
-      where: {
-        userId_bookIndex_chapterIndex: {
-          userId,
-          bookIndex,
-          chapterIndex,
-        },
-      },
-      update: {},
-      create: {
-        userId,
-        bookIndex,
-        chapterIndex,
-      },
-    });
+    // ✅ 1. Save reading progress idempotently
+    try {
+      await prisma.readingprogress.create({
+        data: { userId, bookIndex, chapterIndex },
+      });
+    } catch (e) {
+      if (e?.code !== "P2002") throw e;
+    }
 
     // ✅ 2. Get student’s classroom IDs
     const studentClassrooms = await prisma.studentclassroom.findMany({

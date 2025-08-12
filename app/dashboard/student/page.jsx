@@ -19,7 +19,7 @@ export default function StudentDashboard() {
     if (status === "loading") return;
 
     if (!userId || role !== "STUDENT") {
-      router.push("/login");
+      router.push("/auth");
     } else {
       fetchStudentClassrooms(userId);
       fetchStudentAssignments(userId);
@@ -94,7 +94,7 @@ export default function StudentDashboard() {
   }
 
   function handleLogout() {
-    signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: "/auth" });
   }
 
   if (status === "loading") return <p>Loading...</p>;
