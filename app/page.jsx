@@ -15,7 +15,7 @@ export default function Home() {
             <p className="text-[18px] text-[#666] max-w-2xl">
               Select a book, explore with our interactive tools, and let Reading Pal guide your learning journey. Discover how we can enhance your reading experience.
             </p>
-            <a href="./auth" className="cta-button">
+            <a href="./dashboard" className="cta-button">
               Get started &rarr;
             </a>
             <div className="gif-container w-full mt-8">
@@ -125,7 +125,7 @@ export default function Home() {
                 <h3 className="text-lg font-semibold">Let LearnLoom revolutionize reading for you</h3>
                 <p className="text-[#666]">Just select a book from our library and let the Reading Pal do the rest for you.</p>
               </div>
-              <a href="./auth" className="cta-button">Get started &rarr;</a>
+              <a href="./dashboard" className="cta-button">Get started &rarr;</a>
             </div>
           </section>
 

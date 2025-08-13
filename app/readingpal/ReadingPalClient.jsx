@@ -2,237 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
 import books from "../../src/content/book-content.js";
+import { useEffect, useRef } from "react";
 
 export default function ReadingPalClient() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const readingRef = useRef(false);
   const searchParams = useSearchParams();
+  const uploadId = searchParams.get("upload");
   const bookIndex = searchParams.get("bookIndex");
 
-  // Refs & state
   const bookTitleRef = useRef(null);
   const chapterTitleRef = useRef(null);
   const textRef = useRef(null);
 
   const utteranceRef = useRef(null);
-  const readingRef = useRef(false);
-  const isPausedRef = useRef(false);
-  const currentBookRef = useRef(null);
 
-  const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
-  const [sentenceIndex, setSentenceIndex] = useState(0);
-  const [highlightedColor, setHighlightedColor] = useState("yellow");
+  let highlightedColor = "yellow";
+  let currentBook = null;
+  let currentChapterIndex = 0;
+  let isPaused = false;
 
-  // ---------- Helpers ----------
-  function goBack() {
-    stopReading();
-    window.location.href = "/library";
-  }
-
-  function splitIntoSentences(text) {
-    const cleaned = text.replace(/\s+/g, " ").trim();
-    const parts = cleaned.match(/[^.!?]+[.!?]*/g);
-    return parts && parts.length ? parts : [cleaned];
-  }
-
-  function getSentenceSpan(idx) {
-    return textRef.current?.querySelector(`span.sentence[data-si="${idx}"]`);
-  }
-
-  function highlightSentence(idx, color) {
-    const container = textRef.current;
-    if (!container) return;
-    container.querySelectorAll("span.sentence").forEach((el) => {
-      el.style.backgroundColor = "";
-    });
-    const el = getSentenceSpan(idx);
-    if (el) el.style.backgroundColor = color;
-  }
-
-  function handleFontSizeChange(e) {
-    const newSize = `${e.target.value}px`;
-    if (textRef.current) textRef.current.style.fontSize = newSize;
-  }
-
-  function updateHighlightColor(color) {
-    setHighlightedColor(color);
-  }
-
-  // ---------- TTS controls ----------
-  function startReadingAt(startIdx) {
-    const sents = sentencesRef.current;
-    if (!sents || !sents.length) return;
-
-    speechSynthesis.cancel();
-    utteranceRef.current = null;
-    readingRef.current = true;
-
-    let i = startIdx;
-
-    const speak = () => {
-      if (!readingRef.current || i >= sents.length) {
-        readingRef.current = false;
-        return;
-      }
-
-      const utt = new SpeechSynthesisUtterance(sents[i]);
-      utteranceRef.current = utt;
-
-      // Sync highlight exactly when speech starts
-      utt.onstart = () => {
-        setSentenceIndex(i);
-        highlightSentence(i, highlightedColor);
-      };
-
-      utt.onend = () => {
-        i += 1;
-        speak();
-      };
-
-      utt.onerror = () => {
-        i += 1;
-        speak();
-      };
-
-      speechSynthesis.speak(utt);
-    };
-
-    speak();
-  }
-
-  function startReading() {
-    startReadingAt(sentenceIndex);
-  }
-
-  function pauseReading() {
-    if (!isPausedRef.current && speechSynthesis.speaking) {
-      speechSynthesis.pause();
-      isPausedRef.current = true;
-    }
-  }
-
-  function resumeReading() {
-    if (isPausedRef.current && speechSynthesis.paused) {
-      speechSynthesis.resume();
-      isPausedRef.current = false;
-    }
-  }
-
-  function stopReading() {
-    readingRef.current = false;
-    speechSynthesis.cancel();
-    utteranceRef.current = null;
-    isPausedRef.current = false;
-    // clear any highlight
-    const container = textRef.current;
-    if (container) {
-      container.querySelectorAll("span.sentence").forEach((el) => (el.style.backgroundColor = ""));
-    }
-  }
-
-  // ---------- Chapter rendering ----------
-  const sentencesRef = useRef([]);
-
-  async function displayChapter(book, chapterIndex) {
-    // stop any current TTS + clear highlight before rendering a new chapter
-    stopReading();
-
-    const chapter = book.chapters[chapterIndex];
-
-    if (chapterTitleRef.current) {
-      chapterTitleRef.current.innerText = chapter.chapterTitle;
-    }
-
-    if (textRef.current) {
-      const container = textRef.current;
-      container.innerHTML = "";
-
-      // Split the chapter into sentences and render clickable spans
-      const sentences = splitIntoSentences(chapter.content);
-      sentencesRef.current = sentences;
-      setSentenceIndex(0); // reset to the beginning for the new chapter
-
-      sentences.forEach((s, idx) => {
-        const span = document.createElement("span");
-        span.className = "sentence";
-        span.dataset.si = String(idx);
-        span.style.cursor = "pointer";
-        span.textContent = s + " ";
-
-        // Click-to-jump: start reading exactly at this sentence
-        span.addEventListener("click", () => {
-          stopReading();
-          startReadingAt(idx); // sentenceIndex is set in utt.onstart
-        });
-
-        container.appendChild(span);
-      });
-    }
-
-    // Log reading progress (server is idempotent)
-    if (session?.user?.id) {
-      try {
-        await fetch("/api/readingprogress", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bookIndex: parseInt(bookIndex),
-            chapterIndex,
-          }),
-        });
-      } catch (e) {
-        console.error("Reading progress POST failed:", e);
-      }
-    }
-  }
-
-  function handlePrevChapter() {
-    if (!currentBookRef.current) return;
-    if (currentChapterIndex > 0) {
-      stopReading();
-      setSentenceIndex(0);
-      setCurrentChapterIndex((i) => i - 1);
-    }
-  }
-
-  function handleNextChapter() {
-    const b = currentBookRef.current;
-    if (!b) return;
-    if (currentChapterIndex < b.chapters.length - 1) {
-      stopReading();
-      setSentenceIndex(0);
-      setCurrentChapterIndex((i) => i + 1);
-    }
-  }
-
-  // ---------- Effects ----------
-  // Reset indices when switching books
-  useEffect(() => {
-    setCurrentChapterIndex(0);
-    setSentenceIndex(0);
-  }, [bookIndex]);
-
-  // Load book + chapter
-  useEffect(() => {
-    if (!bookIndex) return;
-    const b = books[parseInt(bookIndex)];
-    currentBookRef.current = b;
-    if (bookTitleRef.current) {
-      bookTitleRef.current.innerText = `${b.title} by ${b.author}`;
-    }
-    displayChapter(b, currentChapterIndex);
-    // cleanup between chapter changes
-    return () => {
-      speechSynthesis.cancel();
-      utteranceRef.current = null;
-      readingRef.current = false;
-      isPausedRef.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookIndex, currentChapterIndex]);
-
-  // ---------- UI ----------
   if (!bookIndex) {
     return (
       <div className="readingpal-wrapper">
@@ -248,31 +38,246 @@ export default function ReadingPalClient() {
     );
   }
 
+  useEffect(() => {
+    if (bookTitleRef.current && bookIndex !== null) {
+      currentBook = books[parseInt(bookIndex)];
+      bookTitleRef.current.innerText = `${currentBook.title} by ${currentBook.author}`;
+      displayChapter(currentBook, currentChapterIndex);
+    }
+
+    if (fontSizeRef.current) {
+      fontSizeRef.current.addEventListener("input", function () {
+        const newSize = this.value + "px";
+        if (textRef.current) textRef.current.style.fontSize = newSize;
+      });
+    }
+
+    if (prevChapterRef.current) {
+      prevChapterRef.current.addEventListener("click", () => {
+        if (currentChapterIndex > 0) {
+          stopReading();
+          currentChapterIndex--;
+          displayChapter(currentBook, currentChapterIndex);
+        }
+      });
+    }
+
+    if (nextChapterRef.current) {
+      nextChapterRef.current.addEventListener("click", () => {
+        if (currentChapterIndex < currentBook.chapters.length - 1) {
+          stopReading();
+          currentChapterIndex++;
+          displayChapter(currentBook, currentChapterIndex);
+        }
+      });
+    }
+
+    // Add color picker listeners
+    document.querySelectorAll(".highlight-color .color").forEach((colorElement) => {
+      colorElement.addEventListener("click", function () {
+        const selectedColor = window.getComputedStyle(this).backgroundColor;
+        updateHighlightColor(selectedColor);
+      });
+    });
+  }, [bookIndex]);
+
+  async function displayChapter(book, chapterIndex) {
+    const chapter = book.chapters[chapterIndex];
+    if (chapterTitleRef.current) chapterTitleRef.current.innerText = chapter.chapterTitle;
+    if (textRef.current) textRef.current.innerText = chapter.content;
+
+    if (session?.user?.id) {
+      console.log("Posting reading progress:", bookIndex, chapterIndex);
+      await fetch("/api/readingprogress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookIndex: parseInt(bookIndex),
+          chapterIndex,
+        }),
+      });
+    }
+  }
+
+  function readText() {
+    speechSynthesis.cancel();
+
+    const text = currentBook.chapters[currentChapterIndex].content;
+    let paragraphs = text.split(/\n\s*\n|\n/);
+    if (paragraphs.length === 1) {
+      paragraphs = text.match(/(.{1,500})(\s|$)/g);
+    }
+
+    let paragraphIndex = 0;
+
+    readingRef.current = true;
+
+    function speakNextParagraph() {
+      if (!readingRef.current) return;
+
+      if (paragraphIndex < paragraphs.length) {
+        const paragraphText = paragraphs[paragraphIndex];
+        const words = paragraphText.split(/\s+/);
+        let wordIndex = 0;
+
+        utteranceRef.current = new SpeechSynthesisUtterance(paragraphText);
+        const utterance = utteranceRef.current;
+
+        utterance.onboundary = (event) => {
+          if (event.name === "word" && wordIndex < words.length) {
+            highlightWord(wordIndex, words);
+            wordIndex++;
+          }
+        };
+
+        utterance.onend = () => {
+          utteranceRef.current = null;
+          if (readingRef.current) {
+            paragraphIndex++;
+            setTimeout(speakNextParagraph, 50);
+          }
+        };
+
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    speakNextParagraph();
+  }
+
+  function updateHighlightColor(color) {
+    highlightedColor = color;
+  }
+
+  function highlightWord(wordIndex, words) {
+    const paragraphElement = textRef.current;
+    if (!paragraphElement) return;
+
+    paragraphElement.innerHTML = "";
+
+    const beforeWord = words.slice(0, wordIndex).join(" ") + " ";
+    const currentWord = words[wordIndex];
+    const afterWord = " " + words.slice(wordIndex + 1).join(" ");
+
+    const beforeSpan = document.createTextNode(beforeWord);
+    const highlightSpan = document.createElement("span");
+    highlightSpan.textContent = currentWord;
+    highlightSpan.style.backgroundColor = highlightedColor;
+    const afterSpan = document.createTextNode(afterWord);
+
+    paragraphElement.appendChild(beforeSpan);
+    paragraphElement.appendChild(highlightSpan);
+    paragraphElement.appendChild(afterSpan);
+  }
+
+  function startReading() {
+    if (currentBook) readText();
+  }
+
+  function pauseReading() {
+    if (!isPaused && speechSynthesis.speaking) {
+      speechSynthesis.pause();
+      isPaused = true;
+    }
+  }
+
+  function resumeReading() {
+    if (isPaused && speechSynthesis.paused) {
+      speechSynthesis.resume();
+      isPaused = false;
+    }
+  }
+
+  function stopReading() {
+    readingRef.current = false;
+    speechSynthesis.cancel();
+    utteranceRef.current = null;
+    isPaused = false;
+  }
+
+  function goBack() {
+    stopReading();
+    window.location.href = "/library";
+  }
+
+  // =============================================================================
+  // 11) Load a selected upload by its ID
+  // =============================================================================
+  function loadUploadById(id) {
+    stopReading();
+    fetch(`/api/uploads/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setUploadData(data);
+        currentBookRef.current = null;
+        if (chapterTitleRef.current) chapterTitleRef.current.innerText = "Uploaded Text";
+        if (bookTitleRef.current) bookTitleRef.current.innerText = data.title;
+        if (textRef.current) {
+          textRef.current.innerText = data.content;
+
+          // Wrap sentences:
+          wrapSentences(textRef.current);
+
+          // Re‐apply font size
+          if (fontSizeRef.current && textRef.current) {
+            const newSize = fontSizeRef.current.value + "px";
+            textRef.current.style.fontSize = newSize;
+          }
+        }
+      });
+  }
+
+  // =============================================================================
+  // 12) RENDER JSX
+  // =============================================================================
   return (
     <div className="readingpal-wrapper">
-      <h1 className="readingpal-title" ref={bookTitleRef}>Book Title</h1>
+      <h1 className="readingpal-title" ref={bookTitleRef}>
+        Book Title
+      </h1>
       <div>
-        <button className="close-btn" onClick={goBack}>&#x2716;</button>
-        <h2 className="readingpal-chapter" ref={chapterTitleRef}>Chapter Title</h2>
-        <div id="text" ref={textRef}>
+        <button className="close-btn" onClick={goBack}>
+          &#x2716;
+        </button>
+        <h2 className="readingpal-chapter" ref={chapterTitleRef}>
+          Chapter Title
+        </h2>
+        <div
+          id="text"
+          ref={textRef}
+          style={{
+            cursor: "text",
+            whiteSpace: "normal",
+            background: "#f8f8f8",
+            padding: "20px",
+            borderRadius: "8px",
+            maxHeight: "400px",
+            overflowY: "auto",
+            fontSize: "16px",
+            lineHeight: "1.6",
+            color: "#333",
+            marginBottom: "30px",
+            transition: "background-color 0.2s ease",
+          }}
+        >
+          {/* This will be replaced by displayChapter or upload fetch */}
           The chapter text will appear here after selecting a book from the library.
         </div>
       </div>
 
-      <div className="control-buttons">
-        <button onClick={startReading}>Start Reading</button>
-        <button onClick={pauseReading}>Pause</button>
-        <button onClick={resumeReading}>Resume</button>
-        <button onClick={stopReading}>Stop</button>
+      {/* === PRIMARY READING CONTROLS === */}
+      <div className="control-row">
+        <button onClick={startReading}>▶️ Start</button>
+        <button onClick={pauseReading}>⏸ Pause</button>
+        <button onClick={resumeReading}>🔁 Resume</button>
+        <button onClick={restartReading}>🔄 Restart</button>
       </div>
 
       <div className="chapter-nav-row">
-        <button className="chapter-btn" onClick={handlePrevChapter} disabled={currentChapterIndex === 0}>
-          Previous Chapter
-        </button>
+        <button ref={prevChapterRef} className="chapter-btn">Previous Chapter</button>
         <div className="settings-section">
           <label htmlFor="fontSize">Font Size</label>
-          <input type="range" id="fontSize" min="10" max="40" defaultValue="16" onChange={handleFontSizeChange} />
+          <input ref={fontSizeRef} type="range" id="fontSize" min="10" max="40" />
           <label>Highlight Color</label>
           <div className="highlight-color">
             <div className="color" style={{ backgroundColor: "red" }} onClick={() => updateHighlightColor("red")}></div>
@@ -282,10 +287,9 @@ export default function ReadingPalClient() {
             <div className="color" style={{ backgroundColor: "orange" }} onClick={() => updateHighlightColor("orange")}></div>
           </div>
         </div>
-        <button className="chapter-btn" onClick={handleNextChapter}>
-          Next Chapter
-        </button>
+        <button ref={nextChapterRef} className="chapter-btn">Next Chapter</button>
       </div>
     </div>
   );
 }
+// =============================================================================
