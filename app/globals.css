@@ -1,72 +1,80 @@
-/* =============================================================================
-   globals.css
-   -----------------------------------------------------------------------------
-   Cleaned and reorganized CSS with comments and removed redundancies.
-   ============================================================================= */
+/* ============================================================================
+   LearnLoom – global styles (vanilla CSS, no Tailwind)
+   ========================================================================== */
 
-/* =============================================================================
-   1. IMPORTS & CSS VARIABLES / THEME
-   -----------------------------------------------------------------------------
-   - Import Tailwind
-   - Define color and font variables
-   ============================================================================= */
-@import "tailwindcss";
-
+/* ---- Theme variables & font bindings (Next/font provides the CSS vars) ---- */
 :root {
-  /* Core Colors */
   --background: #ffffff;
   --foreground: #171717;
-  --color-periwinkle: #788cfc;
+  --periwinkle: #788cfc;
 
-  /* Theme Mapping (inline) */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Next/font variables set in layout.js via Geist/Geist_Mono */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-/* =============================================================================
-   2. GLOBAL ELEMENT STYLES
-   -----------------------------------------------------------------------------
-   - Base styles for body, headings, paragraphs, links, scroll behavior
-   ============================================================================= */
+/* ---- Base / reset (gentle; does not nuke element defaults) ---- */
+* {
+  box-sizing: border-box;
+}
+
 html {
   scroll-behavior: smooth;
 }
 
+html,
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), 'Roboto', sans-serif;
-  font-size: 17px;
   margin: 0;
-  padding: 0 30px;
+  padding: 0;
 }
 
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, "Helvetica Neue",
+    Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 17px;
+  line-height: 1.6;
+  padding: 0 30px;
+  /* matches your original spacing */
+}
+
+code,
+pre {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.antialiased {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings */
 h1 {
   font-size: 40px;
-  margin: 0;
+  margin: 0 0 .5rem 0;
 }
 
 h2 {
   font-size: 28px;
-  margin: 0;
+  margin: 0 0 .5rem 0;
 }
 
 h3 {
   font-size: 20px;
-  margin: 0;
+  margin: 0 0 .5rem 0;
 }
 
+/* Text & links */
 p {
-  font-size: 16px;
-  color: #666;
-  line-height: 1.6;
   margin: 0 0 1em 0;
+  color: #666;
 }
 
 a {
-  color: #738AFD;
+  color: #738afd;
   text-decoration: none;
 }
 
@@ -74,156 +82,155 @@ a:hover {
   text-decoration: underline;
 }
 
-/* =============================================================================
-   3. UTILITY CLASSES
-   -----------------------------------------------------------------------------
-   - Reusable utility classes for margins, padding, text-reset, etc.
-   ============================================================================= */
-/* (You can extend Tailwind instead of repeating utilities here) */
+/* Lists behave normally */
+ul,
+ol {
+  padding-left: 1.25rem;
+  margin: .5rem 0 1rem;
+}
+
+/* ============================================================================
+   Light utility shim (covers the Tailwind-like classes you used in Home)
+   ========================================================================== */
+.w-full {
+  width: 100%
+}
+
+.flex {
+  display: flex
+}
+
+.grid {
+  display: grid
+}
+
+.items-center {
+  align-items: center
+}
+
+.justify-center {
+  justify-content: center
+}
 
 .text-center {
-  text-align: center;
+  text-align: center
 }
 
-.mt-0 {
-  margin-top: 0;
+.gap-5 {
+  gap: 1.25rem
 }
 
-.mb-0 {
-  margin-bottom: 0;
+.gap-8 {
+  gap: 2rem
 }
 
-.mb-1 {
-  margin-bottom: 1rem;
+.gap-10 {
+  gap: 2.5rem
 }
 
-.mb-2 {
-  margin-bottom: 2rem;
+.p-5 {
+  padding: 1.25rem
 }
 
-.p-0 {
-  padding: 0;
+.px-6 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem
 }
 
-.p-1 {
-  padding: 1rem;
+.mt-8 {
+  margin-top: 2rem
 }
 
-.rounded-6 {
-  border-radius: 6px;
+.mt-12 {
+  margin-top: 3rem
 }
 
-.rounded-8 {
-  border-radius: 8px;
+.mt-16 {
+  margin-top: 4rem
 }
 
-.rounded-10 {
-  border-radius: 10px;
+.my-20 {
+  margin-top: 5rem;
+  margin-bottom: 5rem
 }
 
-.shadow-light {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto
 }
 
-/* =============================================================================
-   4. BUTTON STYLES
-   -----------------------------------------------------------------------------
-   - Primary call-to-action and utility buttons
-   ============================================================================= */
-.cta-button {
-  background-color: #738afd;
-  color: white;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 12px;
-  display: inline-block;
-  text-decoration: none;
-  transition: background-color 0.3s ease;
-  cursor: pointer;
+.max-w-2xl {
+  max-width: 42rem
 }
 
-.cta-button:hover {
-  background-color: #5c6ee0;
+.max-w-5xl {
+  max-width: 64rem
 }
 
-.faq-button,
-.features-button {
-  font-family: 'Poppins', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 6px 18px;
-  border-radius: 9999px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  transition: background-color 0.2s ease;
-  cursor: pointer;
+.max-w-7xl {
+  max-width: 80rem
 }
 
-.faq-button {
-  background-color: #eaeaff;
-  color: #738afd;
-  margin-bottom: 10px;
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr))
 }
 
-.features-button {
-  background-color: #e8e8ff;
-  color: #738afd;
-  display: inline-block;
-  margin: 0 auto;
+@media (min-width:768px) {
+  .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr))
+  }
 }
 
-.faq-button:hover {
-  background-color: #d8d4ff;
+.font-semibold {
+  font-weight: 600
 }
 
-.features-button:hover {
-  background-color: #d8d4ff;
+.text-\[36px\] {
+  font-size: 36px;
+  line-height: 1.2
 }
 
-.login-button,
-.logout-button {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  padding: 10px 24px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+.text-\[18px\] {
+  font-size: 18px;
+  line-height: 1.5
 }
 
-.login-button {
-  background-color: #738afd;
-  color: white;
+.text-\[\#333\] {
+  color: #333
 }
 
-.login-button:hover {
-  background-color: #5c6ee0;
+.text-\[\#555\] {
+  color: #555
 }
 
-.logout-button {
-  background-color: #f05d5e;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
+.text-\[\#666\] {
+  color: #666
 }
 
-.logout-button:hover {
-  background-color: #d34748;
+.rounded-lg {
+  border-radius: .5rem
 }
 
-/* =============================================================================
-   5. NAVBAR STYLES
-   -----------------------------------------------------------------------------
-   - Desktop and mobile nav layout
-   ============================================================================= */
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1)
+}
+
+.h-\[1px\] {
+  height: 1px
+}
+
+.bg-\[\#e0e0e0\] {
+  background-color: #e0e0e0
+}
+
+/* ============================================================================
+   Navbar
+   ========================================================================== */
 #navbar {
   width: 100%;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .05);
   padding: 16px 40px;
 }
 
@@ -245,43 +252,74 @@ a:hover {
   list-style: none;
   display: flex;
   gap: 40px;
-  justify-content: center;
-  flex: 1;
   margin: 0;
   padding: 0;
+  flex: 1;
+  justify-content: center;
 }
 
 .nav-links li a {
-  font-family: 'Poppins', sans-serif;
   font-weight: 600;
   font-size: 17px;
   color: #333;
-  text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color .2s ease;
+  font-family: var(--font-sans), sans-serif;
 }
 
 .nav-links li a:hover {
-  color: #788cfc;
+  color: var(--periwinkle);
 }
 
+.login-button {
+  background: #738afd;
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.login-button:hover {
+  background: #5c6ee0;
+}
+
+.logout-button {
+  background: #f05d5e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.logout-button:hover {
+  background: #d34748;
+}
+
+/* Mobile nav */
 .hamburger {
   display: none;
   flex-direction: column;
   gap: 4px;
-  cursor: pointer;
+  cursor: pointer
 }
 
 .hamburger .bar {
   width: 25px;
   height: 3px;
-  background-color: #333;
-  transition: 0.3s ease;
+  background: #333;
+  transition: .3s
 }
 
-/* Mobile Navigation */
-@media (max-width: 768px) {
+@media (max-width:768px) {
   .hamburger {
-    display: flex;
+    display: flex
   }
 
   .nav-links {
@@ -289,46 +327,100 @@ a:hover {
     top: 70px;
     left: 0;
     right: 0;
-    background-color: #fff;
+    background: #fff;
     flex-direction: column;
     align-items: center;
     gap: 20px;
     padding: 20px 0;
     display: none;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, .1)
   }
 
   .nav-links.open {
-    display: flex;
-  }
-
-  .nav-links li {
-    margin: 0;
-  }
-
-  .login-button {
-    padding: 10px 16px;
+    display: flex
   }
 }
 
-/* =============================================================================
-   6. LIBRARY PAGE STYLES
-   -----------------------------------------------------------------------------
-   - Grid and card styles for book library
-   ============================================================================= */
+/* ============================================================================
+   Home page helpers
+   ========================================================================== */
+.home .page-wrapper {
+  display: flex;
+  justify-content: center
+}
+
+.home-content-wrapper {
+  margin: 0 auto
+}
+
+.divider {
+  height: 1px;
+  background: #e0e0e0;
+  width: 100%
+}
+
+.cta-button {
+  display: inline-block;
+  background: var(--periwinkle);
+  color: #fff;
+  text-decoration: none;
+  padding: .65rem 1rem;
+  border-radius: .5rem;
+  line-height: 1;
+  font-weight: 600;
+  transition: background .2s ease;
+}
+
+.cta-button:hover {
+  background: #5c6ee0
+}
+
+.faq-button,
+.features-button {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 18px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  cursor: pointer;
+  display: inline-block
+}
+
+.faq-button {
+  background: #eaeaff;
+  color: #738afd;
+  margin-bottom: 10px
+}
+
+.faq-button:hover {
+  background: #d8d4ff
+}
+
+.features-button {
+  background: #e8e8ff;
+  color: #738afd
+}
+
+.features-button:hover {
+  background: #d8d4ff
+}
+
+/* ============================================================================
+   Library
+   ========================================================================== */
 .library-wrapper {
   max-width: 1000px;
   margin: 60px auto;
   padding: 0 30px;
-  text-align: center;
+  text-align: center
 }
 
 .library-heading {
-  font-family: 'Poppins', sans-serif;
   font-size: 32px;
   font-weight: 600;
   color: #333;
-  margin-bottom: 40px;
+  margin-bottom: 40px
 }
 
 .book-grid {
@@ -336,75 +428,67 @@ a:hover {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 40px;
   justify-items: center;
-  align-items: start;
+  align-items: start
 }
 
 .book-card {
   cursor: pointer;
-  transition: transform 0.2s ease;
-  max-width: 180px;
+  transition: transform .2s ease;
+  max-width: 180px
 }
 
 .book-card:hover {
-  transform: scale(1.05);
+  transform: scale(1.05)
 }
 
 .book-cover {
   width: 100%;
   height: auto;
   border-radius: 6px;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, .1)
 }
 
 .book-title {
   margin-top: 12px;
-  font-family: 'Poppins', sans-serif;
   font-weight: 600;
   font-size: 16px;
-  color: #333;
+  color: #333
 }
 
 .book-author {
-  font-family: 'Roboto', sans-serif;
   font-size: 14px;
   color: #777;
-  margin-top: 4px;
+  margin-top: 4px
 }
 
-/* =============================================================================
-   7. READING PAL PAGE STYLES
-   -----------------------------------------------------------------------------
-   - Container, controls, text box, highlights
-   ============================================================================= */
+/* ============================================================================
+   Reading Pal
+   ========================================================================== */
 .readingpal-wrapper {
   max-width: 1000px;
   margin: 60px auto;
   padding: 40px;
-  background-color: #ffffff;
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  font-family: 'Roboto', sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
 }
 
 .readingpal-title {
   text-align: center;
-  font-family: 'Poppins', sans-serif;
   font-size: 28px;
   font-weight: 600;
   margin-bottom: 20px;
-  color: #333;
+  color: #333
 }
 
 .readingpal-chapter {
   text-align: center;
-  font-family: 'Poppins', sans-serif;
   font-size: 20px;
   font-weight: 500;
   margin-bottom: 20px;
-  color: #333;
+  color: #333
 }
 
-/* Text container for chapter or upload */
 #text {
   background: #f8f8f8;
   padding: 20px;
@@ -415,194 +499,175 @@ a:hover {
   line-height: 1.6;
   color: #333;
   margin-bottom: 30px;
-  cursor: pointer;          /* Indicate clickability */
-  white-space: pre-wrap;    /* Preserve line breaks */
-  transition: background-color 0.2s ease;
+  white-space: pre-wrap;
+  transition: background-color .2s;
 }
 
-/* Only highlight the single word under the mouse, not the entire container */
-.word:hover {
-  background-color: rgba(255, 255, 0, 0.2);
+#text:hover {
+  background: transparent
+}
+
+.sentence {
   cursor: pointer;
+  transition: background-color .2s ease;
 }
 
-
-.highlighted-word {
-  background-color: yellow; /* Default, will be overridden inline */
-  transition: background-color 0.2s ease;
+.sentence:hover {
+  background: rgba(255, 255, 0, .2);
 }
 
-/* Control rows */
-.control-row {
+.w.active-word {
+  text-decoration: underline;
+}
+
+.control-buttons {
   display: flex;
+  gap: .75rem;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 1rem
 }
 
-/* Buttons under reading controls */
-.control-row button {
-  background-color: #788cfc;
-  color: white;
-  font-family: 'Poppins', sans-serif;
+.control-buttons button {
+  background: var(--periwinkle);
+  color: #fff;
   font-weight: 600;
   padding: 12px 24px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background .2s;
 }
 
-.control-row button:hover {
-  background-color: #5f78d4;
+.control-buttons button:hover {
+  background: #5f78d4
 }
 
-/* Settings panel (font slider, voice selector, upload picker, highlight color) */
 .settings-section {
   display: flex;
   flex-wrap: wrap;
   gap: 1.5rem;
   margin-top: 2rem;
   justify-content: center;
-  align-items: flex-start;
+  align-items: flex-start
 }
 
 .highlight-color {
   display: flex;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 8px
 }
 
 .highlight-color .color {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  cursor: pointer;
+  cursor: pointer
 }
 
-/* Previous / Next chapter buttons */
+.chapter-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem
+}
+
 .chapter-btn {
-  background-color: #788cfc;
-  color: white;
-  font-family: 'Poppins', sans-serif;
+  background: var(--periwinkle);
+  color: #fff;
   font-weight: 600;
   border: none;
   padding: 15px 25px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background .2s;
 }
 
 .chapter-btn:hover {
-  background-color: #5c6ee0;
+  background: #5c6ee0
 }
 
-/* Mobile adjustments for readingpal */
-@media (max-width: 768px) {
-  .readingpal-wrapper {
-    padding: 20px;
-  }
+.close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  float: right
+}
 
-  .control-row,
-  .settings-section {
-    flex-direction: column;
-    gap: 12px;
+/* Mobile tweaks */
+@media (max-width:768px) {
+  .readingpal-wrapper {
+    padding: 20px
   }
 
   #text {
-    max-height: 300px;
+    max-height: 300px
+  }
+
+  .control-buttons,
+  .settings-section {
+    flex-direction: column;
+    gap: 12px
   }
 }
 
-/* =============================================================================
-   ReadingPal Specific Styles (for sentence hover & highlight)
-   ============================================================================= */
-
-/* Sentence spans: default state */
-.sentence {
-  cursor: pointer;           /* Show pointer on hover */
-  transition: background-color 0.2s ease;
-}
-
-/* Hover‐over a sentence: light yellow background */
-.sentence:hover {
-  background-color: rgba(255, 255, 0, 0.2);
-}
-
-/* Currently highlighted (click‐or‐being‐read) sentence */
-.highlighted-sentence {
-  background-color: yellow;  /* Or your chosen highlightColor */
-}
-
-/* Remove any #text:hover rule if you added one earlier that shaded the entire container */
-#text:hover {
-  background-color: transparent !important;
-}
-
-
-/* =============================================================================
-   8. GRAMMAR PAGE STYLES
-   -----------------------------------------------------------------------------
-   - Two-column layout: sidebar and content
-   ============================================================================= */
+/* ============================================================================
+   Grammar
+   ========================================================================== */
 .grammar-columns {
   display: flex;
   max-width: 1200px;
   margin: 40px auto;
   padding: 0 20px;
   gap: 40px;
-  align-items: flex-start;
+  align-items: flex-start
 }
 
 .grammar-sidebar {
   flex: 1;
   min-width: 240px;
-  max-width: 300px;
-  font-family: 'Poppins', sans-serif;
+  max-width: 300px
 }
 
 .grammar-sidebar h2 {
   font-size: 20px;
   margin: 24px 0 12px;
-  color: #222;
+  color: #222
 }
 
 .subsection-link {
   display: block;
-  font-family: 'Poppins', sans-serif;
   font-size: 15px;
   margin-bottom: 6px;
   color: #5b6def;
-  text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all .2s
 }
 
 .subsection-link:hover {
   color: #3e4fbb;
   transform: translateX(2px);
-  text-decoration: underline;
+  text-decoration: underline
 }
 
 .grammar-content {
   flex: 2.5;
-  background: #ffffff;
+  background: #fff;
   padding: 40px;
   border-radius: 14px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
-  font-family: 'Roboto', sans-serif;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .06);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .grammar-content h1 {
-  font-family: 'Poppins', sans-serif;
   font-size: 26px;
   font-weight: 600;
   margin-bottom: 10px;
   color: #333;
-  text-align: center;
+  text-align: center
 }
 
 .grammar-content h3 {
@@ -610,7 +675,7 @@ a:hover {
   color: #555;
   margin-bottom: 30px;
   font-weight: 400;
-  text-align: center;
+  text-align: center
 }
 
 .grammar-content form {
@@ -618,7 +683,7 @@ a:hover {
   max-width: 650px;
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 1.2rem
 }
 
 .grammar-content label {
@@ -626,7 +691,7 @@ a:hover {
   font-weight: 500;
   color: #222;
   display: inline-block;
-  margin: 4px 0;
+  margin: 4px 0
 }
 
 .grammar-content input[type="text"] {
@@ -635,116 +700,80 @@ a:hover {
   border-radius: 6px;
   border: 1px solid #ccc;
   width: 100%;
-  box-sizing: border-box;
-  margin-top: 10px;
-  margin-bottom: 8px;
-  font-family: 'Roboto', sans-serif;
+  margin: 10px 0 8px;
 }
 
 .grammar-content input[type="radio"] {
   margin-top: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 8px
 }
 
 .grammar-content input[type="submit"] {
-  background-color: #788cfc;
-  color: white;
+  background: var(--periwinkle);
+  color: #fff;
   border: none;
   padding: 10px 24px;
   font-weight: 600;
   border-radius: 8px;
   cursor: pointer;
-  font-family: 'Poppins', sans-serif;
-  transition: background-color 0.3s ease;
+  transition: background .2s;
   display: block;
   margin: 30px auto 0;
 }
 
 .grammar-content input[type="submit"]:hover {
-  background-color: #5c6ee0;
+  background: #5c6ee0
 }
 
 .correct {
-  color: #28a745; /* softer green */
+  color: #28a745;
   font-weight: 600;
-  margin-top: 6px;
-  transition: all 0.3s ease;
+  margin-top: 6px
 }
 
 .incorrect {
-  color: #dc3545; /* softer red */
+  color: #dc3545;
   font-weight: 600;
-  margin-top: 6px;
-  transition: all 0.3s ease;
+  margin-top: 6px
 }
 
 .warning {
-  color: #ff9800; /* stronger orange */
+  color: #ff9800;
   font-weight: 600;
-  margin-top: 6px;
-  transition: all 0.3s ease;
+  margin-top: 6px
 }
 
-/* Mobile adjustments for grammar page */
-@media (max-width: 768px) {
-  .grammar-columns {
-    flex-direction: column;
-    padding: 20px;
-  }
-
-  .grammar-sidebar {
-    max-width: 100%;
-    width: 100%;
-    margin-bottom: 30px;
-  }
-
-  .grammar-content {
-    width: 100%;
-    padding: 24px;
-    border-radius: 10px;
-    box-shadow: none;
-  }
-
-  .grammar-content input[type="submit"] {
-    width: 100%;
-    text-align: center;
-  }
-}
-
-/* =============================================================================
-   9. LOGIN / SIGNUP PAGE STYLES
-   -----------------------------------------------------------------------------
-   - Centered auth form container with input styling
-   ============================================================================= */
+/* ============================================================================
+   Auth / Dashboard
+   ========================================================================== */
 .auth-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 85vh;
-  background-color: #f9faff;
-  padding: 40px 20px;
+  background: #f9faff;
+  padding: 40px 20px
 }
 
 .auth-box {
-  background: white;
+  background: #fff;
   padding: 40px 30px;
   border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .05);
   max-width: 400px;
   width: 100%;
-  text-align: center;
+  text-align: center
 }
 
 .auth-box h2 {
-  font-family: 'Poppins', sans-serif;
   font-size: 26px;
-  margin-bottom: 8px;
+  margin-bottom: 8px
 }
 
 .auth-box .subtext {
   font-size: 14px;
   color: #666;
-  margin-bottom: 24px;
+  margin-bottom: 24px
 }
 
 .auth-form input {
@@ -754,78 +783,48 @@ a:hover {
   border-radius: 6px;
   border: 1px solid #ddd;
   font-size: 15px;
-  font-family: 'Roboto', sans-serif;
 }
 
 .auth-form input:focus {
   border-color: #738afd;
-  outline: none;
+  outline: none
 }
 
 .auth-form button {
   width: 100%;
   padding: 12px;
-  background-color: #738afd;
-  color: white;
+  background: #738afd;
+  color: #fff;
   border: none;
   border-radius: 6px;
   font-weight: 600;
   font-size: 16px;
-  font-family: 'Poppins', sans-serif;
   cursor: pointer;
 }
 
 .auth-form button:hover {
-  background-color: #5a70e0;
+  background: #5a70e0
 }
 
 .toggle-link {
   font-size: 14px;
   margin-top: 20px;
-  color: #555;
+  color: #555
 }
 
 .toggle-link span {
   color: #738afd;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 500
 }
 
-.role-select {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  margin-top: 16px;
-  font-size: 15px;
-  font-family: 'Poppins', sans-serif;
-  color: #444;
-}
-
-.role-select input {
-  margin-right: 8px;
-}
-
-.google-info {
-  font-size: 13px;
-  color: #888;
-  margin-top: 10px;
-  font-style: italic;
-  text-align: center;
-}
-
-/* =============================================================================
-   10. DASHBOARD PAGE STYLES
-   -----------------------------------------------------------------------------
-   - Teacher/student dashboard container and header
-   ============================================================================= */
 .dashboard-wrapper {
   max-width: 1000px;
   margin: 60px auto;
   padding: 40px 30px;
-  background-color: #ffffff;
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  font-family: 'Poppins', sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
   text-align: center;
 }
 
@@ -833,13 +832,12 @@ a:hover {
   font-size: 30px;
   font-weight: 600;
   color: #333;
-  margin-bottom: 16px;
+  margin-bottom: 16px
 }
 
 .dashboard-wrapper p {
   font-size: 18px;
-  color: #666;
-  line-height: 1.6;
+  color: #666
 }
 
 .input {
@@ -848,108 +846,82 @@ a:hover {
   border-radius: 8px;
   width: 100%;
   max-width: 300px;
-  font-family: 'Roboto', sans-serif;
   font-size: 15px;
-  margin-bottom: 10px;
-}
-
-.divider {
-  margin: 40px 0;
-  height: 1px;
-  background-color: #eee;
+  margin-bottom: 10px
 }
 
 .classroom-list {
   list-style: none;
   padding: 0;
-  margin-top: 15px;
+  margin-top: 15px
 }
 
 .classroom-card {
-  background-color: #f5f6ff;
+  background: #f5f6ff;
   border-radius: 10px;
   padding: 12px 20px;
   margin-bottom: 10px;
-  font-family: 'Poppins', sans-serif;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .05)
 }
 
-/* Dashboard Header */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #f6f7fb;
+  background: #f6f7fb;
   padding: 16px 30px;
   border-bottom: 1px solid #ddd;
-  font-family: 'Poppins', sans-serif;
 }
 
 .logo {
   font-size: 20px;
   font-weight: 700;
-  color: #738afd;
+  color: #738afd
 }
 
 .header-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #333
 }
 
-/* =============================================================================
-   11. TEACHER TOOLS / PROJECT-SPECIFIC STYLES
-   -----------------------------------------------------------------------------
-   - Progress filter bar, details/summary, etc.
-   ============================================================================= */
-.progress-filter-bar {
-  background-color: #f9f9ff;
-  padding: 1rem;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  margin: 1rem 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-}
-
-details summary {
-  padding: 0.5rem 1rem;
-  background-color: #f0f4ff;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-  margin-bottom: 0.5rem;
-  width: fit-content;
-  transition: background 0.2s;
-}
-
-details summary:hover {
-  background-color: #e0e8ff;
-}
-
-/* =============================================================================
-   12. RESPONSIVE / MOBILE STYLES (GENERAL)
-   -----------------------------------------------------------------------------
-   - Override or adjust layouts on smaller screens
-   ============================================================================= */
-@media (max-width: 768px) {
-  /* Adjust global padding */
+/* ============================================================================
+   Responsive overall tweaks
+   ========================================================================== */
+@media (max-width:768px) {
   body {
     padding: 0 15px;
   }
 
-  /* ReadingPal adjustments handled above */
-
-  /* Dashboard adjustments (if needed) */
-  .dashboard-wrapper {
-    padding: 20px 15px;
-  }
-
-  /* Library adjustments */
   .book-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 20px;
+    gap: 20px
+  }
+
+  .dashboard-wrapper {
+    padding: 20px 15px
+  }
+
+  .grammar-columns {
+    flex-direction: column;
+    padding: 20px
+  }
+
+  .grammar-sidebar {
+    max-width: 100%;
+    width: 100%;
+    margin-bottom: 30px
+  }
+
+  .grammar-content {
+    width: 100%;
+    padding: 24px;
+    border-radius: 10px;
+    box-shadow: none
+  }
+
+  .grammar-content input[type="submit"] {
+    width: 100%;
+    text-align: center
   }
 }
