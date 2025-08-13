@@ -1,12 +1,12 @@
-import { prisma } from "@/lib/prisma";
+// app/uploads/[id]/page.jsx
 import { cookies } from "next/headers";
 import UploadReader from "./UploadReader";
 
-export default async function UploadViewPage({ params }) {
-  const id = parseInt(params.id);
-  const cookieStore = await cookies();
+export default async function UploadViewPage(props) {
+  const { id } = await props.params;              //  await params
+  const uploadId = Number(id);
+  const cookieStore = await cookies();            //  await cookies()
   const anonId = cookieStore.get("learnloomId")?.value;
-
   const upload = await prisma.uploadedtext.findUnique({
     where: { id },
   });

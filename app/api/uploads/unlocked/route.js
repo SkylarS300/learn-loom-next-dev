@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 
 export async function GET() {
-  const anonId = cookies().get("learnloomId")?.value;
+  const cookieStore = await cookies();
+  const anonId = cookieStore.get("learnloomId")?.value;
   if (!anonId) return new Response("Unauthorized", { status: 401 });
 
   const unlocked = await prisma.uploadunlock.findMany({

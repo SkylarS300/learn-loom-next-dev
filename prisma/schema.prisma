@@ -91,15 +91,16 @@ model studentclassroom {
 }
 
 model uploadedtext {
-  id           Int            @id @default(autoincrement())
-  userId       Int?
-  anonId       String?
-  title        String
-  content      String
-  password     String? // 🔐 Optional password
-  createdAt    DateTime       @default(now())
-  uploadview   uploadview[]
-  uploadunlock uploadunlock[]
+  id             Int              @id @default(autoincrement())
+  userId         Int?
+  anonId         String?
+  title          String
+  content        String
+  password       String? // 🔐 Optional password
+  createdAt      DateTime         @default(now())
+  uploadview     uploadview[]
+  uploadunlock   uploadunlock[]
+  uploadprogress uploadprogress[] // back relation for uploadprogress
 
   @@index([userId])
   @@index([anonId])
@@ -182,6 +183,21 @@ model uploadunlock {
   anonId    String
   uploadId  Int
   createdAt DateTime @default(now())
+
+  uploadedtext uploadedtext @relation(fields: [uploadId], references: [id])
+
+  @@unique([anonId, uploadId])
+  @@index([anonId])
+  @@index([uploadId])
+}
+
+model uploadprogress {
+  id         Int      @id @default(autoincrement())
+  anonId     String
+  uploadId   Int
+  paraIndex  Int      @default(0)
+  charOffset Int      @default(0)
+  updatedAt  DateTime @default(now())
 
   uploadedtext uploadedtext @relation(fields: [uploadId], references: [id])
 

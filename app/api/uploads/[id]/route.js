@@ -1,33 +1,41 @@
-import { prisma } from "@/lib/prisma";
+// app/api/uploads/[id]/route.js
+import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
-export async function GET(request, context) {
-  const { params } = context;
-  const cookieStore = cookies();
-  const anonId = cookieStore.get("learnloomId")?.value;
-  const id = parseInt(params.id);
+/**
+ * GET /api/uploads/:id
+ * Returns the full upload content ONLY if the anon user has unlocked it.
+ */
+export async function GET(_req, context) {
+  try {
+    const { params } = context;
+    const { id } = await params; //  Next 15 requires await
+    const uploadId = Number(id);
 
-  if (!anonId || !id) return new Response("Unauthorized", { status: 401 });
+    const cookieStore = await cookies(); //  Next 15 requires await
+    const anonId = cookieStore.get("learnloomId")?.value;
 
-  const unlocked = await prisma.uploadunlock.findUnique({
-    where: {
-      anonId_uploadId: {
-        anonId,
-        uploadId: id,
-      },
-    },
-  });
+    if (!anonId || !uploadId) {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
-  if (!unlocked) {
-    return new Response("Forbidden", { status: 403 });
+    // Check if this anonId has unlocked this upload
+    const unlocked = await prisma.uploadunlock.findUnique({
+      where: { anonId_uploadId: { anonId, uploadId } },
+    });
+    if (!unlocked) {
+      return new Response("Locked", { status: 403 });
+    }
+
+    const upload = await prisma.uploadedtext.findUnique({
+      where: { id: uploadId },
+      select: { id: true, title: true, content: true },
+    });
+
+    if (!upload) return new Response("Not found", { status: 404 });
+    return Response.json(upload);
+  } catch (e) {
+    console.error("/api/uploads/[id] GET failed:", e);
+    return new Response("Server error", { status: 500 });
   }
-
-  const upload = await prisma.uploadedtext.findUnique({
-    where: { id },
-    select: { title: true, content: true },
-  });
-
-  if (!upload) return new Response("Not found", { status: 404 });
-
-  return Response.json(upload);
 }
