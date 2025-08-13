@@ -101,6 +101,8 @@ model uploadedtext {
   uploadview   uploadview[]
   uploadunlock uploadunlock[]
 
+  uploadprogress uploadprogress[] // inverse of uploadprogress.uploadedtext
+
   @@index([userId])
   @@index([anonId])
 }
@@ -182,6 +184,21 @@ model uploadunlock {
   anonId    String
   uploadId  Int
   createdAt DateTime @default(now())
+
+  uploadedtext uploadedtext @relation(fields: [uploadId], references: [id])
+
+  @@unique([anonId, uploadId])
+  @@index([anonId])
+  @@index([uploadId])
+}
+
+model uploadprogress {
+  id         Int      @id @default(autoincrement())
+  anonId     String
+  uploadId   Int
+  paraIndex  Int      @default(0)
+  charOffset Int      @default(0)
+  updatedAt  DateTime @updatedAt
 
   uploadedtext uploadedtext @relation(fields: [uploadId], references: [id])
 

@@ -925,3 +925,53 @@ ol {
     text-align: center
   }
 }
+
+/* Library extras */
+.library-search {
+  max-width: 520px;
+  margin: 0 auto 24px;
+}
+
+.section-title {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.uploads-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.upload-cover {
+  width: 100%;
+  aspect-ratio: 3/4;
+  border-radius: 6px;
+  background: #eef1ff;
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, .08);
+}
+
+.upload-initial {
+  font-size: 48px;
+  font-weight: 700;
+  color: #5360c9;
+  font-family: 'Poppins', sans-serif;
+}
+
+.lock-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 16px;
+}
+
+.highlight-progress {
+  background: #fff7a1;
+  transition: background .6s ease;
+}
