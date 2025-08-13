@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function UploadReader({ upload }) {
@@ -10,17 +10,103 @@ export default function UploadReader({ upload }) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (unlocked && upload?.id) {
-            fetch("/api/uploadview", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ uploadId: upload.id }),
-            });
+    // resume: { paraIndex, charOffset }
+    const [resume, setResume] = useState(null);
 
-            setUploadContent(upload.content);
-        }
+    const containerRef = useRef(null);
+    const paraRefs = useRef([]);
+
+    // Record a view + load content + fetch saved progress
+    useEffect(() => {
+        if (!unlocked || !upload?.id) return;
+
+        // log a view
+        fetch("/api/uploadview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uploadId: upload.id }),
+        }).catch(() => { });
+
+        // set whatever we already have
+        setUploadContent(upload.content ?? "");
+
+        // try to load saved progress
+        (async () => {
+            try {
+                const res = await fetch(`/api/uploadprogress?uploadId=${upload.id}`);
+                if (res.ok && res.status !== 204) {
+                    const data = await res.json();
+                    if (data?.paraIndex != null) {
+                        setResume({
+                            paraIndex: Number(data.paraIndex),
+                            charOffset: Number(data.charOffset ?? 0),
+                        });
+                    }
+                }
+            } catch { }
+        })();
     }, [unlocked, upload]);
+
+    // Autosave current paragraph on scroll (throttled via rAF)
+    useEffect(() => {
+        if (!unlocked || !uploadContent) return;
+        const cont = containerRef.current;
+        if (!cont) return;
+
+        let pending = null;
+
+        const saveProgress = async (pi) => {
+            try {
+                await fetch("/api/uploadprogress", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ uploadId: upload.id, paraIndex: pi, charOffset: 0 }),
+                });
+            } catch (e) {
+                // swallow: non-critical
+            }
+        };
+
+        const onScroll = () => {
+            if (pending) return;
+            pending = requestAnimationFrame(() => {
+                pending = null;
+                const rectTop = cont.getBoundingClientRect().top;
+
+                // nearest paragraph to container top (with small bias)
+                let bestIdx = 0;
+                let bestDelta = Infinity;
+                paraRefs.current.forEach((el, i) => {
+                    if (!el) return;
+                    const d = Math.abs(el.getBoundingClientRect().top - rectTop - 20);
+                    if (d < bestDelta) {
+                        bestDelta = d;
+                        bestIdx = i;
+                    }
+                });
+
+                saveProgress(bestIdx);
+            });
+        };
+
+        cont.addEventListener("scroll", onScroll, { passive: true });
+        return () => {
+            cont.removeEventListener("scroll", onScroll);
+            if (pending) cancelAnimationFrame(pending);
+        };
+    }, [unlocked, uploadContent, upload?.id]);
+
+    function handleResume() {
+        if (resume?.paraIndex == null) return;
+        const el = paraRefs.current[resume.paraIndex];
+        if (el && containerRef.current) {
+            containerRef.current.scrollTo({
+                top: el.offsetTop - 10,
+                behavior: "smooth",
+            });
+        }
+        setResume(null);
+    }
 
     async function handleUnlock() {
         setLoading(true);
@@ -36,15 +122,18 @@ export default function UploadReader({ upload }) {
                 setError("");
                 setPassword("");
 
+                // fetch full content after unlock
                 const full = await fetch(`/api/uploads/${upload.id}`);
                 if (full.ok) {
                     const data = await full.json();
-                    setUploadContent(data.content);
+                    setUploadContent(data.content ?? "");
                 }
             } else {
                 const text = await res.text();
                 setError(text || "Incorrect password");
             }
+        } catch {
+            setError("Server error");
         } finally {
             setLoading(false);
         }
@@ -55,26 +144,32 @@ export default function UploadReader({ upload }) {
             <div className="upload-reader locked">
                 <h1>{upload.title}</h1>
                 <p>This upload is password-protected.</p>
-                <div className="password-wrapper">
+
+                <div className="password-wrapper" style={{ position: "relative", display: "flex", gap: 8 }}>
                     <input
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="password-input"
+                        style={{ flex: 1 }}
                     />
                     <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
                         className="eye-toggle"
+                        aria-label="toggle password visibility"
+                        style={{ display: "grid", placeItems: "center", width: 36 }}
                     >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                 </div>
-                <button onClick={handleUnlock} disabled={loading} className="cta-button">
+
+                <button onClick={handleUnlock} disabled={loading} className="cta-button" style={{ marginTop: 8 }}>
                     {loading ? "Unlocking..." : "Unlock"}
                 </button>
-                {error && <p className="error">{error}</p>}
+
+                {error && <p className="error" style={{ color: "#d33", marginTop: 8 }}>{error}</p>}
             </div>
         );
     }
@@ -82,7 +177,39 @@ export default function UploadReader({ upload }) {
     return (
         <div className="upload-reader">
             <h1>{upload.title}</h1>
-            <pre className="upload-text">{uploadContent}</pre>
+
+            {resume && (
+                <div className="progress-banner" style={{ margin: "0 0 10px", display: "flex", gap: 8, alignItems: "center" }}>
+                    <span>Resume where you left off?</span>
+                    <button className="cta-button small" onClick={handleResume}>Resume</button>
+                    <button className="cta-button small" onClick={() => setResume(null)}>Dismiss</button>
+                </div>
+            )}
+
+            <div
+                ref={containerRef}
+                className="upload-text"
+                style={{
+                    maxHeight: 400,
+                    overflowY: "auto",
+                    padding: 16,
+                    background: "#f8f8f8",
+                    borderRadius: 8,
+                }}
+            >
+                {(uploadContent ?? "")
+                    .split(/\n{2,}/g) // paragraphs separated by blank lines
+                    .map((para, i) => (
+                        <p
+                            key={i}
+                            ref={(el) => (paraRefs.current[i] = el)}
+                            data-pi={i}
+                            style={{ margin: "0 0 1rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
+                        >
+                            {para}
+                        </p>
+                    ))}
+            </div>
         </div>
     );
 }
