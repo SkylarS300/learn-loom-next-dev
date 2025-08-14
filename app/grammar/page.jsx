@@ -112,7 +112,13 @@ export default function Grammar() {
                         <div style={{ fontSize: 12, marginTop: 6 }}>
                           Attempts: <strong>{r.attempts}</strong> • Acc:{" "}
                           <strong>{Math.round((r.accuracy || 0) * 100)}%</strong>
+                          {" "}| Conf: <strong>{Math.round((r.confidence || 0) * 100)}%</strong>
                         </div>
+                        {r.attempts < 5 && (
+                          <div style={{ fontSize: 12, color: "#8a6d3b", background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 6, padding: "2px 6px", display: "inline-block", marginTop: 6 }}>
+                            Limited data — do a few more rounds for better recommendations
+                          </div>
+                        )}
                         <button style={btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>
                           Start practice
                         </button>
