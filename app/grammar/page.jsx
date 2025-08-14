@@ -320,17 +320,28 @@ export default function Grammar() {
               {/* Custom quiz */}
               <section className={styles.card} style={{ marginTop: 16 }}>
                 <h2 className={styles.cardTitle}>Custom quiz</h2>
-                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 12 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 12,
+                    gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+                    marginTop: 12,
+                  }}
+                >
                   <label style={label}>
                     <span>Concept</span>
                     <select value={concept} onChange={(e) => setConcept(e.target.value)} style={input}>
-                      {concepts.map((c) => <option key={c} value={c}>{c}</option>)}
+                      {concepts.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
                     </select>
                   </label>
                   <label style={label}>
                     <span>Subtopic</span>
                     <select value={subTopic} onChange={(e) => setSubTopic(e.target.value)} style={input}>
-                      {subTopics.map((s) => <option key={s} value={s}>{s}</option>)}
+                      {subTopics.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                     </select>
                   </label>
                   <label style={label}>
@@ -354,10 +365,14 @@ export default function Grammar() {
                 {/* AI generator */}
                 <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input type="checkbox" checked={aiMode} onChange={(e) => setAiMode(e.target.checked)} />
+                    <input
+                      type="checkbox"
+                      checked={aiMode}
+                      onChange={(e) => setAiMode(e.target.checked)}
+                    />
                     <span>Use AI (generate from my text)</span>
                   </label>
-                  {aiMode && (
+                  {aiMode ? (
                     <textarea
                       value={aiText}
                       onChange={(e) => setAiText(e.target.value)}
@@ -365,26 +380,32 @@ export default function Grammar() {
                       rows={5}
                       style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: 8 }}
                     />
-                  )}
+                  ) : null}
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <button className={styles.btnPrimary} onClick={() => startQuizFrom(concept, subTopic)}>
-                    Start quiz
-                  </button>
-                  <div style={{ marginTop: 12 }}>
-                    {aiMsg && (
-                      <div role="status" style={{ background: "#fffbea", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 6, marginBottom: 8 }}>
-                        {aiMsg}
-                      </div>
-                    )}
-                    <button
-                      className={styles.btnPrimary}
-                      disabled={aiLoading || (aiMode && !aiText.trim())}
-                      onClick={() => startQuizFrom(concept, subTopic)}
+                  {aiMsg ? (
+                    <div
+                      role="status"
+                      style={{
+                        background: "#fffbea",
+                        border: "1px solid #fde68a",
+                        color: "#92400e",
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        marginBottom: 8,
+                      }}
                     >
-                      {aiLoading ? "Generating…" : "Start quiz"}
-                    </button>
-                  </div>
+                      {aiMsg}
+                    </div>
+                  ) : null}
+                  <button
+                    className={styles.btnPrimary}
+                    disabled={aiLoading || (aiMode && !aiText.trim())}
+                    onClick={() => startQuizFrom(concept, subTopic)}
+                  >
+                    {aiLoading ? "Generating…" : "Start quiz"}
+                  </button>
+                </div>
               </section>
             </>
           )}
