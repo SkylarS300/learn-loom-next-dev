@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../Navbar";
 import bank, { buildQuiz } from "@/src/grammar/buildQuiz";
+import styles from "./grammar.module.css";
 
 export default function Grammar() {
   // ----- Recommendations -----
@@ -93,18 +94,16 @@ export default function Grammar() {
       <Navbar />
       <div className="grammar-columns">
         {/* ---- Sidebar: topics from bank (keeps your two-column layout) ---- */}
-        <aside id="quizList" className="grammar-sidebar">
+        <aside id="quizList" className={`grammar-sidebar ${styles.sidebar}`}>
           {concepts.map((c) => (
             <div key={c} style={{ marginBottom: 12 }}>
-              <h2 style={{ margin: "12px 0 6px" }}>{c}</h2>
-              {(bank[c] ? Object.keys(bank[c]) : []).map((s) => (
+              <h2 className={styles.sidebarHeading}>{humanize(c)}</h2>              {(bank[c] ? Object.keys(bank[c]) : []).map((s) => (
                 <div key={s}>
                   <a
-                    className="subsection-link"
-                    onClick={() => startQuizFrom(c, s)}
+                    className={`subsection-link ${styles.sidebarLink}`} onClick={() => startQuizFrom(c, s)}
                     style={{ cursor: "pointer", display: "inline-block", margin: "2px 0" }}
                   >
-                    {s}
+                    {humanize(s)}
                   </a>
                 </div>
               ))}
@@ -136,31 +135,29 @@ export default function Grammar() {
           {mode === "landing" && (
             <>
               {/* Recommended panel */}
-              <section style={cardWrap}>
-                <h2 style={{ marginTop: 0 }}>Recommended</h2>
+              <section className={styles.card}>
+                <h2 className={styles.cardTitle}>Recommended</h2>
                 {recLoading && <p className="dim">Loading…</p>}
                 {recErr && <p style={{ color: "#c0392b" }}>{recErr}</p>}
                 {!recLoading && !recErr && (recs?.length ? (
-                  <div style={grid3}>
-                    {recs.map((r, i) => (
-                      <div key={i} style={card}>
-                        <div style={{ fontWeight: 700 }}>{r.concept}</div>
-                        <div style={{ color: "#555" }}>{r.subTopic}</div>
-                        <div style={{ fontSize: 12, marginTop: 6 }}>
-                          Attempts: <strong>{r.attempts}</strong> • Acc:{" "}
-                          <strong>{Math.round((r.accuracy || 0) * 100)}%</strong>
-                          {" "}| Conf: <strong>{Math.round((r.confidence || 0) * 100)}%</strong>
-                        </div>
-                        {r.attempts < 5 && (
-                          <div style={{ fontSize: 12, color: "#8a6d3b", background: "#fff7e6", border: "1px solid #ffe7ba", borderRadius: 6, padding: "2px 6px", display: "inline-block", marginTop: 6 }}>
-                            Limited data — do a few more rounds for better recommendations
-                          </div>
-                        )}
-                        <button style={btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>
-                          Start practice
-                        </button>
+                  <div className={styles.grid3}>                    {recs.map((r, i) => (
+                    <div key={i} className={styles.subcard}>
+                      <div className={styles.recTitle}>{humanize(r.concept)}</div>
+                      <div className={styles.recSub}>{humanize(r.subTopic)}</div>
+                      <div className={styles.metaRow}>
+                        Attempts: <strong>{r.attempts}</strong> • Acc:{" "}
+                        <strong>{Math.round((r.accuracy || 0) * 100)}%</strong>
+                        {" "}| Conf: <strong>{Math.round((r.confidence || 0) * 100)}%</strong>
                       </div>
-                    ))}
+                      {r.attempts < 5 && (
+                        <div className={styles.badgeWarn}>
+                          Limited data — do a few more rounds for better recommendations
+                        </div>
+                      )}
+                      <button className={styles.btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>                        Start practice
+                      </button>
+                    </div>
+                  ))}
                   </div>
                 ) : (
                   <p className="dim">No history yet. Try a starter quiz below.</p>
@@ -168,8 +165,8 @@ export default function Grammar() {
               </section>
 
               {/* Custom quiz */}
-              <section style={{ ...cardWrap, marginTop: 16 }}>
-                <h2 style={{ marginTop: 0 }}>Custom quiz</h2>
+              <section className={styles.card} style={{ marginTop: 16 }}>
+                <h2 className={styles.cardTitle}>Custom quiz</h2>
                 <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 12 }}>
                   <label style={label}>
                     <span>Concept</span>
@@ -202,7 +199,7 @@ export default function Grammar() {
                   </label>
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <button style={btnPrimary} onClick={() => startQuizFrom(concept, subTopic)}>
+                  <button className={styles.btnPrimary} onClick={() => startQuizFrom(concept, subTopic)}>
                     Start quiz
                   </button>
                 </div>
@@ -225,11 +222,10 @@ export default function Grammar() {
             />)}
 
           {mode === "results" && result && (
-            <section style={{ ...cardWrap, textAlign: "center" }}>
+            <section className={styles.card} style={{ textAlign: "center" }}>
               <h2 style={{ marginTop: 0 }}>Results</h2>
               <p style={{ fontSize: 18, margin: 0 }}>
-                <strong>{quiz.concept}</strong> — {quiz.subTopic}
-              </p>
+                <strong>{humanize(quiz.concept)}</strong> — {humanize(quiz.subTopic)}              </p>
               <p style={{ fontSize: 48, margin: "8px 0" }}>
                 {Math.round(result.scorePct)}%
               </p>
@@ -237,8 +233,8 @@ export default function Grammar() {
                 {result.numCorrect}/{result.total} correct • {Math.round(result.durationMs / 1000)}s
               </p>
               <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
-                <button style={btn} onClick={() => startQuizFrom(quiz.concept, quiz.subTopic)}>Retry</button>
-                <button style={btn} onClick={() => setMode("landing")}>Back</button>
+                <button className={styles.btn} onClick={() => startQuizFrom(quiz.concept, quiz.subTopic)}>Retry</button>
+                <button className={styles.btn} onClick={() => setMode("landing")}>Back</button>
               </div>
             </section>
           )}
@@ -247,6 +243,16 @@ export default function Grammar() {
     </div>
   );
 }
+
+// Humanize "SentenceStructure" -> "Sentence Structure", "verbTenses" -> "Verb Tenses"
+function humanize(s = "") {
+  return String(s)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_\-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
 
 // ---- Quiz Runner (accessible + keyboard) ----
 function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
@@ -259,6 +265,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const startRef = useRef(0);
   const lastTickRef = useRef(0);
   const elapsedRef = useRef(0);
+  const [, forceTick] = useState(0); // for visible timer
 
   // Initialize from stored session index if present (resume path)
   useEffect(() => {
@@ -290,6 +297,8 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         const now = performance.now();
         elapsedRef.current += now - lastTickRef.current;
         lastTickRef.current = now;
+        // trigger re-render for timer
+        forceTick((x) => (x + 1) % 1_000_000);
       } else {
         lastTickRef.current = performance.now();
       }
@@ -367,11 +376,20 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   }
   if (!q) return null;
 
+  const secs = Math.max(0, Math.round(elapsedRef.current / 1000));
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+
   return (
-    <section style={cardWrap} aria-live="polite">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <h2 style={{ margin: 0, flex: 1 }}>{quiz.concept} — {quiz.subTopic}</h2>
-        <div className="dim">{i + 1} / {total}</div>
+    <section className={styles.card} aria-live="polite">
+      <div className={styles.runnerTop}>
+        <h2 className={styles.cardTitle} style={{ margin: 0, flex: 1 }}>
+          {humanize(quiz.concept)} — {humanize(quiz.subTopic)}
+        </h2>
+        <div className={styles.topMeta}>
+          <span>{i + 1} / {total}</span>
+          <span>⏱ {mm}:{ss}</span>
+        </div>
       </div>
       <p style={{ fontSize: 18 }}>{q.prompt}</p>
       <div role="radiogroup" aria-label="Choices" style={{ display: "grid", gap: 8 }}>
@@ -398,18 +416,18 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div className={styles.controlsRow}>
         {!checked ? (
-          <button style={btnPrimary} disabled={sel == null} onClick={handleCheck}>
+          <button className={styles.btnPrimary} disabled={sel == null} onClick={handleCheck}>
             Check <span style={{ opacity: 0.6 }}>(Enter)</span>
           </button>
         ) : (
-          <button style={btnPrimary} onClick={next}>
+          <button className={styles.btnPrimary} onClick={next}>
             {i + 1 < total ? "Next" : "Finish"} <span style={{ opacity: 0.6 }}>(Enter)</span>
           </button>
         )}
-        <button style={btn} onClick={() => setPaused(true)}>Pause <span style={{ opacity: 0.6 }}>(Esc)</span></button>
-        <button style={btn} onClick={onCancel}>Exit</button>
+        <button className={styles.btn} onClick={() => setPaused(true)}>Pause <span style={{ opacity: 0.6 }}>(Esc)</span></button>
+        <button className={styles.btn} onClick={onCancel}>Exit</button>
       </div>
       {checked && (
         <div style={{ marginTop: 10 }}>

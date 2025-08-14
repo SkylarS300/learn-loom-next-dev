@@ -57,7 +57,7 @@ function pickStartersStable(anonId, k = 2) {
 // -------- route --------
 
 export async function GET(req) {
-    const cookieStore = cookies();
+    const cookieStore = await cookies(); // await before using
     const anonId = cookieStore.get("learnloomId")?.value;
 
     if (!anonId) {
