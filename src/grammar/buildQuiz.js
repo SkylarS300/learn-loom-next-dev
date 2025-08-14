@@ -16,6 +16,16 @@ function shuffle(arr, seed = null) {
     return a;
 }
 
+// Deterministically shuffle choices and remap the correct answer index
+function shuffleChoices(q, seedBase) {
+    if (!q || q.kind !== "mcq" || !Array.isArray(q.choices)) return q;
+    const idxs = q.choices.map((_, i) => i);
+    const perm = shuffle(idxs, seedBase);
+    const choices = perm.map((pi) => q.choices[pi]);
+    const answerIndex = perm.indexOf(q.answerIndex);
+    return { ...q, choices, answerIndex };
+}
+
 // Heuristic: expected 'a' or 'an' for a single word following the blank
 function expectedArticle(word) {
     const w = (word || "").toLowerCase();
