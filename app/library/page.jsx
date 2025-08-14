@@ -38,7 +38,9 @@ function UploadCard({ id, title, locked }) {
 
 export default function LibraryPage() {
   const [uploads, setUploads] = useState([]);
+  const [community, setCommunity] = useState([]);
   const [query, setQuery] = useState("");
+  const [shareCode, setShareCode] = useState("");
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -62,6 +64,23 @@ export default function LibraryPage() {
     };
   }, []);
 
+
+  // Load community (PUBLIC + optional CODED by code)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ scope: "public" });
+        if (shareCode.trim()) qs.set("code", shareCode.trim());
+        const r = await fetch(`/api/uploadedtext?${qs.toString()}`);
+        const j = await r.json().catch(() => ({}));
+        const list = Array.isArray(j) ? j : j?.data ?? [];
+        if (!cancelled) setCommunity(list);
+      } catch { /* no-op */ }
+    })();
+    return () => { cancelled = true; };
+  }, [shareCode]);
+
   const filtered = useMemo(() => {
     const curated = books.map((b, i) => ({
       kind: "book",
@@ -75,14 +94,21 @@ export default function LibraryPage() {
       title: u.title,
       locked: !!u.locked, // server should send locked boolean (derived from password)
     }));
+    const comm = (community || []).map((u) => ({
+      id: u.id,
+      title: u.title,
+      locked: !!u.locked,
+      visibility: u.visibility,
+    }));
 
     const q = query.trim().toLowerCase();
-    if (!q) return { curated, ups };
+    if (!q) return { curated, ups, comm };
 
     const match = (s) => (s || "").toLowerCase().includes(q);
     return {
       curated: curated.filter((x) => match(x.title) || match(x.author)),
       ups: ups.filter((x) => match(x.title)),
+      comm: comm.filter((x) => match(x.title)),
     };
   }, [uploads, query]);
 
@@ -123,6 +149,40 @@ export default function LibraryPage() {
                 title={b.title}
                 author={b.author}
                 onOpen={openBook}
+              />
+            ))
+          ) : (
+            <p className={styles.dim}>No matches</p>
+          )}
+        </div>
+      </section>
+
+
+      <section style={{ marginTop: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Community uploads</h3>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <input
+              className={styles.search}
+              style={{ maxWidth: 200 }}
+              placeholder="Have a share code?"
+              value={shareCode}
+              onChange={(e) => setShareCode(e.target.value)}
+              aria-label="Enter share code"
+            />
+          </div>
+        </div>
+        <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
+          Shows PUBLIC uploads from everyone. Enter a code to reveal a CODED title.
+        </p>
+        <div className={styles.grid}>
+          {filtered.comm.length > 0 ? (
+            filtered.comm.map((u) => (
+              <UploadCard
+                key={`c-${u.id}`}
+                id={u.id}
+                title={u.title}
+                locked={u.locked}
               />
             ))
           ) : (

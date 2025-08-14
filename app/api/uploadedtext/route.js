@@ -2,18 +2,31 @@ import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 
+// Short, URL-safe share code (e.g., 6 chars)
+function genShareCode(len = 6) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < len; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return s;
+}
+
+
 export async function POST(req) {
   const cookieStore = await cookies();
   const anonId = cookieStore.get("learnloomId")?.value;
   if (!anonId) return new Response("Unauthorized", { status: 401 });
 
-  const { title, content, password } = await req.json();
-
+  const { title, content, password, visibility = "PRIVATE" } = await req.json();
   if (!title || !content) {
     return new Response("Missing title or content", { status: 400 });
   }
 
   const hashed = password ? await bcrypt.hash(password, 10) : null;
+  const vis = ["PRIVATE", "CODED", "PUBLIC"].includes(String(visibility).toUpperCase())
+    ? String(visibility).toUpperCase()
+    : "PRIVATE";
+  const code = vis === "CODED" ? genShareCode() : null;
+
 
   const newText = await prisma.uploadedtext.create({
     data: {
@@ -21,46 +34,76 @@ export async function POST(req) {
       title,
       content,
       password: hashed,
+      visibility: vis,
+      shareCode: code
     },
   });
 
-  return Response.json({ id: newText.id });
+  // Return shareCode if generated, so user can share immediately
+  return Response.json({ id: newText.id, shareCode: newText.shareCode, visibility: newText.visibility });
 }
 
-// Unified GET (no content leak, stable {ok,data} shape)
-export async function GET() {
+// Unified GET (supports your uploads by default; or community via ?scope=public[&code=XXXX])
+export async function GET(req) {
   const cookieStore = await cookies(); // Next 15: await cookies()
+  const { searchParams } = new URL(req.url);
+  const scope = (searchParams.get("scope") || "mine").toLowerCase(); // mine | public
+  const code = searchParams.get("code")?.trim() || null;
   const anonId = cookieStore.get("learnloomId")?.value;
-  if (!anonId) {
-    return Response.json({ ok: false, error: "Missing anonymous ID" }, { status: 401 });
-  }
 
   try {
-    const rows = await prisma.uploadedtext.findMany({
-      where: { anonId },
-      orderBy: { createdAt: "desc" },
-      // Use select (not include) so we don't leak content/password
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        password: true, // only to compute locked flag; not returned verbatim
-        uploadview: {
+    // Default = "mine" (requires anon)
+    if (scope !== "public" && !anonId) {
+      return Response.json({ ok: false, error: "Missing anonymous ID" }, { status: 401 });
+    }
+
+    const baseSelect = {
+      id: true,
+      title: true,
+      createdAt: true,
+      password: true, // derive locked
+      visibility: true,
+      shareCode: true,
+    };
+
+    const rows =
+      scope === "public"
+        ? await prisma.uploadedtext.findMany({
+          where: code
+            ? {
+              OR: [
+                { visibility: "PUBLIC" },
+                { visibility: "CODED", shareCode: code },
+              ],
+            }
+            : { visibility: "PUBLIC" },
+          orderBy: { createdAt: "desc" },
+          select: baseSelect,
+        })
+        : await prisma.uploadedtext.findMany({
           where: { anonId },
-          orderBy: { viewedAt: "desc" },
-          take: 1,
-          select: { viewedAt: true },
-        },
-      },
-    });
+          orderBy: { createdAt: "desc" },
+          select: {
+            ...baseSelect,
+            uploadview: {
+              where: { anonId },
+              orderBy: { viewedAt: "desc" },
+              take: 1,
+              select: { viewedAt: true },
+            },
+          },
+        });
 
     const data = rows.map((r) => ({
       id: r.id,
       title: r.title,
       createdAt: r.createdAt,
       locked: !!r.password,
-      viewedAt: r.uploadview[0]?.viewedAt ?? null,
+      visibility: r.visibility,
+      // Only include viewedAt for "mine"
+      viewedAt: "uploadview" in r ? r.uploadview[0]?.viewedAt ?? null : undefined,
     }));
+
     return Response.json({ ok: true, data });
   } catch (e) {
     console.error("uploadedtext GET failed:", e);

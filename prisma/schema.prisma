@@ -96,14 +96,22 @@ model uploadedtext {
   anonId         String?
   title          String
   content        String
-  password       String? // 🔐 Optional password
+  password       String? // Optional password
   createdAt      DateTime         @default(now())
   uploadview     uploadview[]
   uploadunlock   uploadunlock[]
   uploadprogress uploadprogress[] // back relation for uploadprogress
+  visibility     upload_visibility @default(PRIVATE)
+  shareCode      String?           @unique
 
   @@index([userId])
   @@index([anonId])
+}
+
+enum upload_visibility {
+  PRIVATE
+  CODED
+  PUBLIC
 }
 
 model user {

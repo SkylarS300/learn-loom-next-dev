@@ -9,6 +9,7 @@ export default function NewUploadPage() {
   const [typedContent, setTypedContent] = useState("");
   const [fileContent, setFileContent] = useState("");
   const [password, setPassword] = useState("");
+  const [visibility, setVisibility] = useState("PRIVATE"); // PRIVATE | CODED | PUBLIC
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,7 +57,7 @@ export default function NewUploadPage() {
     const res = await fetch("/api/uploadedtext", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, content, password }),
+      body: JSON.stringify({ title, content, password, visibility }),
     });
 
     setLoading(false);
@@ -145,6 +146,18 @@ export default function NewUploadPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Leave blank to keep unlocked"
           />
+        </label>
+
+        <label>
+          Visibility:
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value)}
+          >
+            <option value="PRIVATE">Private (only you)</option>
+            <option value="PUBLIC">Public (listed in Community)</option>
+            <option value="CODED">Share code (not listed; show by code)</option>
+          </select>
         </label>
 
         <button type="submit" disabled={loading}>
