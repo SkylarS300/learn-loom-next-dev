@@ -115,6 +115,7 @@ export default function LibraryPage() {
       title: u.title,
       locked: !!u.locked,
       visibility: u.visibility,
+      shareCode: u.shareCode || null,   // available only for matched CODED items
     }));
 
     const q = query.trim().toLowerCase();
@@ -124,7 +125,8 @@ export default function LibraryPage() {
     return {
       curated: curated.filter((x) => match(x.title) || match(x.author)),
       ups: ups.filter((x) => match(x.title)),
-      comm: comm.filter((x) => match(x.title)),
+      // allow searching by title OR matched share code
+      comm: comm.filter((x) => match(x.title) || match(x.shareCode)),
     };
   }, [uploads, query]);
 
@@ -222,7 +224,7 @@ export default function LibraryPage() {
         <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
           Shows PUBLIC uploads from everyone. Enter a code to reveal a CODED title.
         </p>
-        +        {savedCodes.length > 0 && (
+        {savedCodes.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 12px" }}>
             {savedCodes.map((c) => (
               <span key={c} style={{ border: "1px solid #d9e3ff", background: "#f1f5ff", color: "#0b3b9f", borderRadius: 999, padding: "2px 8px" }}>
