@@ -9,7 +9,14 @@ function makeItem(noun, article) {
         prompt,
         choices,
         answerIndex,
-        explanation: `Use "${article}" before ${/^[aeiou]/i.test(noun) ? "vowel" : "consonant"} sounds.`,
+        explanation:
+            article === "A"
+                ? `Use 'a' before consonant sounds. ‘${noun.charAt(0).toUpperCase() + noun.slice(1)}’ begins with a consonant sound.`
+                : article === "An"
+                    ? `Use 'an' before vowel sounds. ‘${noun.charAt(0).toUpperCase() + noun.slice(1)}’ begins with a vowel sound or a silent 'h'.`
+                    : article === "The"
+                        ? "Use 'the' for specific or previously mentioned nouns."
+                        : "No article needed.",
         meta: { difficulty: "easy" },
     };
 }

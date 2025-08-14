@@ -15,6 +15,44 @@ function shuffle(arr, seed = null) {
     }
     return a;
 }
+
+// Heuristic: expected 'a' or 'an' for a single word following the blank
+function expectedArticle(word) {
+    const w = (word || "").toLowerCase();
+    if (!w) return "a";
+    // silent 'h'
+    if (/^(honest|honor|honour|hour|heir)/.test(w)) return "an";
+    // 'u' with /juː/ sound → a (university, unicorn, unique, user, useful...)
+    if (/^(uni|unio|univ|u[snqltrmdfb])/.test(w)) return "a";
+    // 'eu' /juː/ → a (european, eulogy, euphemism)
+    if (/^(eu)/.test(w)) return "a";
+    // 'one', 'once' → a (starts with /w/)
+    if (/^(one|once)/.test(w)) return "a";
+    // default: vowel letter → an; else a
+    return /^[aeiou]/.test(w) ? "an" : "a";
+}
+
+function fixArticleAnswer(q) {
+    if (!q || q.kind !== "mcq" || !Array.isArray(q.choices)) return q;
+    if (!/___\s*\w+/.test(q.prompt || "")) return q;
+    // Only act if both 'a' and 'an' are present
+    const idxA = q.choices.findIndex(c => String(c).toLowerCase() === "a");
+    const idxAn = q.choices.findIndex(c => String(c).toLowerCase() === "an");
+    if (idxA === -1 || idxAn === -1) return q;
+    const m = (q.prompt || "").match(/___\s*([A-Za-z-]+)/);
+    if (!m) return q;
+    const want = expectedArticle(m[1]);
+    const wantIdx = want === "an" ? idxAn : idxA;
+    if (q.answerIndex !== wantIdx) {
+        if (process.env.NODE_ENV !== "production") {
+            console.warn("[bank fix] adjusted a/an answerIndex for:", q.prompt);
+        }
+        return { ...q, answerIndex: wantIdx };
+    }
+    return q;
+}
+
+
 /**
  * Build a quiz from the bank.
  * @param {Object} opts
@@ -61,12 +99,10 @@ export function buildQuiz({
     if (!allowShort) pool = pool.filter((q) => q.kind !== "short");
 
     const items = shuffle(pool, seed).slice(0, count);
-    // Normalize choice order with optional deterministic shuffle per question
-    const normalized = items.map((q, i) => {
-        if (q.kind !== "mcq" || !Array.isArray(q.choices)) return q;
-        // keep choices order stable for now; could add per-item shuffling later
-        return q;
-    });
+    // First fix obvious a/an mistakes, then deterministically shuffle choices
+    const normalized = items.map((q, i) =>
+        shuffleChoices(fixArticleAnswer(q), seed == null ? i + 1 : seed + i + 1)
+    );
     return { concept, subTopic, items: normalized };
 }
 
