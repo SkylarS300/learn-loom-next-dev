@@ -40,16 +40,34 @@ export default function Grammar() {
   const [count, setCount] = useState(10);
 
   // ----- Quiz lifecycle -----
-  const [mode, setMode] = useState("landing"); // landing | running | results
+  const [mode, setMode] = useState("landing"); // landing | running | results | resume
   const [quiz, setQuiz] = useState(null);      // { concept, subTopic, items }
   const [result, setResult] = useState(null);  // { scorePct, numCorrect, total, durationMs }
+  const SESSION_KEY = "grammarSessionV1";
+
+  // Offer resume if we detect an in-progress session
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s?.concept && s?.subTopic && Array.isArray(s?.items) && s.index >= 0) {
+        setMode("resume");
+        setQuiz({ concept: s.concept, subTopic: s.subTopic, items: s.items });
+      }
+    } catch { }
+  }, []);
 
   function startQuizFrom(c, s, diff = difficulty, n = count) {
-    const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false });
+    const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
     if (!q.items?.length) return alert("Not enough questions yet in this area.");
     setQuiz(q);
     setResult(null);
     setMode("running");
+    // seed fresh session
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ concept: q.concept, subTopic: q.subTopic, items: q.items, index: 0, correct: 0, elapsed: 0 }));
+    } catch { }
   }
 
   async function onFinish(summary) {
@@ -96,6 +114,25 @@ export default function Grammar() {
 
         {/* ---- Content ---- */}
         <div id="textContainer" className="grammar-content">
+          {mode === "resume" && quiz && (
+            <section style={{ ...cardWrap, textAlign: "center" }}>
+              <h2 style={{ marginTop: 0 }}>Resume your last quiz?</h2>
+              <p><strong>{quiz.concept}</strong> — {quiz.subTopic}</p>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                <button style={btnPrimary} onClick={() => setMode("running")}>Resume</button>
+                <button
+                  style={btn}
+                  onClick={() => {
+                    try { localStorage.removeItem(SESSION_KEY); } catch { }
+                    setMode("landing");
+                    setQuiz(null);
+                  }}
+                >
+                  Discard
+                </button>
+              </div>
+            </section>
+          )}
           {mode === "landing" && (
             <>
               {/* Recommended panel */}
@@ -174,8 +211,18 @@ export default function Grammar() {
           )}
 
           {mode === "running" && quiz && (
-            <QuizRunner quiz={quiz} onFinish={onFinish} onCancel={() => setMode("landing")} />
-          )}
+            <QuizRunner
+              quiz={quiz}
+              sessionKey={SESSION_KEY}
+              onFinish={(sum) => {
+                try { localStorage.removeItem(SESSION_KEY); } catch { }
+                onFinish(sum);
+              }}
+              onCancel={() => {
+                try { localStorage.removeItem(SESSION_KEY); } catch { }
+                setMode("landing");
+              }}
+            />)}
 
           {mode === "results" && result && (
             <section style={{ ...cardWrap, textAlign: "center" }}>
@@ -202,7 +249,7 @@ export default function Grammar() {
 }
 
 // ---- Quiz Runner (accessible + keyboard) ----
-function QuizRunner({ quiz, onFinish, onCancel }) {
+function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const [i, setI] = useState(0);
   const [sel, setSel] = useState(null);
   const [checked, setChecked] = useState(false);
@@ -212,6 +259,25 @@ function QuizRunner({ quiz, onFinish, onCancel }) {
   const startRef = useRef(0);
   const lastTickRef = useRef(0);
   const elapsedRef = useRef(0);
+
+  // Initialize from stored session index if present (resume path)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(sessionKey);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s?.index >= 0) {
+          setI(s.index);
+          setSel(null);
+          setChecked(false);
+          setFeedback("");
+          elapsedRef.current = Number(s.elapsed || 0);
+          setCorrectCount(Number(s.correct || 0));
+        }
+      }
+    } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const q = quiz.items[i];
   const total = quiz.items.length;
@@ -250,6 +316,24 @@ function QuizRunner({ quiz, onFinish, onCancel }) {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checked, paused, q]);
+
+  // Persist minimal session state
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        sessionKey,
+        JSON.stringify({
+          concept: quiz.concept,
+          subTopic: quiz.subTopic,
+          items: quiz.items, // lightweight MCQs; no PII
+          index: i,
+          correct: correctCount,
+          elapsed: elapsedRef.current,
+        })
+      );
+    } catch { }
+  }, [i, correctCount, quiz, sessionKey]);
+
 
   function handleCheck() {
     if (q.kind !== "mcq" || sel == null) return;

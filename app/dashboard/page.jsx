@@ -47,10 +47,35 @@ export default function DashboardPage() {
     return books?.[idx]?.title || `Book #${idx}`;
   }
 
+  function RecommendedChips() {
+    const [rows, setRows] = useState([]);
+    useEffect(() => {
+      (async () => {
+        try {
+          const r = await fetch("/api/grammar/recommendations");
+          const j = await r.json();
+          if (j?.ok) setRows(j.data || []);
+        } catch { }
+      })();
+    }, []);
+    if (!rows.length) return null;
+    return (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0 16px" }}>
+        {rows.map((r, i) => (
+          <span key={i} title={`Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%`}
+            style={{ border: "1px solid #e5e7eb", background: "#f9fafb", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
+            {r.concept} — {r.subTopic}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ margin: 0 }}>Dashboard</h1>
+        <RecommendedChips />
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button
             style={{ ...btnStyle, background: "#ef4444" }}
