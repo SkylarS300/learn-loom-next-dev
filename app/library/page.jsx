@@ -186,7 +186,10 @@ export default function LibraryPage() {
               style={{ maxWidth: 200 }}
               placeholder="Have a share code?"
               value={shareCode}
-              onChange={(e) => setShareCode(e.target.value)}
+              onChange={(e) => {
+                const v = (e.target.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+                setShareCode(v);
+              }}
               aria-label="Enter share code"
             />
             <button
