@@ -1,73 +1,80 @@
-// /app/api/grammarprogress/route.js
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 
+// GET: list your grammar attempts (most recent first)
 export async function GET() {
   const cookieStore = await cookies();
   const anonId = cookieStore.get("learnloomId")?.value;
-  if (!anonId) return new Response("Unauthorized", { status: 401 });
-
-  const results = await prisma.grammarprogress.findMany({
-    where: { anonId },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      concept: true,
-      subTopic: true,
-      score: true,
-      numQuestions: true,
-      durationMs: true,
-      createdAt: true,
-    },
-  });
-
-  return Response.json(results);
-}
-
-export async function POST(req) {
-  const cookieStore = await cookies();
-  const anonId = cookieStore.get("learnloomId")?.value;
-  if (!anonId) return new Response("Unauthorized", { status: 401 });
-
-  let body;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response("Bad JSON", { status: 400 });
+  if (!anonId) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  console.log("📥 Incoming grammar POST:", body);
 
-  let { concept, subTopic, score, numQuestions, durationMs, isAi } = body ?? {}; console.log("❌ Invalid body. concept:", concept, "subTopic:", subTopic, "score:", score);
-  return new Response("Missing data", { status: 400 });
+  try {
+    const results = await prisma.grammarprogress.findMany({
+      where: { anonId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        concept: true,
+        subTopic: true,
+        score: true,          // Int 0..100
+        numQuestions: true,   // Int?
+        durationMs: true,     // Int?
+        isAi: true,           // Bool?
+        createdAt: true,
+      },
+    });
+    return Response.json({ ok: true, data: results });
+  } catch (e) {
+    console.error("grammarprogress GET failed:", e);
+    return Response.json({ ok: false, error: "Server error" }, { status: 500 });
+  }
 }
 
-// Normalize score to Int 0..100 (schema is Int)
-score = Number(score);
-if (Number.isNaN(score)) return new Response("Invalid score", { status: 422 });
-if (score <= 1) score = Math.round(score * 100);   // treat 0..1 as fraction
-else score = Math.round(score);                     // already 0..100
-score = Math.max(0, Math.min(100, score));
+// POST: record a grammar attempt
+export async function POST(req) {
+  try {
+    const cookieStore = await cookies();
+    const anonId = cookieStore.get("learnloomId")?.value;
+    if (!anonId) {
+      return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
 
-// Optional metadata (sanitize)
-const nq = Number.isFinite(Number(numQuestions)) ? Math.max(0, Math.round(Number(numQuestions))) : null;
-const dur = Number.isFinite(Number(durationMs)) ? Math.max(0, Math.round(Number(durationMs))) : null;
-const ai = typeof isAi === "boolean" ? isAi : false;
+    const body = await req.json();
+    let { concept, subTopic, score, numQuestions, durationMs, isAi } = body ?? {};
 
-try {
-  await prisma.grammarprogress.create({
-    data: {
-      anonId,
-      concept: String(concept),
-      subTopic: String(subTopic),
-      score,
-      numQuestions: nq,
-      durationMs: dur,
-      isAi: ai,
-    },
-  });
-  return new Response("Saved", { status: 200 });
-} catch (e) {
-  console.error("grammarprogress create failed:", e);
-  return new Response("Server error", { status: 500 });
+    if (!concept || !subTopic || score == null) {
+      return Response.json({ ok: false, error: "Missing data" }, { status: 400 });
+    }
+
+    // Normalize score to Int 0..100 (schema is Int)
+    let s = Number(score);
+    if (Number.isNaN(s)) {
+      return Response.json({ ok: false, error: "Invalid score" }, { status: 422 });
+    }
+    if (s <= 1) s = Math.round(s * 100); else s = Math.round(s); // support 0..1 or 0..100
+    s = Math.max(0, Math.min(100, s));
+
+    // Optional numeric fields
+    const nq = Number.isFinite(Number(numQuestions)) ? Math.max(0, Math.round(Number(numQuestions))) : null;
+    const dur = Number.isFinite(Number(durationMs)) ? Math.max(0, Math.round(Number(durationMs))) : null;
+    const ai = typeof isAi === "boolean" ? isAi : false;
+
+    await prisma.grammarprogress.create({
+      data: {
+        anonId,
+        concept: String(concept),
+        subTopic: String(subTopic),
+        score: s,
+        numQuestions: nq,
+        durationMs: dur,
+        isAi: ai,
+      },
+    });
+
+    return Response.json({ ok: true, data: { saved: true } });
+  } catch (e) {
+    console.error("grammarprogress POST failed:", e);
+    return Response.json({ ok: false, error: "Server error" }, { status: 500 });
+  }
 }
-
