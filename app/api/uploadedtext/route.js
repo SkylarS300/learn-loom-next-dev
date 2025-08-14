@@ -48,7 +48,7 @@ export async function GET(req) {
   const cookieStore = await cookies(); // Next 15: await cookies()
   const { searchParams } = new URL(req.url);
   const scope = (searchParams.get("scope") || "mine").toLowerCase(); // mine | public
-  const codeParam = searchParams.get("code")?.trim() || null;
+  const codeParamRaw = searchParams.get("code")?.trim() || null;
   const anonId = cookieStore.get("learnloomId")?.value;
 
   // gather saved codes from cookie (JSON array), plus optional ?code param
@@ -58,8 +58,8 @@ export async function GET(req) {
     if (raw) savedCodes = JSON.parse(raw);
   } catch { }
   const allCodes = new Set(
-    [...(Array.isArray(savedCodes) ? savedCodes : []), ...(codeParam ? [codeParam] : [])]
-      .map(s => String(s || "").trim())
+    [...(Array.isArray(savedCodes) ? savedCodes : []), ...(codeParamRaw ? [codeParamRaw] : [])]
+      .map(s => String(s || "").trim().toUpperCase())
       .filter(Boolean)
   );
 
@@ -84,8 +84,7 @@ export async function GET(req) {
           ? {
             OR: [
               { visibility: "PUBLIC" },
-              { visibility: "CODED", shareCode: { in: Array.from(allCodes) } },
-            ],
+              { visibility: "CODED", shareCode: { in: Array.from(allCodes) } },],
           }
           : { visibility: "PUBLIC" },
         orderBy: { createdAt: "desc" },
@@ -113,6 +112,14 @@ export async function GET(req) {
       visibility: r.visibility,
       // Only include viewedAt for "mine"
       viewedAt: "uploadview" in r ? r.uploadview[0]?.viewedAt ?? null : undefined,
+      // Expose code ONLY when this item actually matched a provided/saved code,
+      // or when it's PUBLIC (we set null to avoid leaking codes broadly).
+      shareCode:
+        scope === "public"
+          ? (r.visibility === "CODED" && allCodes.has((r.shareCode || "").toUpperCase())
+            ? r.shareCode
+            : null)
+          : undefined,
     }));
 
     return Response.json({ ok: true, data });
