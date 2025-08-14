@@ -60,6 +60,14 @@ export async function GET(req) {
     const cookieStore = await cookies(); // await before using
     const anonId = cookieStore.get("learnloomId")?.value;
 
+    // Map seconds-per-question to a speed efficiency [0.5..1.0]
+    // Baseline 15s/q: 1.0; slower → down to 0.5; faster capped at 1.0
+    function speedEfficiency(secPerQ) {
+        if (!Number.isFinite(secPerQ) || secPerQ <= 0) return 1.0;
+        const baseline = 15; // adjust later if needed
+        return Math.max(0.5, Math.min(1.0, baseline / secPerQ));
+    }
+
     if (!anonId) {
         return Response.json({ ok: false, error: "Missing anonymous ID" }, { status: 401 });
     }
@@ -73,7 +81,14 @@ export async function GET(req) {
             where: { anonId },
             orderBy: { createdAt: "desc" },
             take: 200, // last 200 attempts
-            select: { concept: true, subTopic: true, score: true, createdAt: true },
+            select: {
+                concept: true,
+                subTopic: true,
+                score: true,
+                numQuestions: true,
+                durationMs: true,
+                createdAt: true,
+            },
         });
 
         // If there's no history, propose stable starters from the bank
@@ -94,32 +109,38 @@ export async function GET(req) {
         }
 
         const now = Date.now();
-        const buckets = new Map(); // key => aggregate
-
+        // key = `${concept}|${sub}`, value aggregate container
+        const buckets = new Map();
         for (const r of rows) {
             const key = `${r.concept}|${r.subTopic || "General"}`;
             const days = (now - new Date(r.createdAt).getTime()) / 86400000;
             const w = recencyWeight(days);
 
-            const b =
-                buckets.get(key) ||
-                {
-                    concept: r.concept,
-                    subTopic: r.subTopic || "General",
-                    attempts: 0,
-                    correct: 0,     // count attempts with score >= 0.8
-                    wCorrect: 0,    // weighted sum of scores
-                    wTotal: 0,      // total weight
-                    lastAttemptAt: null,
-                };
-
+            const b = buckets.get(key) || {
+                concept: r.concept,
+                subTopic: r.subTopic || "General",
+                attempts: 0,
+                correct: 0,
+                wCorrect: 0,   // accuracy * speed * recency
+                wTotal: 0,     // recency
+                wSec: 0,       // for avg seconds per question (weighted by recency)
+                wN: 0,
+            };
+            // normalize score to 0..1
+            const s = (r.score > 1 ? r.score / 100 : r.score) || 0;
+            const n = Number.isFinite(r.numQuestions) && r.numQuestions > 0 ? r.numQuestions : 10;
+            const secPerQ = (Number.isFinite(r.durationMs) ? r.durationMs : 0) / 1000 / Math.max(1, n);
+            const eff = speedEfficiency(secPerQ); // [0.5..1.0]
             b.attempts += 1;
-
-            // normalize to 0..1 whether stored as 0..100 or 0..1
-            const s = r.score > 1 ? r.score / 100 : r.score;
             b.correct += s >= 0.8 ? 1 : 0;
-            b.wCorrect += s * w;
+            // fold speed into accuracy before aggregating
+            b.wCorrect += s * eff * w;
             b.wTotal += w;
+            // track pace (weighted)
+            if (Number.isFinite(secPerQ) && secPerQ > 0) {
+                b.wSec += secPerQ * w;
+                b.wN += w;
+            }
             if (!b.lastAttemptAt || new Date(r.createdAt) > new Date(b.lastAttemptAt)) {
                 b.lastAttemptAt = r.createdAt;
             }
@@ -128,44 +149,46 @@ export async function GET(req) {
         }
 
         const data = Array.from(buckets.values()).map((b) => {
-            const accuracy = b.correct / Math.max(1, b.attempts); // unweighted accuracy
-            const weightedAccuracy = b.wCorrect / Math.max(1e-6, b.wTotal); // 30-day weighted
-            const confidence = Math.min(1, Math.sqrt(b.attempts) / 5);       // 25 attempts → ~1.0
-            const weakness = (1 - weightedAccuracy) * (0.5 + 0.5 * confidence);
-
-            return {
-                ...b,
-                accuracy,
-                weightedAccuracy,
-                weakness,
-                confidence,
-                recentScore: weightedAccuracy, // alias for clarity in UI
-            };
+            const accuracy = b.correct / Math.max(1, b.attempts);           // crude ratio on ≥80% hits
+            const weightedAccuracy = b.wCorrect / Math.max(1e-6, b.wTotal); // already speed-adjusted
+            const confidence = Math.min(1, Math.sqrt(b.attempts) / 5);      // 25 attempts → ~1.0
+            const avgSecPerQ = b.wN > 0 ? b.wSec / b.wN : null;
+            const efficiency = avgSecPerQ ? speedEfficiency(avgSecPerQ) : 1.0; // [0.5..1.0]
+            // Base weakness from accuracy (0..1), then gently add speed penalty if slow
+            let weakness = (1 - weightedAccuracy) * (0.5 + 0.5 * confidence);
+            if (avgSecPerQ && avgSecPerQ > 15) {
+                const extra = Math.min(0.25, (avgSecPerQ - 15) / 60); // up to +0.25 when very slow
+                weakness = Math.min(1, weakness + extra);
+            }
+            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency };
         });
 
-        // Rank by weakness; return top n with >=1 attempt
+        // Show areas even with limited data (>=1 attempt). Confidence will be low.
         let top = data
             .filter((x) => x.attempts >= 1)
             .sort((a, b) => b.weakness - a.weakness)
-            .slice(0, n);
+            .slice(0, 2);
 
         // Fallback: if no computed top (should be rare), surface the very last practiced item
         if (top.length === 0 && rows.length > 0) {
             const last = rows[0];
-            const s = last.score > 1 ? last.score / 100 : last.score;
-            top = [
-                {
-                    concept: last.concept,
-                    subTopic: last.subTopic || "General",
-                    attempts: 1,
-                    accuracy: s >= 0.8 ? 1 : 0,
-                    weightedAccuracy: s,
-                    recentScore: s,
-                    confidence: Math.min(1, Math.sqrt(1) / 5),
-                    weakness: 1 - s,
-                    lastAttemptAt: last.createdAt,
-                },
-            ];
+            const s = (last.score > 1 ? last.score / 100 : last.score) || 0;
+            const n = Number.isFinite(last.numQuestions) && last.numQuestions > 0 ? last.numQuestions : 10;
+            const spq = (Number.isFinite(last.durationMs) ? last.durationMs : 0) / 1000 / Math.max(1, n);
+            const eff = speedEfficiency(spq);
+            top = [{
+                concept: last.concept,
+                subTopic: last.subTopic || "General",
+                attempts: 1,
+                accuracy: s >= 0.8 ? 1 : 0,
+                weightedAccuracy: s * eff,
+                confidence: Math.min(1, Math.sqrt(1) / 5),
+                avgSecPerQ: spq || null,
+                efficiency: eff,
+                weakness: Math.min(1, 1 - (s * eff)),
+            }];
+
+            return Response.json({ ok: true, data: top });
         }
 
         return Response.json({ ok: true, data: top });

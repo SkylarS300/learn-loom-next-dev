@@ -143,24 +143,28 @@ export default function Grammar() {
                 {recLoading && <p className="dim">Loading…</p>}
                 {recErr && <p style={{ color: "#c0392b" }}>{recErr}</p>}
                 {!recLoading && !recErr && (recs?.length ? (
-                  <div className={styles.grid3}>                    {recs.map((r, i) => (
-                    <div key={i} className={styles.subcard}>
-                      <div className={styles.recTitle}>{humanize(r.concept)}</div>
-                      <div className={styles.recSub}>{humanize(r.subTopic)}</div>
-                      <div className={styles.metaRow}>
-                        Attempts: <strong>{r.attempts}</strong> • Acc:{" "}
-                        <strong>{Math.round((r.accuracy || 0) * 100)}%</strong>
-                        {" "}| Conf: <strong>{Math.round((r.confidence || 0) * 100)}%</strong>
-                      </div>
-                      {r.attempts < 5 && (
-                        <div className={styles.badgeWarn}>
-                          Limited data — do a few more rounds for better recommendations
+                  <div className={styles.grid3}>
+                    {recs.map((r, i) => (
+                      <div key={i} className={styles.subcard}>
+                        <div className={styles.recTitle}>{humanize(r.concept)}</div>
+                        <div className={styles.recSub}>{humanize(r.subTopic)}</div>
+                        <div className={styles.metaRow}>
+                          Attempts: <strong>{r.attempts}</strong> • Acc:{" "}
+                          <strong>{Math.round((r.accuracy || 0) * 100)}%</strong>
+                          {" "}| Conf: <strong>{Math.round((r.confidence || 0) * 100)}%</strong>
+                          {typeof r.avgSecPerQ === "number" && (
+                            <> | Pace: <strong>{Math.round(r.avgSecPerQ)}s/q</strong></>
+                          )}
                         </div>
-                      )}
-                      <button className={styles.btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>                        Start practice
-                      </button>
-                    </div>
-                  ))}
+                        {r.attempts < 5 && (
+                          <div className={styles.badgeWarn}>
+                            Limited data — do a few more rounds for better recommendations
+                          </div>
+                        )}
+                        <button className={styles.btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>                        Start practice
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className="dim">No history yet. Try a starter quiz below.</p>
