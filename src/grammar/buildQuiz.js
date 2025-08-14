@@ -82,6 +82,18 @@ function expectedArticle(word) {
     return /^[aeiou]/.test(w) ? "an" : "a";
 }
 
+function uniqueBy(arr, keyFn) {
+    const seen = new Set();
+    const out = [];
+    for (const it of arr || []) {
+        const k = keyFn(it);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(it);
+    }
+    return out;
+}
+
 function fixArticleAnswer(q) {
     if (!q || q.kind !== "mcq" || !Array.isArray(q.choices)) return q;
     if (!/___\s*\w+/.test(q.prompt || "")) return q;
@@ -101,6 +113,7 @@ function fixArticleAnswer(q) {
     }
     return q;
 }
+
 
 
 /**

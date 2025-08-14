@@ -39,6 +39,20 @@ export default function Grammar() {
   }, [subTopics]);
   const [difficulty, setDifficulty] = useState("mixed");
   const [count, setCount] = useState(10);
+  // Stats for badges
+  const [stats, setStats] = useState([]);
+  const [focusWeak, setFocusWeak] = useState(false);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/grammar/stats");
+        const j = await r.json();
+        if (!dead && j?.ok) setStats(j.data || []);
+      } catch { }
+    })();
+    return () => { dead = true; };
+  }, []);
   const [aiMode, setAiMode] = useState(false);
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -197,18 +211,51 @@ export default function Grammar() {
       <div className="grammar-columns">
         {/* ---- Sidebar: topics from bank (keeps your two-column layout) ---- */}
         <aside id="quizList" className={`grammar-sidebar ${styles.sidebar}`}>
-          {concepts.map((c) => (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+              <input type="checkbox" checked={focusWeak} onChange={e => setFocusWeak(e.target.checked)} />
+              <span>Focus weak areas</span>
+            </label>
+          </div>          {concepts.map((c) => (
             <div key={c} style={{ marginBottom: 12 }}>
-              <h2 className={styles.sidebarHeading}>{humanize(c)}</h2>              {(bank[c] ? Object.keys(bank[c]) : []).map((s) => (
-                <div key={s}>
-                  <a
-                    className={`subsection-link ${styles.sidebarLink}`} onClick={() => startQuizFrom(c, s)}
-                    style={{ cursor: "pointer", display: "inline-block", margin: "2px 0" }}
-                  >
-                    {humanize(s)}
-                  </a>
-                </div>
-              ))}
+              <h2 className={styles.sidebarHeading}>{humanize(c)}</h2>
+              {(bank[c] ? Object.keys(bank[c]) : []).map((s) => {
+                const st = stats.find(x => x.concept === c && x.subTopic === s);
+                const attempts = st?.attempts || 0;
+                const avg = st?.avgScore ?? null;
+                const mastered = attempts >= 3 && (avg ?? 0) >= 80;
+                if (focusWeak && mastered) return null;
+                return (
+                  <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <a
+                      className={`subsection-link ${styles.sidebarLink}`}
+                      onClick={() => startQuizFrom(c, s)}
+                      style={{
+                        cursor: "pointer",
+                        display: "inline-block",
+                        margin: "2px 0",
+                        opacity: mastered ? 0.6 : 1
+                      }}
+                      title={attempts ? `Attempts: ${attempts} · Avg: ${Math.round((avg || 0))}%` : "No attempts yet"}
+                    >
+                      {humanize(s)}
+                    </a>
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        border: "1px solid #e5e7eb",
+                        background: attempts ? (mastered ? "#ecfdf5" : "#fff7ed") : "#f3f4f6",
+                        color: mastered ? "#065f46" : attempts ? "#9a3412" : "#6b7280",
+                      }}
+                    >
+                      {attempts ? `${Math.round(avg || 0)}% • ${attempts}` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </aside>
@@ -486,6 +533,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const [checked, setChecked] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [hintOpen, setHintOpen] = useState(false);
   const [paused, setPaused] = useState(false);
   const startRef = useRef(0);
   const lastTickRef = useRef(0);
@@ -586,6 +634,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
 
   function handleCheck() {
     if (q.kind !== "mcq" || sel == null) return;
+    setHintOpen(false);
     const isCorrect = sel === q.answerIndex;
     if (isCorrect) setCorrectCount((c) => c + 1);
     setFeedback(isCorrect ? "Correct!" : "Try again next time.");
@@ -660,6 +709,19 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
           );
         })}
       </div>
+      {/* Hint (does not grade; shows explanation if available) */}
+      {q.explanation && !checked && (
+        <div style={{ margin: "8px 0" }}>
+          <button className={styles.btn} onClick={() => setHintOpen(v => !v)}>
+            {hintOpen ? "Hide hint" : "Show hint"}
+          </button>
+          {hintOpen && (
+            <div style={{ marginTop: 6, background: "#f0f9ff", border: "1px solid #bae6fd", color: "#0c4a6e", padding: "8px 10px", borderRadius: 6 }}>
+              {q.explanation}
+            </div>
+          )}
+        </div>
+      )}
       <div className={styles.controlsRow}>
         {!checked ? (
           <button className={styles.btnPrimary} disabled={sel == null} onClick={handleCheck}>
