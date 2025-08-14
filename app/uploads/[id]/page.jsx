@@ -9,6 +9,7 @@ export default async function UploadViewPage(props) {
   const uploadId = Number(id);
   const cookieStore = await cookies();            //  await cookies()
   const anonId = cookieStore.get("learnloomId")?.value;
+
   // read saved codes (JSON array)
   let savedCodes = [];
   try {
@@ -16,7 +17,10 @@ export default async function UploadViewPage(props) {
     if (raw) savedCodes = JSON.parse(raw);
   } catch { }
   const codeCookieSet = new Set(Array.isArray(savedCodes) ? savedCodes.map(String) : []);
-  const upload = await prisma.uploadedtext.findUnique({ where: { id: uploadId } });
+
+  const upload = await prisma.uploadedtext.findUnique({
+    where: { id: uploadId }, // ensure number, not the raw string
+  });
 
   if (!upload) {
     return <p>Upload not found.</p>;
@@ -31,40 +35,31 @@ export default async function UploadViewPage(props) {
   if (upload.visibility === "CODED" && !isOwner) {
     const cookieOK = upload.shareCode && codeCookieSet.has(upload.shareCode);
     const urlOK = upload.shareCode && shareCodeParam === upload.shareCode;
-    if (!(cookieOK || urlOK)) {      // allow page, but do not send content
+    if (!(cookieOK || urlOK)) {
+      // allow page, but do not send content
       upload.content = null;
     }
   }
   // PUBLIC: allowed (content may still be password-locked)
-  // If password protected, check if anonId has unlocked it
+  // Password enforcement (never leak content unless unlocked)
+  let unlocked = false;
   if (upload.password && anonId) {
-    const unlocked = await prisma.uploadunlock.findUnique({
-      where: {
-        anonId_uploadId: {
-          anonId,
-          uploadId: upload.id,
-        },
-      },
+    const row = await prisma.uploadunlock.findUnique({
+      where: { anonId_uploadId: { anonId, uploadId: upload.id } },
+      select: { id: true },
     });
-
-    // Build a serializable safe object for the client
-    const safeUpload = {
-      id: upload.id,
-      title: upload.title,
-      content: unlocked ? upload.content : null,
-      password: !!upload.password,
-      createdAt: upload.createdAt,
-    };
-    return <UploadReader upload={safeUpload} />;
+    unlocked = !!row;
   }
 
-  // If not locked or no anonId, still avoid leaking the password hash
+  // Build a serializable safe object for the client
   const safeUpload = {
     id: upload.id,
     title: upload.title,
-    content: upload.content,
+    content: upload.password && !unlocked ? null : upload.content,
     password: !!upload.password,
     createdAt: upload.createdAt,
+    visibility: upload.visibility,
+    shareCode: upload.shareCode ?? null,
   };
-  return <UploadReader upload={safeUpload} />;
+  return <UploadReader upload={safeUpload} isOwner={isOwner} />;
 }
