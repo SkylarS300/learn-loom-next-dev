@@ -65,7 +65,7 @@ export default function LibraryPage() {
   }, []);
 
 
-  // Load community (PUBLIC + optional CODED by code)
+  // Load community (PUBLIC + any saved codes cookie + optional typed code)
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -170,6 +170,22 @@ export default function LibraryPage() {
               onChange={(e) => setShareCode(e.target.value)}
               aria-label="Enter share code"
             />
+            <button
+              className={styles.btn}
+              onClick={async () => {
+                const code = (shareCode || "").trim();
+                if (!code) return;
+                await fetch("/api/sharecode", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ code }),
+                });
+                // re-fetch happens automatically due to shareCode dep above
+              }}
+              aria-label="Save share code"
+            >
+              Save code
+            </button>
           </div>
         </div>
         <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
@@ -177,14 +193,22 @@ export default function LibraryPage() {
         </p>
         <div className={styles.grid}>
           {filtered.comm.length > 0 ? (
-            filtered.comm.map((u) => (
-              <UploadCard
-                key={`c-${u.id}`}
-                id={u.id}
-                title={u.title}
-                locked={u.locked}
-              />
-            ))
+            filtered.comm.map((u) => {
+              const href =
+                u.visibility === "CODED" && shareCode.trim()
+                  ? `/uploads/${u.id}?code=${encodeURIComponent(shareCode.trim())}`
+                  : `/uploads/${u.id}`;
+              return (
+                <a key={`c-${u.id}`} className={styles.card} href={href}>
+                  <div className={styles.cardBadge}>
+                    {u.visibility === "PUBLIC" ? "Public" : "Code required"}
+                    {u.locked ? " • 🔒" : ""}
+                  </div>
+                  <div className={styles.cardTitle}>{u.title}</div>
+                  <div className={styles.cardSub}>{u.locked ? "Unlock to read" : "Open"}</div>
+                </a>
+              );
+            })
           ) : (
             <p className={styles.dim}>No matches</p>
           )}

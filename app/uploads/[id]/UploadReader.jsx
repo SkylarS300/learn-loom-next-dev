@@ -7,6 +7,7 @@ export default function UploadReader({ upload }) {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [uploadContent, setUploadContent] = useState(null);
+    const [shareCodeInput, setShareCodeInput] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -204,6 +205,49 @@ export default function UploadReader({ upload }) {
         return (
             <div className="upload-reader locked">
                 <h1>{upload.title}</h1>
+
+
+                {/* Owner helpers: show share code / visibility */}
+                {upload.visibility && upload.anonId && (
+                    <p style={{ margin: "6px 0 12px", color: "#555" }}>
+                        <strong>Visibility:</strong> {upload.visibility}
+                        {upload.visibility === "CODED" && upload.shareCode ? (
+                            <> • <strong>Share code:</strong> <code>{upload.shareCode}</code></>
+                        ) : null}
+                        {upload.password ? " • 🔒 Password protected" : ""}
+                    </p>
+                )}
+
+                {/* Non-owner: if CODED and content hidden, offer code save */}
+                {!upload.anonId && upload.visibility === "CODED" && uploadContent == null && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0 12px" }}>
+                        <input
+                            value={shareCodeInput}
+                            onChange={(e) => setShareCodeInput(e.target.value)}
+                            placeholder="Enter share code"
+                            style={{ flex: 1, padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
+                            aria-label="Enter share code"
+                        />
+                        <button
+                            className="cta-button small"
+                            onClick={async () => {
+                                const code = (shareCodeInput || "").trim();
+                                if (!code) return;
+                                await fetch("/api/sharecode", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ code }),
+                                });
+                                // reload with ?code= to unlock this page immediately as well
+                                const url = new URL(window.location.href);
+                                url.searchParams.set("code", code);
+                                window.location.href = url.toString();
+                            }}
+                        >
+                            Save code
+                        </button>
+                    </div>
+                )}
                 <p>This upload is password-protected.</p>
 
                 <div className="password-wrapper" style={{ position: "relative", display: "flex", gap: 8 }}>

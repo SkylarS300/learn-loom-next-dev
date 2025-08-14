@@ -9,6 +9,13 @@ export default async function UploadViewPage(props) {
   const uploadId = Number(id);
   const cookieStore = await cookies();            //  await cookies()
   const anonId = cookieStore.get("learnloomId")?.value;
+  // read saved codes (JSON array)
+  let savedCodes = [];
+  try {
+    const raw = cookieStore.get("shareCodes")?.value;
+    if (raw) savedCodes = JSON.parse(raw);
+  } catch { }
+  const codeCookieSet = new Set(Array.isArray(savedCodes) ? savedCodes.map(String) : []);
   const upload = await prisma.uploadedtext.findUnique({ where: { id: uploadId } });
 
   if (!upload) {
@@ -17,19 +24,18 @@ export default async function UploadViewPage(props) {
 
   // Visibility enforcement
   const isOwner = !!anonId && upload.anonId === anonId;
-  const shareCodeParam = search?.code || null;
+  const shareCodeParam = (search?.code || "").toString().trim().toUpperCase();
   if (upload.visibility === "PRIVATE" && !isOwner) {
     return <p>Upload not found.</p>; // hide existence
   }
   if (upload.visibility === "CODED" && !isOwner) {
-    if (!shareCodeParam || shareCodeParam !== upload.shareCode) {
-      // allow page, but do not send content
+    const cookieOK = upload.shareCode && codeCookieSet.has(upload.shareCode);
+    const urlOK = upload.shareCode && shareCodeParam === upload.shareCode;
+    if (!(cookieOK || urlOK)) {      // allow page, but do not send content
       upload.content = null;
     }
   }
   // PUBLIC: allowed (content may still be password-locked)
-
-
   // If password protected, check if anonId has unlocked it
   if (upload.password && anonId) {
     const unlocked = await prisma.uploadunlock.findUnique({

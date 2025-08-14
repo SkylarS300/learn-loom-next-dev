@@ -43,13 +43,25 @@ export async function POST(req) {
   return Response.json({ id: newText.id, shareCode: newText.shareCode, visibility: newText.visibility });
 }
 
-// Unified GET (supports your uploads by default; or community via ?scope=public[&code=XXXX])
+// Unified GET (supports your uploads; or community via ?scope=public[&code=XXXX] plus saved cookie codes)
 export async function GET(req) {
   const cookieStore = await cookies(); // Next 15: await cookies()
   const { searchParams } = new URL(req.url);
   const scope = (searchParams.get("scope") || "mine").toLowerCase(); // mine | public
-  const code = searchParams.get("code")?.trim() || null;
+  const codeParam = searchParams.get("code")?.trim() || null;
   const anonId = cookieStore.get("learnloomId")?.value;
+
+  // gather saved codes from cookie (JSON array), plus optional ?code param
+  let savedCodes = [];
+  try {
+    const raw = cookieStore.get("shareCodes")?.value;
+    if (raw) savedCodes = JSON.parse(raw);
+  } catch { }
+  const allCodes = new Set(
+    [...(Array.isArray(savedCodes) ? savedCodes : []), ...(codeParam ? [codeParam] : [])]
+      .map(s => String(s || "").trim())
+      .filter(Boolean)
+  );
 
   try {
     // Default = "mine" (requires anon)
@@ -66,33 +78,32 @@ export async function GET(req) {
       shareCode: true,
     };
 
-    const rows =
-      scope === "public"
-        ? await prisma.uploadedtext.findMany({
-          where: code
-            ? {
-              OR: [
-                { visibility: "PUBLIC" },
-                { visibility: "CODED", shareCode: code },
-              ],
-            }
-            : { visibility: "PUBLIC" },
-          orderBy: { createdAt: "desc" },
-          select: baseSelect,
-        })
-        : await prisma.uploadedtext.findMany({
-          where: { anonId },
-          orderBy: { createdAt: "desc" },
-          select: {
-            ...baseSelect,
-            uploadview: {
-              where: { anonId },
-              orderBy: { viewedAt: "desc" },
-              take: 1,
-              select: { viewedAt: true },
-            },
+    const rows = scope === "public"
+      ? await prisma.uploadedtext.findMany({
+        where: allCodes.size
+          ? {
+            OR: [
+              { visibility: "PUBLIC" },
+              { visibility: "CODED", shareCode: { in: Array.from(allCodes) } },
+            ],
+          }
+          : { visibility: "PUBLIC" },
+        orderBy: { createdAt: "desc" },
+        select: baseSelect,
+      })
+      : await prisma.uploadedtext.findMany({
+        where: { anonId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          ...baseSelect,
+          uploadview: {
+            where: { anonId },
+            orderBy: { viewedAt: "desc" },
+            take: 1,
+            select: { viewedAt: true },
           },
-        });
+        },
+      });
 
     const data = rows.map((r) => ({
       id: r.id,
