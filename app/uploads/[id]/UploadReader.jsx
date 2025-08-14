@@ -14,6 +14,8 @@ export default function UploadReader({ upload }) {
     const [resume, setResume] = useState(null);
 
     const containerRef = useRef(null);
+    const lastTickRef = useRef(0);
+    const hbRef = useRef(null);
     const paraRefs = useRef([]);
 
     // Record a view + load content + fetch saved progress
@@ -93,6 +95,65 @@ export default function UploadReader({ upload }) {
         return () => {
             cont.removeEventListener("scroll", onScroll);
             if (pending) cancelAnimationFrame(pending);
+        };
+    }, [unlocked, uploadContent, upload?.id]);
+
+
+    // Time heartbeat: post deltaTimeMs every ~5s; flush on hide/unload
+    useEffect(() => {
+        if (!unlocked || !uploadContent || !upload?.id) return;
+        lastTickRef.current = performance.now();
+
+        const postDelta = (ms) => {
+            const delta = Math.max(0, Math.round(ms || 0));
+            if (!delta) return;
+            fetch("/api/uploadprogress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ uploadId: upload.id, deltaTimeMs: delta }),
+            }).catch(() => { });
+        };
+
+        hbRef.current = setInterval(() => {
+            const now = performance.now();
+            const dt = now - lastTickRef.current;
+            lastTickRef.current = now;
+            postDelta(dt);
+        }, 5000);
+
+        const onVisibility = () => {
+            if (document.hidden) {
+                const now = performance.now();
+                const dt = now - lastTickRef.current;
+                lastTickRef.current = now;
+                try {
+                    navigator.sendBeacon?.(
+                        "/api/uploadprogress",
+                        new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })],
+                            { type: "application/json" })
+                    );
+                } catch { }
+            }
+        };
+        const onBeforeUnload = () => {
+            const now = performance.now();
+            const dt = now - lastTickRef.current;
+            lastTickRef.current = now;
+            try {
+                navigator.sendBeacon?.(
+                    "/api/uploadprogress",
+                    new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })],
+                        { type: "application/json" })
+                );
+            } catch { }
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+        window.addEventListener("beforeunload", onBeforeUnload);
+        return () => {
+            clearInterval(hbRef.current);
+            hbRef.current = null;
+            document.removeEventListener("visibilitychange", onVisibility);
+            window.removeEventListener("beforeunload", onBeforeUnload);
         };
     }, [unlocked, uploadContent, upload?.id]);
 
