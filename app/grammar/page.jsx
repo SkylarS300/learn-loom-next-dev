@@ -44,6 +44,7 @@ export default function Grammar() {
   const [mode, setMode] = useState("landing"); // landing | running | results | resume
   const [quiz, setQuiz] = useState(null);      // { concept, subTopic, items }
   const [result, setResult] = useState(null);  // { scorePct, numCorrect, total, durationMs }
+  const [report, setReport] = useState(null);  // { prompt, concept, subTopic } 
   const SESSION_KEY = "grammarSessionV1";
 
   // Offer resume if we detect an in-progress session
@@ -222,20 +223,83 @@ export default function Grammar() {
             />)}
 
           {mode === "results" && result && (
-            <section className={styles.card} style={{ textAlign: "center" }}>
+            <section className={styles.card}>
               <h2 style={{ marginTop: 0 }}>Results</h2>
               <p style={{ fontSize: 18, margin: 0 }}>
                 <strong>{humanize(quiz.concept)}</strong> — {humanize(quiz.subTopic)}              </p>
-              <p style={{ fontSize: 48, margin: "8px 0" }}>
-                {Math.round(result.scorePct)}%
-              </p>
-              <p style={{ marginTop: 0 }}>
-                {result.numCorrect}/{result.total} correct • {Math.round(result.durationMs / 1000)}s
-              </p>
-              <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }}>
+              <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: 48, margin: "8px 0" }}>
+                  {Math.round(result.scorePct)}%
+                </p>
+                <p style={{ marginTop: 0 }}>
+                  {result.numCorrect}/{result.total} correct • {Math.round(result.durationMs / 1000)}s
+                </p>
+              </div>
+
+              {/* Review answers */}
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600 }}>Review answers</summary>
+                <div className={styles.reviewList}>
+                  {result.answers?.map((a, idx) => {
+                    const item = quiz.items[a.index];
+                    const userText = item.choices?.[a.sel] ?? "(n/a)";
+                    const correctText = item.choices?.[item.answerIndex] ?? "(n/a)";
+                    const ok = a.correct;
+                    return (
+                      <div key={idx} className={styles.reviewRow}>
+                        <div className={styles.reviewPrompt}>{idx + 1}. {item.prompt}</div>
+                        <div className={styles.reviewCols}>
+                          <div className={ok ? styles.good : styles.bad}>
+                            Your answer: {userText}
+                          </div>
+                          {!ok && (
+                            <div>
+                              Correct: <strong>{correctText}</strong>
+                            </div>
+                          )}
+                        </div>
+                        {item.explanation && (
+                          <div className={styles.reviewExpl}>{item.explanation}</div>
+                        )}
+                        <button
+                          className={styles.linkBtn}
+                          onClick={() => setReport({ prompt: item.prompt, concept: quiz.concept, subTopic: quiz.subTopic })}
+                        >
+                          Report an issue
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
                 <button className={styles.btn} onClick={() => startQuizFrom(quiz.concept, quiz.subTopic)}>Retry</button>
                 <button className={styles.btn} onClick={() => setMode("landing")}>Back</button>
               </div>
+
+              {report && (
+                <ReportModal
+                  data={report}
+                  onClose={() => setReport(null)}
+                  onSubmit={async (issueText) => {
+                    try {
+                      const r = await fetch("/api/quizfeedback", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...report, issue: issueText }),
+                      });
+                      const j = await r.json();
+                      if (!j?.ok) alert(j?.error || "Failed to send");
+                      else alert("Thanks! We logged your report.");
+                    } catch {
+                      alert("Failed to send");
+                    } finally {
+                      setReport(null);
+                    }
+                  }}
+                />
+              )}
             </section>
           )}
         </div>
@@ -253,6 +317,33 @@ function humanize(s = "") {
     .trim();
 }
 
+function ReportModal({ data, onClose, onSubmit }) {
+  const [txt, setTxt] = useState("");
+  return (
+    <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
+      <div className={styles.modalCard}>
+        <h3 style={{ marginTop: 0 }}>Report an issue</h3>
+        <p style={{ fontSize: 14, color: "#555" }}>
+          <strong>Question:</strong> {data.prompt}
+        </p>
+        <textarea
+          className={styles.textarea}
+          placeholder="Describe what’s wrong (miskeyed answer, unclear wording, etc.)"
+          value={txt}
+          onChange={(e) => setTxt(e.target.value)}
+          rows={5}
+        />
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+          <button className={styles.btn} onClick={onClose}>Cancel</button>
+          <button className={styles.btnPrimary} disabled={!txt.trim()} onClick={() => onSubmit(txt.trim())}>
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ---- Quiz Runner (accessible + keyboard) ----
 function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
@@ -266,6 +357,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const lastTickRef = useRef(0);
   const elapsedRef = useRef(0);
   const [, forceTick] = useState(0); // for visible timer
+  const [answers, setAnswers] = useState([]); // { index, sel, correct }
 
   // Initialize from stored session index if present (resume path)
   useEffect(() => {
@@ -350,6 +442,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
     if (isCorrect) setCorrectCount((c) => c + 1);
     setFeedback(isCorrect ? "Correct!" : "Try again next time.");
     setChecked(true);
+    setAnswers((arr) => [...arr, { index: i, sel, correct: isCorrect }]);
   }
   function next() {
     if (i + 1 < total) {
@@ -360,7 +453,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
     } else {
       const durationMs = elapsedRef.current + (performance.now() - lastTickRef.current);
       const scorePct = (correctCount / total) * 100;
-      onFinish({ scorePct, numCorrect: correctCount, total, durationMs });
+      onFinish({ scorePct, numCorrect: correctCount, total, durationMs, answers });
     }
   }
 

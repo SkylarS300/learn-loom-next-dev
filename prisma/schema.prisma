@@ -218,6 +218,19 @@ model uploadprogress {
   @@index([uploadId])
 }
 
+model quizfeedback {
+  id        Int      @id @default(autoincrement())
+  anonId    String?
+  concept   String
+  subTopic  String
+  prompt    String
+  issue     String
+  createdAt DateTime @default(now())
+
+  @@index([anonId])
+  @@index([concept, subTopic, createdAt])
+}
+
 model uploadunlockattempt {
   id          Int      @id @default(autoincrement())
   anonId      String
