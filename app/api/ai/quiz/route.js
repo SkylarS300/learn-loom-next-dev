@@ -48,15 +48,39 @@ export async function POST(req) {
             text.slice(0, 4000),
         ].join("\n\n");
 
-        const resp = await client.chat.completions.create({
-            model: process.env.AI_QUIZ_MODEL || "gpt-4o-mini",
-            messages: [
-                { role: "system", content: system },
-                { role: "user", content: user },
-            ],
-            temperature: 0.2,
-            response_format: { type: "json_object" },
-        });
+        let resp;
+        try {
+            resp = await client.chat.completions.create({
+                model: process.env.AI_QUIZ_MODEL || "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: system },
+                    { role: "user", content: user },
+                ],
+                temperature: 0.2,
+                response_format: { type: "json_object" },
+            });
+        } catch (e) {
+            // Map OpenAI errors to helpful HTTP codes/messages
+            const code = e?.code || e?.error?.type || "";
+            const status = Number(e?.status) || 502;
+            if (code === "insufficient_quota" || code === "rate_limit_exceeded" || status === 429) {
+                return Response.json(
+                    { ok: false, error: "OpenAI quota or rate limit exceeded. Please try again later.", code: code || "rate_limited" },
+                    { status: 429 }
+                );
+            }
+            if (code === "invalid_api_key" || status === 401) {
+                return Response.json(
+                    { ok: false, error: "Invalid API key for AI provider.", code: "invalid_api_key" },
+                    { status: 401 }
+                );
+            }
+            console.error("ai/quiz provider error:", e);
+            return Response.json(
+                { ok: false, error: "AI provider error. Please try again later.", code: code || "provider_error" },
+                { status: 502 }
+            );
+        }
         const content = resp.choices?.[0]?.message?.content || "{}";
         let parsed;
         try {

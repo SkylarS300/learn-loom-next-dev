@@ -101,7 +101,12 @@ export default function Grammar() {
           } catch { }
           return;
         } else {
-          alert(j?.error || "AI generator returned no questions.");
+          // Show specific message for 429
+          if (r.status === 429) {
+            alert(j?.error || "AI is rate-limited right now. Falling back to built-in questions.");
+          } else {
+            alert(j?.error || "AI generator returned no questions.");
+          }
         }
       } catch {
         alert("AI generator error.");
