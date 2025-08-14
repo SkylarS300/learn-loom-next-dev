@@ -47,8 +47,10 @@ export async function POST(req) {
 export async function GET(req) {
   const cookieStore = await cookies(); // Next 15: await cookies()
   const { searchParams } = new URL(req.url);
-  const scope = (searchParams.get("scope") || "mine").toLowerCase(); // mine | public
+  const scope = (searchParams.get("scope") || "mine").toLowerCase(); // mine | public  const codeParamRaw = searchParams.get("code")?.trim() || null;
   const codeParamRaw = searchParams.get("code")?.trim() || null;
+  const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") || 24)));
+  const cursor = searchParams.get("cursor"); // ISO date string
   const anonId = cookieStore.get("learnloomId")?.value;
 
   // gather saved codes from cookie (JSON array), plus optional ?code param
@@ -80,14 +82,16 @@ export async function GET(req) {
 
     const rows = scope === "public"
       ? await prisma.uploadedtext.findMany({
-        where: allCodes.size
-          ? {
-            OR: [
-              { visibility: "PUBLIC" },
-              { visibility: "CODED", shareCode: { in: Array.from(allCodes) } },],
-          }
-          : { visibility: "PUBLIC" },
+        where: {
+          AND: [
+            allCodes.size
+              ? { OR: [{ visibility: "PUBLIC" }, { visibility: "CODED", shareCode: { in: Array.from(allCodes) } }] }
+              : { visibility: "PUBLIC" },
+            cursor ? { createdAt: { lt: new Date(cursor) } } : {},
+          ],
+        },
         orderBy: { createdAt: "desc" },
+        take: limit + 1, // fetch one extra to know if there's a next page
         select: baseSelect,
       })
       : await prisma.uploadedtext.findMany({
@@ -104,7 +108,11 @@ export async function GET(req) {
         },
       });
 
-    const data = rows.map((r) => ({
+    const page = rows.slice(0, limit);
+    const nextCursor =
+      rows.length > limit ? rows[limit - 1].createdAt.toISOString() : null;
+
+    const data = page.map((r) => ({
       id: r.id,
       title: r.title,
       createdAt: r.createdAt,
@@ -122,7 +130,7 @@ export async function GET(req) {
           : undefined,
     }));
 
-    return Response.json({ ok: true, data });
+    return Response.json({ ok: true, data, nextCursor });
   } catch (e) {
     console.error("uploadedtext GET failed:", e);
     return Response.json({ ok: false, error: "Server error" }, { status: 500 });

@@ -49,7 +49,31 @@ export default function DashboardPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px" }}>
-      <h1>Dashboard</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h1 style={{ margin: 0 }}>Dashboard</h1>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            style={{ ...btnStyle, background: "#ef4444" }}
+            onClick={async () => {
+              try {
+                // Clear local app data
+                localStorage.clear();
+              } catch { }
+              try {
+                // Clear share-code cookie via API
+                await fetch("/api/sharecode", { method: "DELETE" });
+              } catch { }
+              // Expire learnloomId (client-set cookie)
+              document.cookie = "learnloomId=; Max-Age=0; path=/";
+              // Reload to let InitAnonId.jsx set a fresh anon
+              window.location.href = "/";
+            }}
+            aria-label="Clear my anonymous data"
+          >
+            Clear my traces
+          </button>
+        </div>
+      </div>
       {err && <p style={{ color: "red" }}>{err}</p>}
 
       <section

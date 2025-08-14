@@ -39,6 +39,8 @@ function UploadCard({ id, title, locked }) {
 export default function LibraryPage() {
   const [uploads, setUploads] = useState([]);
   const [community, setCommunity] = useState([]);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState("");
   const [shareCode, setShareCode] = useState("");
   const [savedCodes, setSavedCodes] = useState([]);
@@ -54,7 +56,10 @@ export default function LibraryPage() {
         const j = await r.json().catch(() => ({}));
         // Accept either {ok,data} or a raw array (dev convenience)
         const list = Array.isArray(j) ? j : j?.data ?? [];
-        if (!cancelled) setUploads(list);
+        if (!cancelled) {
+          setCommunity(list);
+          setNextCursor(j?.nextCursor || null);
+        }
         if (!Array.isArray(list) && !j?.ok && !cancelled) {
           setErr(j?.error || "Failed to load uploads");
         }
@@ -85,7 +90,7 @@ export default function LibraryPage() {
     let cancelled = false;
     (async () => {
       try {
-        const qs = new URLSearchParams({ scope: "public" });
+        const qs = new URLSearchParams({ scope: "public", limit: "24" });
         if (shareCode.trim()) qs.set("code", shareCode.trim());
         const r = await fetch(`/api/uploadedtext?${qs.toString()}`);
         const j = await r.json().catch(() => ({}));
@@ -96,7 +101,23 @@ export default function LibraryPage() {
       } catch { /* no-op */ }
     })();
     return () => { cancelled = true; };
-  }, [shareCode, codesVersion]); // re-fetch when codes change
+  }, [shareCode, codesVersion]); // reset list when codes change
+
+  async function loadMore() {
+    if (!nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const qs = new URLSearchParams({ scope: "public", limit: "24", cursor: nextCursor });
+      if (shareCode.trim()) qs.set("code", shareCode.trim());
+      const r = await fetch(`/api/uploadedtext?${qs.toString()}`);
+      const j = await r.json();
+      const list = Array.isArray(j) ? j : j?.data ?? [];
+      setCommunity((prev) => [...prev, ...list]);
+      setNextCursor(j?.nextCursor || null);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const curated = books.map((b, i) => ({
@@ -174,6 +195,14 @@ export default function LibraryPage() {
             <p className={styles.dim}>No matches</p>
           )}
         </div>
+
+        {nextCursor && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+            <button className={styles.btn} onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          </div>
+        )}
       </section>
 
 

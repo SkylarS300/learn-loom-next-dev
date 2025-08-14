@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import UploadReader from "./UploadReader";
 
+
+
 export default async function UploadViewPage(props) {
   const { id } = await props.params;
   const search = await props.searchParams;
@@ -63,3 +65,8 @@ export default async function UploadViewPage(props) {
   };
   return <UploadReader upload={safeUpload} isOwner={isOwner} />;
 }
+
+
+export const metadata = {
+  robots: { index: false, follow: false },
+};

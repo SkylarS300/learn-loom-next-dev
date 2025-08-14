@@ -264,7 +264,9 @@ export default function UploadReader({ upload, isOwner = false }) {
                                 }}
                             >
                                 Copy link
-                            </button></div>
+                            </button>
+                        </>
+                    )}
                     <button
                         className="cta-button small"
                         onClick={async () => {
@@ -279,118 +281,127 @@ export default function UploadReader({ upload, isOwner = false }) {
                     >
                         Regenerate
                     </button>
-                </>
+                </div>
             )}
+            {upload.password ? <div style={{ color: "#555" }}>🔒 Password protected</div> : null}
         </div>
-    )}
-{ upload.password ? <div style={{ color: "#555" }}>🔒 Password protected</div> : null }
-        </div >
     ) : null;
 
-if (!unlocked) {
+    if (!unlocked) {
+        return (
+            <div className="upload-reader locked">
+                <h1>{upload.title}</h1>
+                {ownerControls}
+
+                {/* Visitors: if CODED and content hidden, offer code save */}
+                {!isOwner && upload.visibility === "CODED" && uploadContent == null && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0 12px" }}>
+                        <input
+                            value={shareCodeInput}
+                            onChange={(e) => setShareCodeInput(e.target.value)}
+                            placeholder="Enter share code"
+                            style={{ flex: 1, padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
+                            aria-label="Enter share code"
+                        />
+                        <button
+                            className="cta-button small"
+                            onClick={async () => {
+                                const code = (shareCodeInput || "").trim();
+                                if (!code) return;
+                                await fetch("/api/sharecode", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ code }),
+                                });
+                                // reload with ?code= to unlock this page immediately as well
+                                const url = new URL(window.location.href);
+                                url.searchParams.set("code", code);
+                                window.location.href = url.toString();
+                            }}
+                        >
+                            Save code
+                        </button>
+                    </div>
+                )}
+                <p>This upload is password-protected.</p>
+
+                <div className="password-wrapper" style={{ position: "relative", display: "flex", gap: 8 }}>
+                    <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="password-input"
+                        style={{ flex: 1 }}
+                        aria-invalid={!!error}
+                        aria-describedby={error ? "upload-password-error" : undefined}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="eye-toggle"
+                        aria-label="toggle password visibility"
+                        style={{ display: "grid", placeItems: "center", width: 36 }}
+                    >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
+
+                <button onClick={handleUnlock} disabled={loading} className="cta-button" style={{ marginTop: 8 }}>
+                    {loading ? "Unlocking..." : "Unlock"}
+                </button>
+
+                {error && (
+                    <p
+                        id="upload-password-error"
+                        className="error"
+                        style={{ color: "#d33", marginTop: 8 }}
+                        role="alert"
+                        aria-live="polite"
+                    >
+                        {error}
+                    </p>
+                )}            </div>
+        );
+    }
+
     return (
-        <div className="upload-reader locked">
+        <div className="upload-reader">
             <h1>{upload.title}</h1>
             {ownerControls}
 
-            {/* Visitors: if CODED and content hidden, offer code save */}
-            {!isOwner && upload.visibility === "CODED" && uploadContent == null && (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0 12px" }}>
-                    <input
-                        value={shareCodeInput}
-                        onChange={(e) => setShareCodeInput(e.target.value)}
-                        placeholder="Enter share code"
-                        style={{ flex: 1, padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
-                        aria-label="Enter share code"
-                    />
-                    <button
-                        className="cta-button small"
-                        onClick={async () => {
-                            const code = (shareCodeInput || "").trim();
-                            if (!code) return;
-                            await fetch("/api/sharecode", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ code }),
-                            });
-                            // reload with ?code= to unlock this page immediately as well
-                            const url = new URL(window.location.href);
-                            url.searchParams.set("code", code);
-                            window.location.href = url.toString();
-                        }}
-                    >
-                        Save code
-                    </button>
+            {resume && (
+                <div className="progress-banner" style={{ margin: "0 0 10px", display: "flex", gap: 8, alignItems: "center" }}>
+                    <span>Resume where you left off?</span>
+                    <button className="cta-button small" onClick={handleResume}>Resume</button>
+                    <button className="cta-button small" onClick={() => setResume(null)}>Dismiss</button>
                 </div>
             )}
-            <p>This upload is password-protected.</p>
 
-            <div className="password-wrapper" style={{ position: "relative", display: "flex", gap: 8 }}>
-                <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="password-input"
-                    style={{ flex: 1 }}
-                />
-                <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="eye-toggle"
-                    aria-label="toggle password visibility"
-                    style={{ display: "grid", placeItems: "center", width: 36 }}
-                >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+            <div
+                ref={containerRef}
+                className="upload-text"
+                style={{
+                    maxHeight: 400,
+                    overflowY: "auto",
+                    padding: 16,
+                    background: "#f8f8f8",
+                    borderRadius: 8,
+                }}
+            >
+                {(uploadContent ?? "")
+                    .split(/\n{2,}/g) // paragraphs separated by blank lines
+                    .map((para, i) => (
+                        <p
+                            key={i}
+                            ref={(el) => (paraRefs.current[i] = el)}
+                            data-pi={i}
+                            style={{ margin: "0 0 1rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
+                        >
+                            {para}
+                        </p>
+                    ))}
             </div>
-
-            <button onClick={handleUnlock} disabled={loading} className="cta-button" style={{ marginTop: 8 }}>
-                {loading ? "Unlocking..." : "Unlock"}
-            </button>
-
-            {error && <p className="error" style={{ color: "#d33", marginTop: 8 }}>{error}</p>}
         </div>
     );
-}
-
-return (
-    <div className="upload-reader">
-        <h1>{upload.title}</h1>
-        {ownerControls}
-
-        {resume && (
-            <div className="progress-banner" style={{ margin: "0 0 10px", display: "flex", gap: 8, alignItems: "center" }}>
-                <span>Resume where you left off?</span>
-                <button className="cta-button small" onClick={handleResume}>Resume</button>
-                <button className="cta-button small" onClick={() => setResume(null)}>Dismiss</button>
-            </div>
-        )}
-
-        <div
-            ref={containerRef}
-            className="upload-text"
-            style={{
-                maxHeight: 400,
-                overflowY: "auto",
-                padding: 16,
-                background: "#f8f8f8",
-                borderRadius: 8,
-            }}
-        >
-            {(uploadContent ?? "")
-                .split(/\n{2,}/g) // paragraphs separated by blank lines
-                .map((para, i) => (
-                    <p
-                        key={i}
-                        ref={(el) => (paraRefs.current[i] = el)}
-                        data-pi={i}
-                        style={{ margin: "0 0 1rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
-                    >
-                        {para}
-                    </p>
-                ))}
-        </div>
-    </div>
-);
 }

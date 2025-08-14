@@ -106,6 +106,7 @@ model uploadedtext {
 
   @@index([userId])
   @@index([anonId])
+  @@index([visibility])
 }
 
 enum upload_visibility {
@@ -211,6 +212,19 @@ model uploadprogress {
   timeMs     Int      @default(0)
 
   uploadedtext uploadedtext @relation(fields: [uploadId], references: [id])
+
+  @@unique([anonId, uploadId])
+  @@index([anonId])
+  @@index([uploadId])
+}
+
+model uploadunlockattempt {
+  id          Int      @id @default(autoincrement())
+  anonId      String
+  uploadId    Int
+  count       Int      @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime @updatedAt
 
   @@unique([anonId, uploadId])
   @@index([anonId])
