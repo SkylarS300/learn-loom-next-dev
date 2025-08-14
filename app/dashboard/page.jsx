@@ -12,7 +12,13 @@ export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [rangeDays, setRangeDays] = useState(7);
-  const [metrics, setMetrics] = useState({ readingDaily: [], grammarDaily: [], grammarPaceDaily: [], topWeakAreas: [] });
+  const [metrics, setMetrics] = useState({
+    readingDaily: [],
+    grammarDaily: [],
+    grammarPaceDaily: [],
+    topWeakAreas: [],
+  });
+
   useEffect(() => {
     (async () => {
       try {
@@ -227,7 +233,8 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* NEW: Grammar pace (sec per question) */}
+
+          {/* NEW: Grammar pace (sec / question) */}
           <div style={{ ...cardStyle, marginTop: 12 }}>
             <h4 style={{ margin: "0 0 8px" }}>Grammar pace (sec / question)</h4>
             <div style={{ width: "100%", height: 220 }}>
@@ -235,7 +242,7 @@ export default function DashboardPage() {
                 <LineChart data={metrics.grammarPaceDaily}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis width={40} domain={[0, 'auto']} tick={{ fontSize: 12 }} />
+                  <YAxis width={40} domain={[0, "auto"]} tick={{ fontSize: 12 }} />
                   <Tooltip />
                   <Line type="monotone" dataKey="secPerQ" dot={false} />
                 </LineChart>
@@ -255,7 +262,9 @@ export default function DashboardPage() {
                     Acc: <strong>{Math.round((r.weightedAccuracy || 0) * 100)}%</strong>
                     {" · "}
                     <button
-                      onClick={() => (window.location.href = `/grammar?start=${encodeURIComponent(r.concept)}|${encodeURIComponent(r.subTopic)}`)}
+                      onClick={() =>
+                      (window.location.href =
+                        `/grammar?start=${encodeURIComponent(r.concept)}|${encodeURIComponent(r.subTopic)}`)}
                       style={{ ...btnStyle, marginLeft: 6 }}
                     >
                       Practice
