@@ -41,7 +41,30 @@ export default function Grammar() {
   const [count, setCount] = useState(10);
   const [aiMode, setAiMode] = useState(false);
   const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMsg, setAiMsg] = useState(""); // shows inline banner (errors/info)
   const isAiRef = useRef(false);
+
+  // Sticky AI form (localStorage)
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("aiFormV1") || "{}");
+      if (typeof saved.aiMode === "boolean") setAiMode(saved.aiMode);
+      if (typeof saved.aiText === "string") setAiText(saved.aiText);
+    } catch { }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("aiFormV1", JSON.stringify({ aiMode, aiText })); } catch { }
+  }, [aiMode, aiText]);
+
+  // tiny hash for session cache key
+  function fnv1a(str = "") {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return ("0000000" + h.toString(16)).slice(-8);
+  }
 
   // ----- Quiz lifecycle -----
   const [mode, setMode] = useState("landing"); // landing | running | results | resume
@@ -82,7 +105,29 @@ export default function Grammar() {
   async function startQuizFrom(c, s, diff = difficulty, n = count) {
     isAiRef.current = false;
     if (aiMode) {
+      setAiMsg("");
+      setAiLoading(true);
       try {
+
+        // session cache to avoid repeat calls on same input
+        const cacheKey = `aiQuizCache::${c}|${s}|${diff}|${n}|${fnv1a(aiText)}`;
+        try {
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) {
+            const items = JSON.parse(cached);
+            if (Array.isArray(items) && items.length) {
+              setQuiz({ concept: c, subTopic: s, items });
+              setResult(null);
+              setMode("running");
+              isAiRef.current = true;
+              try {
+                localStorage.setItem(SESSION_KEY, JSON.stringify({ concept: c, subTopic: s, items, index: 0, correct: 0, elapsed: 0 }));
+              } catch { }
+              return;
+            }
+          }
+        } catch { }
+
         const r = await fetch("/api/ai/quiz", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -90,8 +135,10 @@ export default function Grammar() {
         });
         const j = await r.json();
         if (r.status === 501) {
-          alert(j?.error || "AI quiz is disabled by the server.");
+          setAiMsg(j?.error || "AI quiz is disabled by the server.");
         } else if (j?.ok && Array.isArray(j.items) && j.items.length) {
+          // cache for this tab/session
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(j.items)); } catch { }
           setQuiz({ concept: c, subTopic: s, items: j.items });
           setResult(null);
           setMode("running");
@@ -101,15 +148,17 @@ export default function Grammar() {
           } catch { }
           return;
         } else {
-          // Show specific message for 429
-          if (r.status === 429) {
-            alert(j?.error || "AI is rate-limited right now. Falling back to built-in questions.");
-          } else {
-            alert(j?.error || "AI generator returned no questions.");
-          }
+          // Show specific message inline (we still fall back below)
+          setAiMsg(
+            r.status === 429
+              ? (j?.error || "AI is rate-limited right now. Falling back to built-in questions.")
+              : (j?.error || "AI generator returned no questions.")
+          );
         }
       } catch {
-        alert("AI generator error.");
+        setAiMsg("AI generator error. Falling back to built-in questions.");
+      } finally {
+        setAiLoading(false);
       }
       // If AI path failed, fall back to the bank below.
     } const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
@@ -275,7 +324,20 @@ export default function Grammar() {
                   <button className={styles.btnPrimary} onClick={() => startQuizFrom(concept, subTopic)}>
                     Start quiz
                   </button>
-                </div>
+                  <div style={{ marginTop: 12 }}>
+                    {aiMsg && (
+                      <div role="status" style={{ background: "#fffbea", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 6, marginBottom: 8 }}>
+                        {aiMsg}
+                      </div>
+                    )}
+                    <button
+                      className={styles.btnPrimary}
+                      disabled={aiLoading || (aiMode && !aiText.trim())}
+                      onClick={() => startQuizFrom(concept, subTopic)}
+                    >
+                      {aiLoading ? "Generating…" : "Start quiz"}
+                    </button>
+                  </div>
               </section>
             </>
           )}
