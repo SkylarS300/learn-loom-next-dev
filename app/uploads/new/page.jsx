@@ -61,8 +61,13 @@ export default function NewUploadPage() {
 
     setLoading(false);
     if (res.ok) {
-      const data = await res.json();
-      router.push(`/uploads/${data.id}`);
+      const j = await res.json().catch(() => null);
+      const newId = j?.data?.id ?? j?.id; // support both shapes
+      if (newId) {
+        router.push(`/uploads/${newId}`);
+      } else {
+        setError("Upload succeeded but response had no ID.");
+      }
     } else {
       setError("Failed to upload text.");
     }

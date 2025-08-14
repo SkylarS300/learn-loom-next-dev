@@ -1,113 +1,186 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import ProgressCodeBanner from "/app/dashboard/ProgressCodeBanner.jsx";
-import UploadedTexts from "./UploadedTexts";
-import GrammarQuizHistory from "./GrammarQuizHistory";
-import ReadingProgressChecklist from "./ReadingProgressChecklist";
-import ReadingProgressChart from "./ReadingProgressChart";
-import GrammarScoreChart from "./GrammarScoreChart";
-import QuickResume from "./QuickResume";
-import CollapsibleSection from "./CollapsibleSection";
+import books from "@/src/content/book-content.js";
 
-function ResumeLastUpload() {
-  const [upload, setUpload] = useState(null);
+export default function DashboardPage() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    fetch("/api/uploadview")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.latest?.uploadedtext) {
-          setUpload(data.latest.uploadedtext);
-        }
-      });
+    (async () => {
+      try {
+        const r = await fetch("/api/quickresume");
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || "Failed");
+        setData(j.data);
+      } catch (e) {
+        setErr(e.message);
+      }
+    })();
   }, []);
 
-  if (!upload) return null;
+  const reading = data?.reading;
+  const upload = data?.upload;
+  const grammar = data?.grammar;
+
+  function titleForBookIndex(idx) {
+    if (idx == null) return null;
+    return books?.[idx]?.title || `Book #${idx}`;
+  }
 
   return (
-    <div className="resume-panel">
-      <h3>📤 Resume Your Last Upload</h3>
-      <p><strong>{upload.title}</strong></p>
-      <Link href={`/uploads/${upload.id}`}>
-        <button className="cta-button">Resume Reading</button>
-      </Link>
-    </div>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px" }}>
+      <h1>Dashboard</h1>
+      {err && <p style={{ color: "red" }}>{err}</p>}
+
+      <section
+        style={{
+          display: "grid",
+          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          marginTop: 16,
+        }}
+      >
+        {/* Quick Resume: Reading */}
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>📖 Reading</h3>
+          {reading ? (
+            <>
+              <p>
+                <strong>{titleForBookIndex(reading.bookIndex)}</strong>, Chapter{" "}
+                {reading.chapterIndex}
+                {Number.isInteger(reading.sentenceIndex)
+                  ? `, Sentence ${reading.sentenceIndex}`
+                  : ""}
+              </p>
+              <button
+                onClick={() =>
+                  (window.location.href = `/readingpal?bookIndex=${reading.bookIndex}`)
+                }
+                style={btnStyle}
+              >
+                Resume Reading
+              </button>
+            </>
+          ) : (
+            <p>No recent book progress.</p>
+          )}
+        </div>
+
+        {/* Quick Resume: Upload */}
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>📤 Upload</h3>
+          {upload ? (
+            <>
+              <p>
+                Upload #{upload.uploadId}
+                {Number.isInteger(upload.paraIndex)
+                  ? `, Paragraph ${upload.paraIndex}`
+                  : ""}
+              </p>
+              <button
+                onClick={() => (window.location.href = `/uploads/${upload.uploadId}`)}
+                style={btnStyle}
+              >
+                Resume Upload
+              </button>
+            </>
+          ) : (
+            <p>No recent upload reading.</p>
+          )}
+        </div>
+
+        {/* Quick Resume: Grammar */}
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>🧠 Grammar</h3>
+          {grammar ? (
+            <>
+              <p>
+                Last practiced: <strong>{grammar.concept}</strong>
+                {grammar.subTopic ? ` — ${grammar.subTopic}` : ""}
+              </p>
+              <button
+                onClick={() => (window.location.href = `/grammar`)}
+                style={btnStyle}
+              >
+                Practice More
+              </button>
+            </>
+          ) : (
+            <p>No recent grammar practice.</p>
+          )}
+        </div>
+      </section>
+
+      {/* Export Data */}
+      <section style={{ marginTop: 24 }}>
+        <h3 style={{ marginTop: 0 }}>⬇️ Export Data</h3>
+        <p style={{ color: "#555", marginTop: 4, marginBottom: 12 }}>
+          Exports include only your anonymous activity tied to your browser’s cookie.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+          <a
+            href="/api/export?kind=reading"
+            download="reading.csv"
+            style={btnStyle}
+          >
+            Reading CSV
+          </a>
+          <a
+            href="/api/export?kind=grammar"
+            download="grammar.csv"
+            style={btnStyle}
+          >
+            Grammar CSV
+          </a>
+          <a
+            href="/api/export?kind=uploads"
+            download="uploads.csv"
+            style={btnStyle}
+          >
+            Uploads CSV
+          </a>
+          <a
+            href="/api/export?kind=all"
+            download="all_exports.zip"
+            style={btnStyleSecondary}
+          >
+            All (ZIP)
+          </a>
+        </div>
+      </section>
+    </main>
   );
 }
 
-function ProgressCodeBadge() {
-  const [anonId, setAnonId] = useState("");
+const cardStyle = {
+  background: "#fff",
+  border: "1px solid #e5e5e5",
+  borderRadius: 8,
+  padding: 16,
+  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+};
 
-  useEffect(() => {
-    const match = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("learnloomId="));
-    if (match) {
-      const id = match.split("=")[1];
-      setAnonId(id);
-    }
-  }, []);
+const btnStyleBase = {
+  display: "inline-block",
+  textDecoration: "none",
+  borderRadius: 6,
+  cursor: "pointer",
+};
 
-  if (!anonId) return null;
+const btnStyle = {
+  ...btnStyleBase,
+  background: "#0070f3",
+  color: "#fff",
+  border: "none",
+  padding: "8px 12px",
+};
 
-  return (
-    <div className="progress-code-badge" style={{ marginLeft: "auto", fontSize: "0.85rem", color: "#888" }}>
-      Progress Code: <code>{anonId.slice(0, 4)}…{anonId.slice(-4)}</code>
-    </div>
-  );
-}
-
-export default function UnifiedDashboard() {
-  return (
-    <div className="dashboard-wrapper">
-      <header className="dashboard-header" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <h2 className="logo">LearnLoom</h2>
-        <span className="header-title">Dashboard</span>
-        <nav className="dashboard-nav" style={{ marginLeft: "auto", marginRight: "1rem" }}>
-          <Link href="/library">Library</Link>{" | "}
-          <Link href="/readingpal">Reading Pal</Link>{" | "}
-          <Link href="/grammar">Grammar</Link>{" | "}
-          <Link href="/uploads">My Uploads</Link>
-        </nav>
-      </header>
-
-      <div className="dashboard-content">
-        <ProgressCodeBanner />
-
-        <h1>Welcome to LearnLoom</h1>
-        <p>Your progress is saved anonymously using your Progress Code.</p>
-
-        <ul className="feature-list">
-          <li>📖 Explore the <Link href="/library">Book Library</Link></li>
-          <li>🗣️ Use <Link href="/readingpal">Reading Pal</Link> for TTS and highlights</li>
-          <li>🧪 Practice grammar with <Link href="/grammar">quizzes</Link></li>
-          <li>📤 Upload your own files in <Link href="/uploads">My Uploads</Link></li>
-        </ul>
-
-        <hr className="divider" />
-
-        <ResumeLastUpload />
-        <QuickResume />
-        <UploadedTexts />
-
-        <CollapsibleSection title="🧪 Grammar Quiz History">
-          <GrammarQuizHistory />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="📚 Reading Progress Checklist">
-          <ReadingProgressChecklist />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="📊 Reading Progress by Book">
-          <ReadingProgressChart />
-        </CollapsibleSection>
-
-        <CollapsibleSection title="📈 Grammar Score Trends">
-          <GrammarScoreChart />
-        </CollapsibleSection>
-      </div>
-    </div>
-  );
-}
+const btnStyleSecondary = {
+  ...btnStyleBase,
+  background: "#e9eefc",
+  color: "#0b3b9f",
+  border: "1px solid #c9d7fb",
+  padding: "8px 12px",
+};

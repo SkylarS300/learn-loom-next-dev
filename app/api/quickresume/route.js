@@ -1,25 +1,42 @@
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import prisma from "@/lib/prisma";
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const anonId = cookieStore.get("learnloomId")?.value;
-  if (!anonId) return new Response("Unauthorized", { status: 401 });
+  const c = await cookies();
+  const anonId = c.get("learnloomId")?.value;
+  if (!anonId) {
+    return NextResponse.json({ ok: false, error: "Missing anonymous ID" }, { status: 401 });
+  }
 
-  const [latestRead, latestUpload, latestQuiz] = await Promise.all([
-    prisma.readingprogress.findFirst({
-      where: { anonId },
-      orderBy: { completedAt: "desc" },
-    }),
-    prisma.uploadedtext.findFirst({
-      where: { anonId },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.grammarprogress.findFirst({
-      where: { anonId },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  try {
+    const [read, upload, grammar] = await Promise.all([
+      prisma.readingprogress.findFirst({
+        where: { anonId },
+        orderBy: [{ updatedAt: "desc" }, { completedAt: "desc" }],
+        select: { bookIndex: true, chapterIndex: true, sentenceIndex: true, timeMs: true, updatedAt: true },
+      }),
+      prisma.uploadprogress.findFirst({
+        where: { anonId },
+        orderBy: { updatedAt: "desc" },
+        select: { uploadId: true, paraIndex: true, charOffset: true, updatedAt: true },
+      }),
+      prisma.grammarprogress.findFirst({
+        where: { anonId },
+        orderBy: { createdAt: "desc" },
+        select: { concept: true, subTopic: true, score: true, createdAt: true },
+      }),
+    ]);
 
-  return Response.json({ latestRead, latestUpload, latestQuiz });
+    return NextResponse.json({
+      ok: true,
+      data: {
+        reading: read ?? null,
+        upload: upload ?? null,
+        grammar: grammar ?? null,
+      },
+    });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: "Failed to fetch quick resume" }, { status: 500 });
+  }
 }

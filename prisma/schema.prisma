@@ -132,27 +132,29 @@ model assignmentcompletion {
   assignment assignment @relation(fields: [assignmentId], references: [id])
   user       user?      @relation(fields: [userId], references: [id])
 
-  @@unique([anonId, assignmentId]) // 👈 Prevent duplicate completions for anonymous users
+  @@unique([anonId, assignmentId]) //  Prevent duplicate completions for anonymous users
   @@index([assignmentId])
   @@index([userId])
   @@index([anonId])
 }
 
 model readingprogress {
-  id           Int      @id @default(autoincrement())
-  userId       Int?
-  anonId       String?
-  bookIndex    Int
-  chapterIndex Int
-  completedAt  DateTime @default(now())
-
+  id            Int      @id @default(autoincrement())
+  userId        Int?
+  anonId        String?
+  bookIndex     Int
+  chapterIndex  Int
+  sentenceIndex Int?
+  timeMs        Int?
+  updatedAt     DateTime @updatedAt
+  completedAt   DateTime @default(now())
   user user? @relation(fields: [userId], references: [id])
-
-  @@unique([anonId, bookIndex, chapterIndex]) // 👈 Prevent duplicate progress logs
+  @@unique([anonId, bookIndex, chapterIndex])
   @@index([userId])
   @@index([anonId])
   @@index([bookIndex, chapterIndex])
 }
+
 
 enum assignment_type {
   BOOK
@@ -197,7 +199,8 @@ model uploadprogress {
   uploadId   Int
   paraIndex  Int      @default(0)
   charOffset Int      @default(0)
-  updatedAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  timeMs     Int      @default(0)
 
   uploadedtext uploadedtext @relation(fields: [uploadId], references: [id])
 
