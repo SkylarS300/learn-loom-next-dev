@@ -56,10 +56,12 @@ model classroom {
 model grammarprogress {
   id        Int      @id @default(autoincrement())
   osis      Int?
-  anonId    String? // 👈 for anonymous quiz logging
+  anonId    String? // for anonymous quiz logging
   concept   String
   subTopic  String
   score     Int
+  numQuestions Int?   // optional: total questions in the attempt
+  durationMs  Int?    // optional: time spent on the attempt (ms)
   createdAt DateTime @default(now())
 }
 

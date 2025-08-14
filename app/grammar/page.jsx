@@ -82,7 +82,9 @@ export default function Grammar() {
         body: JSON.stringify({
           concept: quiz.concept,
           subTopic: quiz.subTopic,
-          score: Math.round(summary.scorePct),
+          score: Math.round(result.scorePct),
+          numQuestions: result.total,
+          durationMs: Math.round(result.durationMs || 0),
           numQuestions: summary.total,
           durationMs: summary.durationMs,
         }),
@@ -359,6 +361,20 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const [, forceTick] = useState(0); // for visible timer
   const [answers, setAnswers] = useState([]); // { index, sel, correct }
 
+  // Local miss history helpers (privacy-first)
+  const MISS_KEY = "grammarMistakesV1";
+  function bumpMiss(prompt, delta) {
+    if (typeof window === "undefined") return;
+    try {
+      const key = `${quiz.concept}|${quiz.subTopic}|${prompt}`;
+      const map = JSON.parse(localStorage.getItem(MISS_KEY) || "{}");
+      const cur = map[key] || { count: 0, last: 0 };
+      const next = { count: Math.max(0, (cur.count || 0) + delta), last: Date.now() };
+      if (next.count === 0) delete map[key]; else map[key] = next;
+      localStorage.setItem(MISS_KEY, JSON.stringify(map));
+    } catch { }
+  }
+
   // Initialize from stored session index if present (resume path)
   useEffect(() => {
     try {
@@ -443,6 +459,9 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
     setFeedback(isCorrect ? "Correct!" : "Try again next time.");
     setChecked(true);
     setAnswers((arr) => [...arr, { index: i, sel, correct: isCorrect }]);
+    // Update miss history
+    if (!isCorrect) bumpMiss(q.prompt, +1);      // missed: increase weight
+    else bumpMiss(q.prompt, -1);                 // correct: gentle decay / clear over time
   }
   function next() {
     if (i + 1 < total) {
