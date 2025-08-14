@@ -16,6 +16,16 @@ function shuffle(arr, seed = null) {
     return a;
 }
 
+// Ensure a topic node always has expected buckets (non-destructive init)
+function ensureBuckets(node) {
+    if (!node.pool) node.pool = [];
+    if (!node.easy) node.easy = [];
+    if (!node.medium) node.medium = [];
+    if (!node.hard) node.hard = [];
+    return node;
+}
+
+
 // ---- Local miss history (client-only, privacy-first) ----
 const MISS_KEY = "grammarMistakesV1";
 function loadMistakes() {
@@ -94,6 +104,20 @@ function uniqueBy(arr, keyFn) {
     return out;
 }
 
+// Basic MCQ sanity: 2–6 choices, valid answerIndex
+function sanitizeMCQ(q) {
+    if (!q || q.kind !== "mcq") return null;
+    const choices = Array.isArray(q.choices) ? q.choices.map(String) : [];
+    if (choices.length < 2 || choices.length > 6) return null;
+    let answerIndex = Number(q.answerIndex);
+    if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= choices.length) return null;
+    const prompt = String(q.prompt || "").trim();
+    if (!prompt) return null;
+    const explanation = q.explanation ? String(q.explanation).trim() : undefined;
+    return { kind: "mcq", prompt, choices, answerIndex, ...(explanation ? { explanation } : {}) };
+}
+
+
 function fixArticleAnswer(q) {
     if (!q || q.kind !== "mcq" || !Array.isArray(q.choices)) return q;
     if (!/___\s*\w+/.test(q.prompt || "")) return q;
@@ -135,10 +159,14 @@ export function buildQuiz({
     seed = null,
     allowShort = false,
 }) {
-    const node = bank?.[concept]?.[subTopic];
-    if (!node) {
+    let node = bank?.[concept]?.[subTopic]; if (!node) {
         return { concept, subTopic, items: [] };
     }
+    node = ensureBuckets(node);
+
+    // Normalize inputs
+    count = Math.max(1, Math.min(30, Number(count) || 10));
+    if (seed != null && !Number.isFinite(seed)) seed = null;
 
     let pool = [];
     if (difficulty === "mixed") {
@@ -152,14 +180,26 @@ export function buildQuiz({
         const need = Math.max(0, count - pool.length);
         if (need > 0) {
             const generated = node.gen(need);
-            pool.push(...generated);
-            node.pool.push(...generated);
-            node[difficulty === "mixed" ? "easy" : difficulty].push(...generated); // default bucket
+            const safeGen = (generated || [])
+                .map(sanitizeMCQ)
+                .filter(Boolean);
+            pool.push(...safeGen);
+            // Also keep bank caches updated for future sessions
+            node.pool.push(...safeGen);
+            const bucketName = (difficulty === "mixed" ? "easy" : difficulty);
+            node[bucketName].push(...safeGen);
         }
     }
 
-    // Filter by kind unless allowShort
-    if (!allowShort) pool = pool.filter((q) => q.kind !== "short");
+    // Filter by kind unless allowShort and sanitize
+    pool = (pool || [])
+        .filter(q => allowShort ? true : q.kind !== "short")
+        .map(sanitizeMCQ)
+        .filter(Boolean);
+
+    // Dedupe by prompt (case-insensitive) to reduce repeats
+    pool = uniqueBy(pool, q => (q.prompt || "").trim().toLowerCase());
+
     // --- Smart bias: pull ~40% from recent misses (if available) ---
     const targetWeak = Math.max(1, Math.floor(count * 0.4));
     const weak = pickWeakFromPool(pool, concept, subTopic, targetWeak);
@@ -170,11 +210,13 @@ export function buildQuiz({
     }
     const remainderPick = shuffle(remainder, seed).slice(0, Math.max(0, count - weak.length));
     const items = [...weak.map(w => w.item), ...remainderPick].slice(0, count);
-
+    if (!items.length) return { concept, subTopic, items: [] };
     // First fix obvious a/an mistakes, then deterministically shuffle choices
     const normalized = items.map((q, i) =>
-        shuffleChoices(fixArticleAnswer(q), seed == null ? i + 1 : seed + i + 1)
-    );
+        shuffleChoices(
+            fixArticleAnswer(q),
+            seed == null ? (i + 1) : (seed + i + 1)
+        ));
 
     return { concept, subTopic, items: normalized };
 }
