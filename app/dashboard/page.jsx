@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import books from "@/src/content/book-content.js";
+import {
+  ResponsiveContainer,
+  LineChart, Line,
+  CartesianGrid, XAxis, YAxis, Tooltip,
+} from "recharts";
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  const [rangeDays, setRangeDays] = useState(7);
+  const [metrics, setMetrics] = useState({ readingDaily: [], grammarDaily: [] });
 
   useEffect(() => {
     (async () => {
@@ -19,6 +26,17 @@ export default function DashboardPage() {
       }
     })();
   }, []);
+
+  // fetch charts
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`/api/metrics?days=${rangeDays}`);
+        const j = await r.json();
+        if (j?.ok) setMetrics(j.data);
+      } catch { }
+    })();
+  }, [rangeDays]);
 
   const reading = data?.reading;
   const upload = data?.upload;
@@ -110,6 +128,55 @@ export default function DashboardPage() {
           ) : (
             <p>No recent grammar practice.</p>
           )}
+        </div>
+      </section>
+
+      {/* Progress charts */}
+      <section style={{ marginTop: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h3 style={{ margin: 0 }}>📈 Progress</h3>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setRangeDays(7)}
+              style={{ ...btnStyle, background: rangeDays === 7 ? "#0070f3" : "#e9eefc", color: rangeDays === 7 ? "#fff" : "#0b3b9f" }}
+            >7 days</button>
+            <button
+              onClick={() => setRangeDays(30)}
+              style={{ ...btnStyle, background: rangeDays === 30 ? "#0070f3" : "#e9eefc", color: rangeDays === 30 ? "#fff" : "#0b3b9f" }}
+            >30 days</button>
+          </div>
+        </div>
+
+        {/* Reading minutes */}
+        <div style={cardStyle}>
+          <h4 style={{ margin: "0 0 8px" }}>Reading time (minutes / day)</h4>
+          <div style={{ width: "100%", height: 220 }}>
+            <ResponsiveContainer>
+              <LineChart data={metrics.readingDaily}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis width={40} tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="minutes" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Grammar average score */}
+        <div style={{ ...cardStyle, marginTop: 12 }}>
+          <h4 style={{ margin: "0 0 8px" }}>Grammar average score (/ day)</h4>
+          <div style={{ width: "100%", height: 220 }}>
+            <ResponsiveContainer>
+              <LineChart data={metrics.grammarDaily}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis width={40} domain={[0, 100]} tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="avg" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </section>
 
