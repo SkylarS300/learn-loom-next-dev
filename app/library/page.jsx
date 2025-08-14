@@ -42,6 +42,8 @@ export default function LibraryPage() {
   const [query, setQuery] = useState("");
   const [shareCode, setShareCode] = useState("");
   const [savedCodes, setSavedCodes] = useState([]);
+  // bump this whenever codes change so community re-fetches
+  const [codesVersion, setCodesVersion] = useState(0);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -89,13 +91,12 @@ export default function LibraryPage() {
         const j = await r.json().catch(() => ({}));
         const list = Array.isArray(j) ? j : j?.data ?? [];
         if (!cancelled) setCommunity(list);
-        // If user just typed a code and clicked Save, refresh local list
-        // (The cookie already saved server-side)
+        // keep local chip list in sync
         if (!cancelled) refreshSavedCodes();
       } catch { /* no-op */ }
     })();
     return () => { cancelled = true; };
-  }, [shareCode]);
+  }, [shareCode, codesVersion]); // re-fetch when codes change
 
   const filtered = useMemo(() => {
     const curated = books.map((b, i) => ({
@@ -200,6 +201,7 @@ export default function LibraryPage() {
                 });
                 // re-fetch happens automatically due to shareCode dep above
                 refreshSavedCodes();
+                setCodesVersion((v) => v + 1); // trigger community refresh
               }}
               aria-label="Save share code"
             >
@@ -213,6 +215,7 @@ export default function LibraryPage() {
                   setSavedCodes([]);
                   // community will show only PUBLIC on next fetch
                   setShareCode(""); // clear input too
+                  setCodesVersion((v) => v + 1); // trigger community refresh
                 }}
                 aria-label="Clear all saved codes"
               >
@@ -235,6 +238,7 @@ export default function LibraryPage() {
                     setSavedCodes((prev) => prev.filter((x) => x !== c));
                     // let the next community fetch show fewer CODED items
                     setShareCode(""); // decouple input from removed chip
+                    setCodesVersion((v) => v + 1); // trigger community refresh
                   }}
                   aria-label={`Remove code ${c}`}
                   style={{ marginLeft: 6, border: "none", background: "transparent", cursor: "pointer" }}
