@@ -41,6 +41,7 @@ export default function LibraryPage() {
   const [community, setCommunity] = useState([]);
   const [query, setQuery] = useState("");
   const [shareCode, setShareCode] = useState("");
+  const [savedCodes, setSavedCodes] = useState([]);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -64,6 +65,18 @@ export default function LibraryPage() {
     };
   }, []);
 
+  // Load saved codes once (for display) and whenever we modify them
+  async function refreshSavedCodes() {
+    try {
+      const r = await fetch("/api/sharecode");
+      const j = await r.json();
+      if (j?.ok) setSavedCodes(j.data || []);
+    } catch { }
+  }
+  useEffect(() => {
+    refreshSavedCodes();
+  }, []);
+
 
   // Load community (PUBLIC + any saved codes cookie + optional typed code)
   useEffect(() => {
@@ -76,6 +89,9 @@ export default function LibraryPage() {
         const j = await r.json().catch(() => ({}));
         const list = Array.isArray(j) ? j : j?.data ?? [];
         if (!cancelled) setCommunity(list);
+        // If user just typed a code and clicked Save, refresh local list
+        // (The cookie already saved server-side)
+        if (!cancelled) refreshSavedCodes();
       } catch { /* no-op */ }
     })();
     return () => { cancelled = true; };
@@ -181,16 +197,53 @@ export default function LibraryPage() {
                   body: JSON.stringify({ code }),
                 });
                 // re-fetch happens automatically due to shareCode dep above
+                refreshSavedCodes();
               }}
               aria-label="Save share code"
             >
               Save code
             </button>
+            {savedCodes.length > 0 && (
+              <button
+                className={styles.btn}
+                onClick={async () => {
+                  await fetch("/api/sharecode", { method: "DELETE" });
+                  setSavedCodes([]);
+                  // community will show only PUBLIC on next fetch
+                  setShareCode(""); // clear input too
+                }}
+                aria-label="Clear all saved codes"
+              >
+                Clear codes
+              </button>
+            )}
           </div>
         </div>
         <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
           Shows PUBLIC uploads from everyone. Enter a code to reveal a CODED title.
         </p>
+        +        {savedCodes.length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 12px" }}>
+            {savedCodes.map((c) => (
+              <span key={c} style={{ border: "1px solid #d9e3ff", background: "#f1f5ff", color: "#0b3b9f", borderRadius: 999, padding: "2px 8px" }}>
+                {c}
+                <button
+                  onClick={async () => {
+                    await fetch(`/api/sharecode?code=${encodeURIComponent(c)}`, { method: "DELETE" });
+                    setSavedCodes((prev) => prev.filter((x) => x !== c));
+                    // let the next community fetch show fewer CODED items
+                    setShareCode(""); // decouple input from removed chip
+                  }}
+                  aria-label={`Remove code ${c}`}
+                  style={{ marginLeft: 6, border: "none", background: "transparent", cursor: "pointer" }}
+                  title="Remove"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className={styles.grid}>
           {filtered.comm.length > 0 ? (
             filtered.comm.map((u) => {
@@ -232,6 +285,6 @@ export default function LibraryPage() {
           )}
         </div>
       </section>
-    </main>
+    </main >
   );
 }

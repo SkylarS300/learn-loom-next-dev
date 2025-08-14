@@ -204,83 +204,84 @@ export default function UploadReader({ upload, isOwner = false }) {
         }
     }
 
+    // ——— Owner controls (render in both locked/unlocked) ———
+    const ownerControls = isOwner ? (
+        <div style={{ margin: "6px 0 12px", display: "grid", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <label style={{ fontWeight: 600 }}>Visibility:</label>
+                <select value={vis} onChange={(e) => setVis(e.target.value)}>
+                    <option value="PRIVATE">Private (only you)</option>
+                    <option value="PUBLIC">Public (listed in Community)</option>
+                    <option value="CODED">Share code (not listed; show by code)</option>
+                </select>
+                <button
+                    className="cta-button small"
+                    disabled={savingVis}
+                    onClick={async () => {
+                        setSavingVis(true);
+                        try {
+                            const r = await fetch(`/api/uploadedtext/${upload.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ visibility: vis }),
+                            });
+                            const j = await r.json();
+                            if (j?.ok) {
+                                setVis(j.data.visibility);
+                                setCode(j.data.shareCode || "");
+                            }
+                        } finally {
+                            setSavingVis(false);
+                        }
+                    }}
+                >
+                    Save
+                </button>
+            </div>
+            {vis === "CODED" && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span>
+                        <strong>Share code:</strong>{" "}
+                        {code ? <code>{code}</code> : <em>(will be generated on save)</em>}
+                    </span>
+                    {code && (
+                        <>
+                            <button
+                                className="cta-button small"
+                                onClick={async () => {
+                                    await navigator.clipboard?.writeText(code);
+                                    alert("Code copied");
+                                }}
+                            >
+                                Copy
+                            </button>
+                            <button
+                                className="cta-button small"
+                                onClick={async () => {
+                                    const r = await fetch(`/api/uploadedtext/${upload.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ action: "regenCode" }),
+                                    });
+                                    const j = await r.json();
+                                    if (j?.ok) setCode(j.data.shareCode || "");
+                                }}
+                            >
+                                Regenerate
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+            {upload.password ? <div style={{ color: "#555" }}>🔒 Password protected</div> : null}
+        </div>
+    ) : null;
+
     if (!unlocked) {
         return (
             <div className="upload-reader locked">
                 <h1>{upload.title}</h1>
-
-                {/* Owner helpers */}
-                {isOwner && (
-                    <div style={{ margin: "6px 0 12px", display: "grid", gap: 8 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                            <label style={{ fontWeight: 600 }}>Visibility:</label>
-                            <select value={vis} onChange={(e) => setVis(e.target.value)}>
-                                <option value="PRIVATE">Private (only you)</option>
-                                <option value="PUBLIC">Public (listed in Community)</option>
-                                <option value="CODED">Share code (not listed; show by code)</option>
-                            </select>
-                            <button
-                                className="cta-button small"
-                                disabled={savingVis}
-                                onClick={async () => {
-                                    setSavingVis(true);
-                                    try {
-                                        const r = await fetch(`/api/uploadedtext/${upload.id}`, {
-                                            method: "PATCH",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ visibility: vis }),
-                                        });
-                                        const j = await r.json();
-                                        if (j?.ok) {
-                                            setVis(j.data.visibility);
-                                            setCode(j.data.shareCode || "");
-                                        }
-                                    } finally {
-                                        setSavingVis(false);
-                                    }
-                                }}
-                            >
-                                Save
-                            </button>
-                        </div>
-                        {vis === "CODED" && (
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                                <span>
-                                    <strong>Share code:</strong>{" "}
-                                    {code ? <code>{code}</code> : <em>(will be generated on save)</em>}
-                                </span>
-                                {code && (
-                                    <>
-                                        <button
-                                            className="cta-button small"
-                                            onClick={async () => {
-                                                await navigator.clipboard?.writeText(code);
-                                                alert("Code copied");
-                                            }}
-                                        >
-                                            Copy
-                                        </button>
-                                        <button
-                                            className="cta-button small"
-                                            onClick={async () => {
-                                                const r = await fetch(`/api/uploadedtext/${upload.id}`, {
-                                                    method: "PATCH",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ action: "regenCode" }),
-                                                });
-                                                const j = await r.json();
-                                                if (j?.ok) setCode(j.data.shareCode || "");
-                                            }}
-                                        >
-                                            Regenerate
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                        {upload.password ? <div style={{ color: "#555" }}>🔒 Password protected</div> : null}
-                    </div>
-                )}
+                {ownerControls}
 
                 {/* Visitors: if CODED and content hidden, offer code save */}
                 {!isOwner && upload.visibility === "CODED" && uploadContent == null && (
@@ -346,6 +347,7 @@ export default function UploadReader({ upload, isOwner = false }) {
     return (
         <div className="upload-reader">
             <h1>{upload.title}</h1>
+            {ownerControls}
 
             {resume && (
                 <div className="progress-banner" style={{ margin: "0 0 10px", display: "flex", gap: 8, alignItems: "center" }}>
