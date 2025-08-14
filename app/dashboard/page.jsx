@@ -72,6 +72,27 @@ export default function DashboardPage() {
             {r.concept} — {r.subTopic}
           </span>
         ))}
+        {rows.map((r, i) => {
+          const href = `/grammar?concept=${encodeURIComponent(r.concept)}&subTopic=${encodeURIComponent(r.subTopic)}&start=1`;
+          return (
+            <a
+              key={i}
+              href={href}
+              title={`Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%`}
+              style={{
+                textDecoration: "none",
+                color: "inherit",
+                border: "1px solid #e5e7eb",
+                background: "#f9fafb",
+                borderRadius: 999,
+                padding: "4px 10px",
+                fontSize: 12,
+              }}
+            >
+              {r.concept} — {r.subTopic}
+            </a>
+          );
+        })}
       </div>
     );
   }

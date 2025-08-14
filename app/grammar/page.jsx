@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Navbar from "../Navbar";
 import bank, { buildQuiz } from "@/src/grammar/buildQuiz";
 import styles from "./grammar.module.css";
 
 export default function Grammar() {
   // ----- Recommendations -----
+  const search = useSearchParams();
   const [recs, setRecs] = useState([]);
   const [recErr, setRecErr] = useState("");
   const [recLoading, setRecLoading] = useState(true);
@@ -87,6 +89,9 @@ export default function Grammar() {
   const [report, setReport] = useState(null);  // { prompt, concept, subTopic } 
   const SESSION_KEY = "grammarSessionV1";
 
+  // Prevent multiple auto-starts
+  const deepLinkRan = useRef(false);
+
   // Offer resume if we detect an in-progress session
   useEffect(() => {
     try {
@@ -99,6 +104,38 @@ export default function Grammar() {
       }
     } catch { }
   }, []);
+
+
+  // Deep-link handler (canonical):
+  //   /grammar?concept=...&subTopic=...&start=1
+  // Back-compat also supported:
+  //   /grammar?start=Concept|Subtopic
+  useEffect(() => {
+    let c = search.get("concept");
+    let s = search.get("subTopic");
+    const startRaw = search.get("start");
+
+    // Legacy: if concept/subTopic missing, accept start="Concept|Subtopic"
+    if ((!c || !s) && startRaw && startRaw.includes("|")) {
+      const [cRaw, sRaw] = String(startRaw).split("|");
+      c = decodeURIComponent(cRaw || "");
+      s = decodeURIComponent(sRaw || "");
+    }
+    if (!c || !s) return;
+    if (deepLinkRan.current) return;        // already handled
+    if (mode !== "landing") return;         // don't override resume/results
+
+    // preselect UI for consistency
+    setConcept(c);
+    setSubTopic(s);
+
+    // Autostart if start=1 or the legacy start payload was used
+    if (startRaw === "1" || (startRaw && startRaw.includes("|"))) {
+      setTimeout(() => startQuizFrom(c, s), 80);
+    }
+    deepLinkRan.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, mode]);
 
   // Optional deep-link: /grammar?start=Concept|Subtopic
   useEffect(() => {
