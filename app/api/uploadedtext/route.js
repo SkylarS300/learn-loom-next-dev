@@ -55,6 +55,37 @@ export async function POST(req) {
   return Response.json({ id: newText.id });
 }
 
+export async function GET() {
+  const cookieStore = await cookies();            // Next 15: await cookies()
+  const anonId = cookieStore.get("learnloomId")?.value;
+  if (!anonId) {
+    return Response.json({ ok: false, error: "Missing anonymous ID" }, { status: 401 });
+  }
+
+  try {
+    const rows = await prisma.uploadedtext.findMany({
+      where: { anonId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        password: true,   // we won’t send the value—just to derive locked flag
+      },
+    });
+    const data = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      createdAt: r.createdAt,
+      locked: !!r.password,   // do not return content or password
+    }));
+    return Response.json({ ok: true, data });
+  } catch (e) {
+    console.error("uploadedtext GET failed:", e);
+    return Response.json({ ok: false, error: "Server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(req) {
   const cookieStore = await cookies();
   const anonId = cookieStore.get("learnloomId")?.value;
