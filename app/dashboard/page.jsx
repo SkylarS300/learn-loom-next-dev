@@ -12,8 +12,7 @@ export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [rangeDays, setRangeDays] = useState(7);
-  const [metrics, setMetrics] = useState({ readingDaily: [], grammarDaily: [] });
-
+  const [metrics, setMetrics] = useState({ readingDaily: [], grammarDaily: [], grammarPaceDaily: [], topWeakAreas: [] });
   useEffect(() => {
     (async () => {
       try {
@@ -215,6 +214,7 @@ export default function DashboardPage() {
         {/* Grammar average score */}
         <div style={{ ...cardStyle, marginTop: 12 }}>
           <h4 style={{ margin: "0 0 8px" }}>Grammar average score (/ day)</h4>
+
           <div style={{ width: "100%", height: 220 }}>
             <ResponsiveContainer>
               <LineChart data={metrics.grammarDaily}>
@@ -225,6 +225,47 @@ export default function DashboardPage() {
                 <Line type="monotone" dataKey="avg" dot={false} />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* NEW: Grammar pace (sec per question) */}
+          <div style={{ ...cardStyle, marginTop: 12 }}>
+            <h4 style={{ margin: "0 0 8px" }}>Grammar pace (sec / question)</h4>
+            <div style={{ width: "100%", height: 220 }}>
+              <ResponsiveContainer>
+                <LineChart data={metrics.grammarPaceDaily}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis width={40} domain={[0, 'auto']} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="secPerQ" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* NEW: Grammar insights (top weak areas) */}
+          <div style={{ ...cardStyle, marginTop: 12 }}>
+            <h4 style={{ margin: "0 0 8px" }}>Grammar insights</h4>
+            {metrics.topWeakAreas?.length ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {metrics.topWeakAreas.map((r, i) => (
+                  <li key={i} style={{ marginBottom: 8 }}>
+                    <strong>{r.concept}</strong> — {r.subTopic}
+                    {" · "}
+                    Acc: <strong>{Math.round((r.weightedAccuracy || 0) * 100)}%</strong>
+                    {" · "}
+                    <button
+                      onClick={() => (window.location.href = `/grammar?start=${encodeURIComponent(r.concept)}|${encodeURIComponent(r.subTopic)}`)}
+                      style={{ ...btnStyle, marginLeft: 6 }}
+                    >
+                      Practice
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="dim">No insights yet. Take a quiz to get started.</p>
+            )}
           </div>
         </div>
       </section>

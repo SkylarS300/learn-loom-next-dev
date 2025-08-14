@@ -62,6 +62,7 @@ model grammarprogress {
   score     Int
   numQuestions Int?   // optional: total questions in the attempt
   durationMs  Int?    // optional: time spent on the attempt (ms)
+  isAi        Boolean? @default(false) // optional: tag AI-generated quizzes
   createdAt DateTime @default(now())
 }
 

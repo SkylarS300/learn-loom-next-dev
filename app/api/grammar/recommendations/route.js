@@ -78,7 +78,10 @@ export async function GET(req) {
 
     try {
         const rows = await prisma.grammarprogress.findMany({
-            where: { anonId },
+            where: {
+                anonId,
+                OR: [{ isAi: false }, { isAi: null }], // exclude AI by default
+            },
             orderBy: { createdAt: "desc" },
             take: 200, // last 200 attempts
             select: {

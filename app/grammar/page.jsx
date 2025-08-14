@@ -60,6 +60,22 @@ export default function Grammar() {
     } catch { }
   }, []);
 
+  // Optional deep-link: /grammar?start=Concept|Subtopic
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const startArg = sp.get("start");
+      if (!startArg) return;
+      // do not auto-start if a resume session is present
+      if (mode !== "landing") return;
+      const [cRaw, sRaw] = String(startArg).split("|");
+      const c = decodeURIComponent(cRaw || "");
+      const s = decodeURIComponent(sRaw || "");
+      if (c && s) startQuizFrom(c, s);
+    } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   function startQuizFrom(c, s, diff = difficulty, n = count) {
     const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
     if (!q.items?.length) return alert("Not enough questions yet in this area.");
@@ -82,11 +98,10 @@ export default function Grammar() {
         body: JSON.stringify({
           concept: quiz.concept,
           subTopic: quiz.subTopic,
-          score: Math.round(result.scorePct),
-          numQuestions: result.total,
-          durationMs: Math.round(result.durationMs || 0),
+          score: Math.round(summary.scorePct),
           numQuestions: summary.total,
-          durationMs: summary.durationMs,
+          durationMs: Math.round(summary.durationMs || 0),
+          // isAi: false, // add later if you wire AI quizzes
         }),
       });
     } catch { }
