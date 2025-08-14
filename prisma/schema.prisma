@@ -66,6 +66,19 @@ model grammarprogress {
   createdAt DateTime @default(now())
 }
 
+model aifeedback {
+  id        Int      @id @default(autoincrement())
+  anonId    String?
+  concept   String
+  subTopic  String
+  prompt    String
+  issue     String
+  createdAt DateTime @default(now())
+
+  @@index([anonId])
+  @@index([createdAt])
+}
+
 model quizprogress {
   id        Int      @id @default(autoincrement())
   userId    Int?

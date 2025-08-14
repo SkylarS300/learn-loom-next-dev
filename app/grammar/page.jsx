@@ -39,6 +39,9 @@ export default function Grammar() {
   }, [subTopics]);
   const [difficulty, setDifficulty] = useState("mixed");
   const [count, setCount] = useState(10);
+  const [aiMode, setAiMode] = useState(false);
+  const [aiText, setAiText] = useState("");
+  const isAiRef = useRef(false);
 
   // ----- Quiz lifecycle -----
   const [mode, setMode] = useState("landing"); // landing | running | results | resume
@@ -76,8 +79,35 @@ export default function Grammar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  function startQuizFrom(c, s, diff = difficulty, n = count) {
-    const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
+  async function startQuizFrom(c, s, diff = difficulty, n = count) {
+    isAiRef.current = false;
+    if (aiMode) {
+      try {
+        const r = await fetch("/api/ai/quiz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: aiText, concept: c, subTopic: s, difficulty: diff, count: n }),
+        });
+        const j = await r.json();
+        if (r.status === 501) {
+          alert(j?.error || "AI quiz is disabled by the server.");
+        } else if (j?.ok && Array.isArray(j.items) && j.items.length) {
+          setQuiz({ concept: c, subTopic: s, items: j.items });
+          setResult(null);
+          setMode("running");
+          isAiRef.current = true;
+          try {
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ concept: c, subTopic: s, items: j.items, index: 0, correct: 0, elapsed: 0 }));
+          } catch { }
+          return;
+        } else {
+          alert(j?.error || "AI generator returned no questions.");
+        }
+      } catch {
+        alert("AI generator error.");
+      }
+      // If AI path failed, fall back to the bank below.
+    } const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
     if (!q.items?.length) return alert("Not enough questions yet in this area.");
     setQuiz(q);
     setResult(null);
@@ -101,7 +131,7 @@ export default function Grammar() {
           score: Math.round(summary.scorePct),
           numQuestions: summary.total,
           durationMs: Math.round(summary.durationMs || 0),
-          // isAi: false, // add later if you wire AI quizzes
+          isAi: !!isAiRef.current,
         }),
       });
     } catch { }
@@ -219,6 +249,22 @@ export default function Grammar() {
                       <option value={15}>15</option>
                     </select>
                   </label>
+                </div>
+                {/* AI generator */}
+                <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="checkbox" checked={aiMode} onChange={(e) => setAiMode(e.target.checked)} />
+                    <span>Use AI (generate from my text)</span>
+                  </label>
+                  {aiMode && (
+                    <textarea
+                      value={aiText}
+                      onChange={(e) => setAiText(e.target.value)}
+                      placeholder="Paste a short passage to generate questions from…"
+                      rows={5}
+                      style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: 8 }}
+                    />
+                  )}
                 </div>
                 <div style={{ marginTop: 12 }}>
                   <button className={styles.btnPrimary} onClick={() => startQuizFrom(concept, subTopic)}>
