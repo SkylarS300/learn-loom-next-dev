@@ -149,7 +149,9 @@ export default function ReadingPalClient() {
       });
       setServerBookmark({ sentenceIndex: Number(sentenceIndexRef.current) || 0 });
       toast(`🔖 Saved: Chapter ${cIdx + 1}, Sentence ${Number(sentenceIndexRef.current) + 1}`);
-    } catch { /* noop */ }
+    } catch {
+      toast("⚠️ Couldn't save bookmark");
+    }
   }
 
   async function loadServerBookmark(autoJump = false) {
@@ -176,7 +178,9 @@ export default function ReadingPalClient() {
         setServerBookmark(null);
         setResumePromptOpen(false);
       }
-    } catch { /* noop */ }
+    } catch {
+      toast("⚠️ Couldn't load bookmark");
+    }
   }
 
   /* ---------- voices + prefs ---------- */
@@ -282,9 +286,14 @@ export default function ReadingPalClient() {
   useEffect(() => {
     (async () => {
       if (uploadId) {
-        const r = await fetch(`/api/uploads/${uploadId}`);
-        const data = await r.json();
-        setUploadData(data);
+        try {
+          const r = await fetch(`/api/uploads/${uploadId}`);
+          const data = await r.json();
+          setUploadData(data);
+        } catch {
+          toast("⚠️ Failed to load upload");
+          return;
+        }
 
         if (bookTitleRef.current) bookTitleRef.current.innerText = data.title;
         if (chapterTitleRef.current) chapterTitleRef.current.innerText = "Uploaded Text";
@@ -317,7 +326,9 @@ export default function ReadingPalClient() {
         const r = await fetch("/api/uploadedtext");
         const j = await r.json();
         setUploads(Array.isArray(j) ? j : j?.data ?? []);
-      } catch { }
+      } catch {
+        toast("⚠️ Failed to load your uploads");
+      }
     })();
 
     // chapter nav

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "../Navbar";
+import NavbarGuard from "../components/NavbarGuard";
 import bank, { buildQuiz } from "@/src/grammar/buildQuiz";
 import styles from "./grammar.module.css";
 
@@ -245,7 +246,9 @@ export default function Grammar() {
 
   return (
     <div id="main-content" className="grammar-layout">
-      <Navbar />
+      <NavbarGuard>
+        <Navbar />
+      </NavbarGuard>
       <div className="grammar-columns">
         {/* ---- Sidebar: topics from bank (keeps your two-column layout) ---- */}
         <aside id="quizList" className={`grammar-sidebar ${styles.sidebar}`}>
