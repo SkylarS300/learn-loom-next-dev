@@ -79,6 +79,10 @@ export async function GET(req) {
     const n = Math.max(1, Math.min(5, Number(searchParams.get("n")) || 2));
     // minimum attempts before full trust (penalize sparse topics a bit)
     const minAttempts = Math.max(1, Number(searchParams.get("minAttempts")) || 3);
+    // weights/knobs (exposed for experiments)
+    const alphaHints = Math.max(0, Math.min(0.15, Number(searchParams.get("alphaHints")) || 0.12));
+    const alphaPace = Math.max(0, Math.min(0.30, Number(searchParams.get("alphaPace")) || 0.15));
+
 
     try {
         const rows = await prisma.grammarprogress.findMany({
@@ -133,6 +137,9 @@ export async function GET(req) {
                 wTotal: 0,     // recency
                 wSec: 0,       // for avg seconds per question (weighted by recency)
                 wN: 0,
+                wHints: 0,     // weighted hints per question
+                wHintsN: 0,    // weighted count for hints
+                daySet: new Set(), // for streaks
             };
             // normalize score to 0..1
             const s = (r.score > 1 ? r.score / 100 : r.score) || 0;
@@ -152,12 +159,12 @@ export async function GET(req) {
             }
             // track hints (weighted)
             if (hintsPerQ > 0) {
-                b.wHints = (b.wHints || 0) + hintsPerQ * w;
-                b.wHintsN = (b.wHintsN || 0) + w;
+                b.wHints += hintsPerQ * w;
+                b.wHintsN += w;
             }
-            if (!b.lastAttemptAt || new Date(r.createdAt) > new Date(b.lastAttemptAt)) {
-                b.lastAttemptAt = r.createdAt;
-            }
+            // collect day keys for streaks
+            const dayKey = Math.floor(new Date(r.createdAt).getTime() / 86400000); // epoch days
+            b.daySet.add(dayKey);
 
             buckets.set(key, b);
         }
@@ -173,19 +180,25 @@ export async function GET(req) {
             let weakness = (1 - weightedAccuracy) * (0.5 + 0.5 * confidence);
             const paceBaseline = Math.max(1, Number(searchParams.get("paceBaseline")) || 15);
             if (avgSecPerQ && avgSecPerQ > paceBaseline) {
-                const extra = Math.min(0.25, (avgSecPerQ - paceBaseline) / 60); // up to +0.25 when very slow
+                // pace penalty scaled by alphaPace (kept gentle)
+                const extra = Math.min(0.25, (avgSecPerQ - paceBaseline) / 60) * alphaPace;
                 weakness = Math.min(1, weakness + extra);
             }
-            // Hints penalty (small): up to +0.15 when relying heavily on hints
+            // Hints penalty (small): scaled by alphaHints
             if (avgHintsPerQ > 0) {
-                const hintAlpha = Math.max(0, Math.min(0.15, Number(searchParams.get("alphaHints")) || 0.12));
-                const extra = Math.min(0.15, avgHintsPerQ * hintAlpha * 2); // scale gently
+                const extra = Math.min(0.15, avgHintsPerQ * alphaHints * 2);
                 weakness = Math.min(1, weakness + extra);
+            }
+            // Compute streak (consecutive days ending at most-recent attempt)
+            let streakDays = 0;
+            if (b.daySet && b.daySet.size) {
+                const days = Array.from(b.daySet.values());
+                let cur = Math.max(...days);
+                while (b.daySet.has(cur)) { streakDays += 1; cur -= 1; }
             }
             // Penalize topics with too few attempts so they rank a bit lower than established weaknesses
-            const attemptsPenalty = b.attempts < minAttempts ? (0.05 * (minAttempts - b.attempts)) : 0;
             const rank = Math.max(0, weakness - attemptsPenalty); // higher rank = more recommended
-            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency, avgHintsPerQ, rank };
+            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency, avgHintsPerQ, streakDays, rank };
         });
 
         // Show areas even with limited data (>=1 attempt). Confidence will be low.
@@ -211,6 +224,9 @@ export async function GET(req) {
                 avgSecPerQ: spq || null,
                 efficiency: eff,
                 weakness: Math.min(1, 1 - (s * eff)),
+                rank: Math.min(1, 1 - (s * eff)), // fallback rank aligns with weakness
+                avgHintsPerQ: 0,
+                streakDays: 1,
                 rank: Math.min(1, 1 - (s * eff)), // fallback rank aligns with weakness
             }];
 

@@ -339,6 +339,9 @@ export default function Grammar() {
                           {typeof r.avgSecPerQ === "number" && (
                             <> | Pace: <strong>{Math.round(r.avgSecPerQ)}s/q</strong></>
                           )}
+                          {typeof r.streakDays === "number" && r.streakDays > 0 && (
+                            <> | Streak: <strong>{r.streakDays}d</strong></>
+                          )}
                         </div>
                         {r.attempts < 5 && (
                           <div className={styles.badgeWarn}>
