@@ -1,5 +1,6 @@
 "use client";
 
+import RecentGrammarCard from "./RecentGrammarCard";
 import { useEffect, useState } from "react";
 import books from "@/src/content/book-content.js";
 import {
@@ -67,7 +68,12 @@ export default function DashboardPage() {
     return (
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0 16px" }}>
         {rows.map((r, i) => (
-          <span key={i} title={`Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%`}
+          <span
+            key={i}
+            title={
+              `Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%` +
+              (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "")
+            }
             style={{ border: "1px solid #e5e7eb", background: "#f9fafb", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
             {r.concept} — {r.subTopic}
           </span>
@@ -78,7 +84,10 @@ export default function DashboardPage() {
             <a
               key={i}
               href={href}
-              title={`Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%`}
+              title={
+                `Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%` +
+                (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "")
+              }
               style={{
                 textDecoration: "none",
                 color: "inherit",
@@ -204,6 +213,11 @@ export default function DashboardPage() {
             <p>No recent grammar practice.</p>
           )}
         </div>
+      </section>
+
+      {/* Recent grammar mini-card */}
+      <section style={{ marginTop: 16 }}>
+        <RecentGrammarCard />
       </section>
 
       {/* Progress charts */}

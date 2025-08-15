@@ -59,12 +59,15 @@ function pickStartersStable(anonId, k = 2) {
 export async function GET(req) {
     const cookieStore = await cookies(); // await before using
     const anonId = cookieStore.get("learnloomId")?.value;
+    const { searchParams } = new URL(req.url);
 
     // Map seconds-per-question to a speed efficiency [0.5..1.0]
     // Baseline 15s/q: 1.0; slower → down to 0.5; faster capped at 1.0
+    // Baseline and knobs are tunable via query:
+    //  - paceBaseline (default 15)
     function speedEfficiency(secPerQ) {
         if (!Number.isFinite(secPerQ) || secPerQ <= 0) return 1.0;
-        const baseline = 15; // adjust later if needed
+        const baseline = Math.max(1, Number(searchParams.get("paceBaseline")) || 15);
         return Math.max(0.5, Math.min(1.0, baseline / secPerQ));
     }
 
@@ -73,8 +76,9 @@ export async function GET(req) {
     }
 
     // how many recommendations? default 2
-    const { searchParams } = new URL(req.url);
     const n = Math.max(1, Math.min(5, Number(searchParams.get("n")) || 2));
+    // minimum attempts before full trust (penalize sparse topics a bit)
+    const minAttempts = Math.max(1, Number(searchParams.get("minAttempts")) || 3);
 
     try {
         const rows = await prisma.grammarprogress.findMany({
@@ -159,18 +163,22 @@ export async function GET(req) {
             const efficiency = avgSecPerQ ? speedEfficiency(avgSecPerQ) : 1.0; // [0.5..1.0]
             // Base weakness from accuracy (0..1), then gently add speed penalty if slow
             let weakness = (1 - weightedAccuracy) * (0.5 + 0.5 * confidence);
-            if (avgSecPerQ && avgSecPerQ > 15) {
-                const extra = Math.min(0.25, (avgSecPerQ - 15) / 60); // up to +0.25 when very slow
+            const paceBaseline = Math.max(1, Number(searchParams.get("paceBaseline")) || 15);
+            if (avgSecPerQ && avgSecPerQ > paceBaseline) {
+                const extra = Math.min(0.25, (avgSecPerQ - paceBaseline) / 60); // up to +0.25 when very slow
                 weakness = Math.min(1, weakness + extra);
             }
-            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency };
+            // Penalize topics with too few attempts so they rank a bit lower than established weaknesses
+            const attemptsPenalty = b.attempts < minAttempts ? (0.05 * (minAttempts - b.attempts)) : 0;
+            const rank = Math.max(0, weakness - attemptsPenalty); // higher rank = more recommended
+            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency, rank };
         });
 
         // Show areas even with limited data (>=1 attempt). Confidence will be low.
         let top = data
             .filter((x) => x.attempts >= 1)
-            .sort((a, b) => b.weakness - a.weakness)
-            .slice(0, 2);
+            .sort((a, b) => b.rank - a.rank)
+            .slice(0, n);
 
         // Fallback: if no computed top (should be rare), surface the very last practiced item
         if (top.length === 0 && rows.length > 0) {
@@ -189,6 +197,7 @@ export async function GET(req) {
                 avgSecPerQ: spq || null,
                 efficiency: eff,
                 weakness: Math.min(1, 1 - (s * eff)),
+                rank: Math.min(1, 1 - (s * eff)), // fallback rank aligns with weakness
             }];
 
             return Response.json({ ok: true, data: top });
