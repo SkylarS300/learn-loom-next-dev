@@ -189,6 +189,10 @@ export async function GET(req) {
                 const extra = Math.min(0.15, avgHintsPerQ * alphaHints * 2);
                 weakness = Math.min(1, weakness + extra);
             }
+            // NEW: define attemptsPenalty (we referenced it below)
+            const attemptsPenalty =
+                b.attempts < minAttempts ? ((minAttempts - b.attempts) * 0.05) : 0;
+
             // Compute streak (consecutive days ending at most-recent attempt)
             let streakDays = 0;
             if (b.daySet && b.daySet.size) {
