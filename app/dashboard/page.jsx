@@ -160,7 +160,8 @@ export default function DashboardPage() {
               </p>
               <button
                 onClick={() =>
-                  (window.location.href = `/readingpal?bookIndex=${reading.bookIndex}`)
+                (window.location.href =
+                  `/readingpal?bookIndex=${reading.bookIndex}&chapterIndex=${reading.chapterIndex}&resume=1`)
                 }
                 style={btnStyle}
               >

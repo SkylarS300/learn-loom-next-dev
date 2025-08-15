@@ -70,7 +70,8 @@ export default function ReadingPalClient() {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("upload");
   const bookIndex = searchParams.get("bookIndex");
-
+  const resumeFlag = searchParams.get("resume") === "1";
+  const initialChapterParam = Number(searchParams.get("chapterIndex"));
   const anonId = typeof window !== "undefined" ? getAnonId() : null;
 
   const [uploadData, setUploadData] = useState(null);
@@ -151,7 +152,7 @@ export default function ReadingPalClient() {
     } catch { /* noop */ }
   }
 
-  async function loadServerBookmark() {
+  async function loadServerBookmark(autoJump = false) {
     try {
       if (!anonId || uploadId) return;
       const bIdx = Number(bookIndex);
@@ -162,7 +163,15 @@ export default function ReadingPalClient() {
       const idx = j?.data?.sentenceIndex;
       if (Number.isInteger(idx)) {
         setServerBookmark({ sentenceIndex: idx });
-        setResumePromptOpen(true); // show the “Resume?” bar once per chapter load
+        if (autoJump && textRef.current) {
+          sentenceIndexRef.current = idx;
+          setHighlight(idx);
+          const spans = Array.from(textRef.current.querySelectorAll(".sentence"));
+          if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
+          setResumePromptOpen(false);
+        } else {
+          setResumePromptOpen(true); // show the “Resume?” bar once per chapter load
+        }
       } else {
         setServerBookmark(null);
         setResumePromptOpen(false);
@@ -294,6 +303,10 @@ export default function ReadingPalClient() {
         if (b) setBookmark(b);
       } else if (bookIndex !== null && bookTitleRef.current) {
         currentBookRef.current = books[parseInt(bookIndex)];
+        // honor deep-linked chapterIndex if provided
+        if (Number.isInteger(initialChapterParam) && initialChapterParam >= 0) {
+          chapterIndexRef.current = initialChapterParam;
+        }
         bookTitleRef.current.innerText =
           `${currentBookRef.current.title} by ${currentBookRef.current.author}`;
         await displayChapter(currentBookRef.current, chapterIndexRef.current); const b = getBookmark("book", bookIndex);
@@ -312,6 +325,8 @@ export default function ReadingPalClient() {
     const next = nextChapterRef.current;
     const goPrev = () => {
       if (chapterIndexRef.current > 0 && currentBookRef.current) {
+        // autosave bookmark before leaving
+        saveServerBookmark();
         stopReading();
         chapterIndexRef.current--;
         displayChapter(currentBookRef.current, chapterIndexRef.current);
@@ -322,6 +337,8 @@ export default function ReadingPalClient() {
         currentBookRef.current &&
         chapterIndexRef.current < currentBookRef.current.chapters.length - 1
       ) {
+        // autosave bookmark before leaving
+        saveServerBookmark();
         stopReading();
         chapterIndexRef.current++;
         displayChapter(currentBookRef.current, chapterIndexRef.current);
@@ -354,6 +371,30 @@ export default function ReadingPalClient() {
           if (speechSynthesis.speaking && !speechSynthesis.paused) pauseReading();
           else if (speechSynthesis.paused) resumeReading();
           else speakSentencesFrom(sentenceIndexRef.current || 0);
+          break;
+        case "b":
+        case "B":
+          // quick bookmark save
+          e.preventDefault();
+          saveBookmark({
+            type: uploadId ? "upload" : "book",
+            id: uploadId || bookIndex,
+            chapterIndex: uploadId ? undefined : chapterIndexRef.current,
+            scrollY: textRef.current?.scrollTop || 0,
+          });
+          saveServerBookmark();
+          break;
+        case "r":
+        case "R":
+          // quick resume to server sentence if available
+          if (serverBookmark && Number.isInteger(serverBookmark.sentenceIndex)) {
+            e.preventDefault();
+            const idx = serverBookmark.sentenceIndex;
+            sentenceIndexRef.current = idx;
+            setHighlight(idx);
+            const spans = Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+            if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
+          }
           break;
         case "ArrowLeft":
           e.preventDefault();
@@ -416,8 +457,9 @@ export default function ReadingPalClient() {
       }
     }
 
-    // Check if a server bookmark exists for this chapter (we ask before jumping)
-    await loadServerBookmark();
+    // Check if a server bookmark exists for this chapter.
+    // If resume=1 is present, jump automatically; otherwise show the prompt.
+    await loadServerBookmark(resumeFlag);
   }
 
   /* ---------- sentence wrapping & highlight ---------- */
@@ -486,12 +528,16 @@ export default function ReadingPalClient() {
     readingRef.current = false;
     isPausedRef.current = false;
     clearTimeout(postTimerRef.current);
+    // autosave on explicit stop
+    saveServerBookmark();
     hardCancelSpeechQueue();
   }
   function pauseReading() {
     if (!isPausedRef.current && speechSynthesis.speaking) {
       speechSynthesis.pause();
       isPausedRef.current = true;
+      // autosave on pause
+      saveServerBookmark();
       // (Optional: you can flush time slice here if desired)
     }
   }
