@@ -94,6 +94,7 @@ export async function GET(req) {
                 score: true,
                 numQuestions: true,
                 durationMs: true,
+                hintsUsed: true,
                 createdAt: true,
             },
         });
@@ -135,9 +136,10 @@ export async function GET(req) {
             };
             // normalize score to 0..1
             const s = (r.score > 1 ? r.score / 100 : r.score) || 0;
-            const n = Number.isFinite(r.numQuestions) && r.numQuestions > 0 ? r.numQuestions : 10;
-            const secPerQ = (Number.isFinite(r.durationMs) ? r.durationMs : 0) / 1000 / Math.max(1, n);
+            const n = Number.isFinite(r.numQuestions) && r.numQuestions > 0 ? r.numQuestions : 10; const secPerQ = (Number.isFinite(r.durationMs) ? r.durationMs : 0) / 1000 / Math.max(1, n);
             const eff = speedEfficiency(secPerQ); // [0.5..1.0]
+            const hints = Number.isFinite(r.hintsUsed) ? Math.max(0, r.hintsUsed) : 0;
+            const hintsPerQ = n > 0 ? (hints / n) : 0;
             b.attempts += 1;
             b.correct += s >= 0.8 ? 1 : 0;
             // fold speed into accuracy before aggregating
@@ -147,6 +149,11 @@ export async function GET(req) {
             if (Number.isFinite(secPerQ) && secPerQ > 0) {
                 b.wSec += secPerQ * w;
                 b.wN += w;
+            }
+            // track hints (weighted)
+            if (hintsPerQ > 0) {
+                b.wHints = (b.wHints || 0) + hintsPerQ * w;
+                b.wHintsN = (b.wHintsN || 0) + w;
             }
             if (!b.lastAttemptAt || new Date(r.createdAt) > new Date(b.lastAttemptAt)) {
                 b.lastAttemptAt = r.createdAt;
@@ -160,6 +167,7 @@ export async function GET(req) {
             const weightedAccuracy = b.wCorrect / Math.max(1e-6, b.wTotal); // already speed-adjusted
             const confidence = Math.min(1, Math.sqrt(b.attempts) / 5);      // 25 attempts → ~1.0
             const avgSecPerQ = b.wN > 0 ? b.wSec / b.wN : null;
+            const avgHintsPerQ = (b.wHintsN > 0) ? (b.wHints / b.wHintsN) : 0;
             const efficiency = avgSecPerQ ? speedEfficiency(avgSecPerQ) : 1.0; // [0.5..1.0]
             // Base weakness from accuracy (0..1), then gently add speed penalty if slow
             let weakness = (1 - weightedAccuracy) * (0.5 + 0.5 * confidence);
@@ -168,10 +176,16 @@ export async function GET(req) {
                 const extra = Math.min(0.25, (avgSecPerQ - paceBaseline) / 60); // up to +0.25 when very slow
                 weakness = Math.min(1, weakness + extra);
             }
+            // Hints penalty (small): up to +0.15 when relying heavily on hints
+            if (avgHintsPerQ > 0) {
+                const hintAlpha = Math.max(0, Math.min(0.15, Number(searchParams.get("alphaHints")) || 0.12));
+                const extra = Math.min(0.15, avgHintsPerQ * hintAlpha * 2); // scale gently
+                weakness = Math.min(1, weakness + extra);
+            }
             // Penalize topics with too few attempts so they rank a bit lower than established weaknesses
             const attemptsPenalty = b.attempts < minAttempts ? (0.05 * (minAttempts - b.attempts)) : 0;
             const rank = Math.max(0, weakness - attemptsPenalty); // higher rank = more recommended
-            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency, rank };
+            return { ...b, accuracy, weightedAccuracy, weakness, confidence, avgSecPerQ, efficiency, avgHintsPerQ, rank };
         });
 
         // Show areas even with limited data (>=1 attempt). Confidence will be low.

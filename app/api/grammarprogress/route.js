@@ -21,6 +21,7 @@ export async function GET() {
         numQuestions: true,   // Int?
         durationMs: true,     // Int?
         isAi: true,           // Bool?
+        hintsUsed: true,      // Int?
         createdAt: true,
       },
     });
@@ -41,9 +42,7 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    let { concept, subTopic, score, numQuestions, durationMs, isAi } = body ?? {};
-
-    if (!concept || !subTopic || score == null) {
+    const { concept, subTopic, score, durationMs, numQuestions, isAi, hintsUsed } = body || {}; if (!concept || !subTopic || score == null) {
       return Response.json({ ok: false, error: "Missing data" }, { status: 400 });
     }
 
@@ -59,6 +58,7 @@ export async function POST(req) {
     const nq = Number.isFinite(Number(numQuestions)) ? Math.max(0, Math.round(Number(numQuestions))) : null;
     const dur = Number.isFinite(Number(durationMs)) ? Math.max(0, Math.round(Number(durationMs))) : null;
     const ai = typeof isAi === "boolean" ? isAi : false;
+    const hints = Number.isFinite(Number(hintsUsed)) ? Math.max(0, Math.round(Number(hintsUsed))) : null;
 
     await prisma.grammarprogress.create({
       data: {
@@ -69,6 +69,7 @@ export async function POST(req) {
         numQuestions: nq,
         durationMs: dur,
         isAi: ai,
+        hintsUsed: hints,
       },
     });
 

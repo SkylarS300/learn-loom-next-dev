@@ -63,7 +63,12 @@ model grammarprogress {
   numQuestions Int?   // optional: total questions in the attempt
   durationMs  Int?    // optional: time spent on the attempt (ms)
   isAi        Boolean? @default(false) // optional: tag AI-generated quizzes
+  hintsUsed    Int?      // number of hints used in this attempt
   createdAt DateTime @default(now())
+
+
+  @@index([anonId])
+  @@index([concept, subTopic])
 }
 
 model aifeedback {

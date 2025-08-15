@@ -72,7 +72,8 @@ export default function DashboardPage() {
             key={i}
             title={
               `Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%` +
-              (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "")
+              (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "") +
+              (typeof r.avgHintsPerQ === "number" && r.avgHintsPerQ > 0 ? ` · Hints ${r.avgHintsPerQ.toFixed(2)}/q` : "")
             }
             style={{ border: "1px solid #e5e7eb", background: "#f9fafb", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
             {r.concept} — {r.subTopic}
@@ -86,7 +87,8 @@ export default function DashboardPage() {
               href={href}
               title={
                 `Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%` +
-                (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "")
+                (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "") +
+                (typeof r.avgHintsPerQ === "number" && r.avgHintsPerQ > 0 ? ` · Hints ${r.avgHintsPerQ.toFixed(2)}/q` : "")
               }
               style={{
                 textDecoration: "none",
