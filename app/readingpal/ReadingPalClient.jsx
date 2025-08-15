@@ -105,6 +105,43 @@ export default function ReadingPalClient() {
 
   let highlightedColor = "yellow";
 
+
+  // ------- Server bookmark helpers (books only, not uploads) -------
+  async function saveServerBookmark() {
+    try {
+      if (!anonId || uploadId) return; // uploads remain local-only
+      const bIdx = Number(bookIndex);
+      const cIdx = chapterIndexRef.current;
+      if (!Number.isInteger(bIdx) || !Number.isInteger(cIdx)) return;
+      await fetch("/api/reading/bookmark", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookIndex: bIdx,
+          chapterIndex: cIdx,
+          sentenceIndex: Number(sentenceIndexRef.current) || 0,
+        }),
+      });
+    } catch { /* noop */ }
+  }
+
+  async function loadServerBookmark() {
+    try {
+      if (!anonId || uploadId) return;
+      const bIdx = Number(bookIndex);
+      const cIdx = chapterIndexRef.current;
+      if (!Number.isInteger(bIdx) || !Number.isInteger(cIdx)) return;
+      const r = await fetch(`/api/reading/bookmark?bookIndex=${bIdx}&chapterIndex=${cIdx}`, { cache: "no-store" });
+      const j = await r.json();
+      const idx = j?.data?.sentenceIndex;
+      if (Number.isInteger(idx) && textRef.current) {
+        const spans = Array.from(textRef.current.querySelectorAll(".sentence"));
+        if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
+        sentenceIndexRef.current = idx;
+      }
+    } catch { /* noop */ }
+  }
+
   /* ---------- voices + prefs ---------- */
   useEffect(() => {
     function loadVoices() {
@@ -231,8 +268,7 @@ export default function ReadingPalClient() {
         currentBookRef.current = books[parseInt(bookIndex)];
         bookTitleRef.current.innerText =
           `${currentBookRef.current.title} by ${currentBookRef.current.author}`;
-        await displayChapter(currentBookRef.current, chapterIndexRef.current);
-        const b = getBookmark("book", bookIndex);
+        await displayChapter(currentBookRef.current, chapterIndexRef.current); const b = getBookmark("book", bookIndex);
         if (b) setBookmark(b);
       }
 
@@ -352,26 +388,8 @@ export default function ReadingPalClient() {
       }
     }
 
-    if (anonId) {
-      try {
-        const res = await fetch("/api/readingprogress", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bookIndex: Number(bookIndex),
-            chapterIndex,
-            deltaTimeMs: 0,
-          }),
-        });
-        const j = await res.json().catch(() => null);
-        const idx = j?.data?.sentenceIndex;
-        if (Number.isInteger(idx) && textRef.current) {
-          const spans = Array.from(textRef.current.querySelectorAll(".sentence"));
-          if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
-          sentenceIndexRef.current = idx;
-        }
-      } catch { }
-    }
+    // Restore last server bookmark (if any) for this book/chapter
+    await loadServerBookmark();
   }
 
   /* ---------- sentence wrapping & highlight ---------- */
@@ -667,6 +685,8 @@ export default function ReadingPalClient() {
                 chapterIndex: uploadId ? undefined : chapterIndexRef.current,
                 scrollY,
               });
+              // Also persist server-side bookmark for books
+              saveServerBookmark();
               alert("🔖 Bookmark saved!");
             }}
           >
