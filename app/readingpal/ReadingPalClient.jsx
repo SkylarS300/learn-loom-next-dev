@@ -77,8 +77,9 @@ export default function ReadingPalClient() {
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [uploads, setUploads] = useState([]);
-  const [bookmark, setBookmark] = useState(null);
-
+  const [bookmark, setBookmark] = useState(null);          // local scroll bookmark
+  const [serverBookmark, setServerBookmark] = useState(null); // server-side (chapter/sentence)
+  const [resumePromptOpen, setResumePromptOpen] = useState(false);
   const [rate, setRate] = useState(1);
   const [pitch, setPitch] = useState(1);
   const [volume, setVolume] = useState(1);
@@ -105,6 +106,29 @@ export default function ReadingPalClient() {
 
   let highlightedColor = "yellow";
 
+  // ------- tiny toast helper (non-blocking) -------
+  function toast(msg) {
+    const el = document.createElement("div");
+    el.textContent = msg;
+    Object.assign(el.style, {
+      position: "fixed",
+      bottom: "20px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      backgroundColor: "#111827",
+      color: "#fff",
+      padding: "10px 16px",
+      borderRadius: "8px",
+      zIndex: "9999",
+      fontSize: "14px",
+      opacity: "0.95",
+      boxShadow: "0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.1)"
+    });
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+  }
+
+
 
   // ------- Server bookmark helpers (books only, not uploads) -------
   async function saveServerBookmark() {
@@ -122,6 +146,8 @@ export default function ReadingPalClient() {
           sentenceIndex: Number(sentenceIndexRef.current) || 0,
         }),
       });
+      setServerBookmark({ sentenceIndex: Number(sentenceIndexRef.current) || 0 });
+      toast(`🔖 Saved: Chapter ${cIdx + 1}, Sentence ${Number(sentenceIndexRef.current) + 1}`);
     } catch { /* noop */ }
   }
 
@@ -134,10 +160,12 @@ export default function ReadingPalClient() {
       const r = await fetch(`/api/reading/bookmark?bookIndex=${bIdx}&chapterIndex=${cIdx}`, { cache: "no-store" });
       const j = await r.json();
       const idx = j?.data?.sentenceIndex;
-      if (Number.isInteger(idx) && textRef.current) {
-        const spans = Array.from(textRef.current.querySelectorAll(".sentence"));
-        if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
-        sentenceIndexRef.current = idx;
+      if (Number.isInteger(idx)) {
+        setServerBookmark({ sentenceIndex: idx });
+        setResumePromptOpen(true); // show the “Resume?” bar once per chapter load
+      } else {
+        setServerBookmark(null);
+        setResumePromptOpen(false);
       }
     } catch { /* noop */ }
   }
@@ -388,7 +416,7 @@ export default function ReadingPalClient() {
       }
     }
 
-    // Restore last server bookmark (if any) for this book/chapter
+    // Check if a server bookmark exists for this chapter (we ask before jumping)
     await loadServerBookmark();
   }
 
@@ -661,6 +689,49 @@ export default function ReadingPalClient() {
       </div>
       <h2 className={styles.chapter} ref={chapterTitleRef}>Chapter Title</h2>
 
+      {/* Resume prompt (only when a server bookmark exists and we haven't acted yet) */}
+      {resumePromptOpen && serverBookmark && Number.isInteger(serverBookmark.sentenceIndex) && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            margin: "8px 0 0",
+            padding: "8px 10px",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            background: "#f9fafb",
+            display: "flex",
+            alignItems: "center",
+            gap: 8
+          }}
+        >
+          <span>Resume where you left off? (Sentence {serverBookmark.sentenceIndex + 1})</span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <button
+              className={styles.secondaryBtn}
+              onClick={() => {
+                const idx = serverBookmark.sentenceIndex;
+                sentenceIndexRef.current = idx;
+                setHighlight(idx);
+                const spans = Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+                if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
+                setResumePromptOpen(false);
+              }}
+              title="Jump to saved sentence"
+            >
+              ↩ Resume
+            </button>
+            <button
+              className={styles.secondaryBtn}
+              onClick={() => setResumePromptOpen(false)}
+              title="Stay at chapter start"
+            >
+              Start at top
+            </button>
+          </div>
+        </div>
+      )}
+
       <div id="text" ref={textRef} className={styles.text}>
         The chapter text will appear here after selecting a book from the library.
       </div>
@@ -687,11 +758,14 @@ export default function ReadingPalClient() {
               });
               // Also persist server-side bookmark for books
               saveServerBookmark();
-              alert("🔖 Bookmark saved!");
             }}
           >
             🔖 Save
           </button>
+          <div style={{ fontSize: 12, color: "#666", lineHeight: 1.4 }}>
+            <div><strong>What this does:</strong> Saves your exact sentence in this chapter.</div>
+            <div>Next time, you’ll see a “Resume?” prompt or use the buttons below.</div>
+          </div>
           {bookmark && (
             <>
               <button className={styles.secondaryBtn} onClick={() => {
@@ -709,6 +783,51 @@ export default function ReadingPalClient() {
                 Saved at: {new Date(bookmark.timestamp).toLocaleString()}
               </span>
             </>
+          )}
+        </div>
+        {/* If we have a server bookmark, offer a resume button explicitly */}
+        {serverBookmark && Number.isInteger(serverBookmark.sentenceIndex) && (
+          <div className={styles.controlsRow} style={{ marginTop: 8 }}>
+            <button
+              className={styles.secondaryBtn}
+              onClick={() => {
+                const idx = serverBookmark.sentenceIndex;
+                sentenceIndexRef.current = idx;
+                setHighlight(idx);
+                const spans = Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+                if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              title={`Jump to sentence ${serverBookmark.sentenceIndex + 1}`}
+            >
+              ↩ Resume to sentence {serverBookmark.sentenceIndex + 1}
+            </button>
+          </div>
+        )}
+
+        {/* Existing local (scroll) bookmark controls */}
+        <div className={styles.controlsRow} style={{ marginTop: 8 }}>
+          {bookmark && (
+            <>
+              <button className={styles.secondaryBtn} onClick={() => {
+                textRef.current?.scrollTo(0, bookmark.scrollY);
+              }}>
+                ↩ Resume (scroll position)
+              </button>
+              <button className={styles.secondaryBtn} onClick={() => {
+                clearBookmark(uploadId ? "upload" : "book", uploadId || bookIndex);
+                setBookmark(null);
+              }}>
+                🗑 Clear local
+              </button>
+              <span style={{ fontSize: 12, color: "#666" }}>
+                Saved at: {new Date(bookmark.timestamp).toLocaleString()}
+              </span>
+            </>
+          )}
+          {!bookmark && (
+            <span style={{ fontSize: 12, color: "#666" }}>
+              (No local scroll bookmark yet.)
+            </span>
           )}
         </div>
       </details>
