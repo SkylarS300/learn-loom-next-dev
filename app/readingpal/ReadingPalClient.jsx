@@ -105,7 +105,7 @@ export default function ReadingPalClient() {
   const lastTickRef = useRef(0);
   const postTimerRef = useRef(null);
 
-  let highlightedColor = "yellow";
+  const highlightedColorRef = useRef("yellow");
 
   // ------- tiny toast helper (non-blocking) -------
   function toast(msg) {
@@ -361,7 +361,7 @@ export default function ReadingPalClient() {
     // color palette
     document.querySelectorAll(`.${styles.swatch}`).forEach((el) => {
       el.addEventListener("click", function () {
-        highlightedColor = window.getComputedStyle(this).backgroundColor;
+        highlightedColorRef.current = window.getComputedStyle(this).backgroundColor;
       });
     });
 
@@ -495,8 +495,7 @@ export default function ReadingPalClient() {
     const t = spans[idx];
     if (t) {
       t.classList.add(styles.highlightedSentence);
-      t.style.backgroundColor = highlightedColor; // keep your color palette override
-      t.scrollIntoView({ behavior: "smooth", block: "center" });
+      t.style.backgroundColor = highlightedColorRef.current; // keep your color palette override      t.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }
 
