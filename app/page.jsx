@@ -17,9 +17,11 @@ export default function Home() {
             Select a book, explore with our interactive tools, and let Reading Pal guide your learning
             journey. Discover how we can enhance your reading experience.
           </p>
-          <a href="/dashboard" className="cta-button" aria-label="Get started on your dashboard">
-            Get started &rarr;
-          </a>
+          <div className={styles.actions}>
+            <a href="/dashboard" className="cta-button" aria-label="Get started on your dashboard">
+              Get started &rarr;
+            </a>
+          </div>
 
           <div className={`${styles.gifCard} ${styles.fadeUp}`} style={{ "--ad": ".05s" }}>
             <Image

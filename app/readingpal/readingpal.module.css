@@ -121,3 +121,16 @@
 .highlightedSentence {
     background-color: yellow;
 }
+
+:global(.sentence) {
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+
+:global(.sentence:hover) {
+    background-color: rgba(255, 255, 0, 0.2);
+}
+
+:global(.highlighted-sentence) {
+    background-color: yellow;
+}

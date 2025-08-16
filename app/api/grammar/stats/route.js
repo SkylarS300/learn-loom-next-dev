@@ -67,7 +67,7 @@ export async function GET(req) {
 
             return Response.json({ ok: true, data: { topThree } });
         }
-    } catch (e) {
+    } catch {
         // If URL parsing fails, fall through to default aggregation
     }
 

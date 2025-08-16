@@ -36,7 +36,7 @@ export async function GET() {
         grammar: grammar ?? null,
       },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: false, error: "Failed to fetch quick resume" }, { status: 500 });
   }
 }

@@ -45,27 +45,28 @@ model classroom {
   name      String
   code      String   @unique(map: "Classroom_code_key")
   teacherId Int
+  ownerAnon String? // optional anon owner (teacher-by-code)
   createdAt DateTime @default(now())
 
   assignments assignment[]
   students    studentclassroom[]
 
   @@index([teacherId], map: "Classroom_teacherId_fkey")
+  @@index([ownerAnon])
 }
 
 model grammarprogress {
-  id        Int      @id @default(autoincrement())
-  osis      Int?
-  anonId    String? // for anonymous quiz logging
-  concept   String
-  subTopic  String
-  score     Int
-  numQuestions Int?   // optional: total questions in the attempt
-  durationMs  Int?    // optional: time spent on the attempt (ms)
-  isAi        Boolean? @default(false) // optional: tag AI-generated quizzes
-  hintsUsed    Int?      // number of hints used in this attempt
-  createdAt DateTime @default(now())
-
+  id           Int      @id @default(autoincrement())
+  osis         Int?
+  anonId       String? // for anonymous quiz logging
+  concept      String
+  subTopic     String
+  score        Int
+  numQuestions Int? // optional: total questions in the attempt
+  durationMs   Int? // optional: time spent on the attempt (ms)
+  isAi         Boolean? @default(false) // optional: tag AI-generated quizzes
+  hintsUsed    Int? // number of hints used in this attempt
+  createdAt    DateTime @default(now())
 
   @@index([anonId])
   @@index([concept, subTopic])
@@ -99,9 +100,10 @@ model quizprogress {
 
 model studentclassroom {
   id          Int     @id @default(autoincrement())
-  studentId   Int? // 👈 now optional
-  anonId      String? // 👈 NEW
+  studentId   Int?
+  anonId      String?
   classroomId Int
+  role        String  @default("student") // 'teacher' | 'student'
 
   student   user?     @relation(fields: [studentId], references: [id])
   classroom classroom @relation(fields: [classroomId], references: [id])
@@ -109,16 +111,17 @@ model studentclassroom {
   @@index([classroomId], map: "StudentClassroom_classroomId_fkey")
   @@index([studentId], map: "StudentClassroom_studentId_fkey")
   @@index([anonId])
+  @@index([role])
 }
 
 model uploadedtext {
-  id             Int              @id @default(autoincrement())
+  id             Int               @id @default(autoincrement())
   userId         Int?
   anonId         String?
   title          String
   content        String
   password       String? // Optional password
-  createdAt      DateTime         @default(now())
+  createdAt      DateTime          @default(now())
   uploadview     uploadview[]
   uploadunlock   uploadunlock[]
   uploadprogress uploadprogress[] // back relation for uploadprogress
@@ -178,13 +181,13 @@ model readingprogress {
   timeMs        Int?
   updatedAt     DateTime @updatedAt
   completedAt   DateTime @default(now())
-  user user? @relation(fields: [userId], references: [id])
+  user          user?    @relation(fields: [userId], references: [id])
+
   @@unique([anonId, bookIndex, chapterIndex])
   @@index([userId])
   @@index([anonId])
   @@index([bookIndex, chapterIndex])
 }
-
 
 enum assignment_type {
   BOOK
@@ -253,14 +256,52 @@ model quizfeedback {
 }
 
 model uploadunlockattempt {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   anonId      String
   uploadId    Int
-  count       Int      @default(0)
+  count       Int       @default(0)
   lockedUntil DateTime?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   @@unique([anonId, uploadId])
   @@index([anonId])
   @@index([uploadId])
+}
+
+model Note {
+  id            String   @id @default(cuid())
+  anonId        String
+  targetType    String // 'book' | 'upload' | 'grammar'
+  // ReadingPal anchors
+  bookIndex     Int?
+  uploadId      Int?
+  chapterIndex  Int?
+  sentenceIndex Int?
+  wordIndex     Int?
+  // Grammar anchors
+  concept       String?
+  subTopic      String?
+  promptHash    String?
+  // UX helpers
+  anchorText    String?
+  body          String
+  tagsJson      Json     @default("[]") // JSON array of strings (portable)
+  isBookmark    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([anonId, createdAt])
+  @@index([anonId, targetType, bookIndex, chapterIndex, sentenceIndex])
+  @@index([anonId, targetType, concept, subTopic])
+}
+
+model UserCode {
+  id         String   @id @default(cuid())
+  anonId     String
+  shortCode  String   @unique
+  longCode   String?
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@index([anonId])
 }
