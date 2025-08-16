@@ -1,0 +1,15 @@
+{
+    "$schema": "https://raw.githubusercontent.com/webpro/knip/main/schema.json",
+    "entry": [
+        "app/**/*.{js,jsx,ts,tsx}",
+        "src/**/*.{js,jsx,ts,tsx}"
+    ],
+    "project": [
+        "**/*.{js,jsx,ts,tsx}"
+    ],
+    "ignore": [
+        "public/**",
+        "src/content/**"
+    ],
+    "reporter": "detail"
+}
