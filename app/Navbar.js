@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { ProgressCodeBadge } from "./ProgressCodeBadge";
+import styles from "./Navbar.module.css";
 
 export default function Navbar() {
   return (
-    <header id="navbar">
-      <div className="navbar-inner">
-        <a className="logo" href="/">
-          <img src="/assets/images/learnloom.png" alt="LearnLoom Logo" className="logo-image" />
+    <header className={styles.navbar}>
+      <div className={styles.inner}>
+        <a className={styles.logoLink} href="/">
+          <img src="/assets/images/learnloom.png" alt="LearnLoom Logo" className={styles.logoImage} />
         </a>
 
-        <ul className="nav-links">
+        <ul className={styles.navLinks}>
           <li><Link href="/">Home</Link></li>
           <li><Link href="/library">Library</Link></li>
           <li><Link href="/readingpal">Reading Pal</Link></li>

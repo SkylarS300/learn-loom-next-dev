@@ -11,6 +11,9 @@
    - Define color and font variables
    ============================================================================= */
 @import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/base.css";
+@import "../styles/utilities.css";
 
 :root {
   /* Core Colors */
@@ -216,102 +219,6 @@ a:hover {
 }
 
 /* =============================================================================
-   5. NAVBAR STYLES
-   -----------------------------------------------------------------------------
-   - Desktop and mobile nav layout
-   ============================================================================= */
-#navbar {
-  width: 100%;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  padding: 16px 40px;
-}
-
-.navbar-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo-image {
-  height: 70px;
-  width: auto;
-  margin-right: auto;
-}
-
-.nav-links {
-  list-style: none;
-  display: flex;
-  gap: 40px;
-  justify-content: center;
-  flex: 1;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-links li a {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  font-size: 17px;
-  color: #333;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.nav-links li a:hover {
-  color: #788cfc;
-}
-
-.hamburger {
-  display: none;
-  flex-direction: column;
-  gap: 4px;
-  cursor: pointer;
-}
-
-.hamburger .bar {
-  width: 25px;
-  height: 3px;
-  background-color: #333;
-  transition: 0.3s ease;
-}
-
-/* Mobile Navigation */
-@media (max-width: 768px) {
-  .hamburger {
-    display: flex;
-  }
-
-  .nav-links {
-    position: absolute;
-    top: 70px;
-    left: 0;
-    right: 0;
-    background-color: #fff;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    padding: 20px 0;
-    display: none;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-
-  .nav-links.open {
-    display: flex;
-  }
-
-  .nav-links li {
-    margin: 0;
-  }
-
-  .login-button {
-    padding: 10px 16px;
-  }
-}
-
-/* =============================================================================
    6. LIBRARY PAGE STYLES
    -----------------------------------------------------------------------------
    - Grid and card styles for book library
@@ -415,8 +322,10 @@ a:hover {
   line-height: 1.6;
   color: #333;
   margin-bottom: 30px;
-  cursor: pointer;          /* Indicate clickability */
-  white-space: pre-wrap;    /* Preserve line breaks */
+  cursor: pointer;
+  /* Indicate clickability */
+  white-space: pre-wrap;
+  /* Preserve line breaks */
   transition: background-color 0.2s ease;
 }
 
@@ -428,7 +337,8 @@ a:hover {
 
 
 .highlighted-word {
-  background-color: yellow; /* Default, will be overridden inline */
+  background-color: yellow;
+  /* Default, will be overridden inline */
   transition: background-color 0.2s ease;
 }
 
@@ -521,7 +431,8 @@ a:hover {
 
 /* Sentence spans: default state */
 .sentence {
-  cursor: pointer;           /* Show pointer on hover */
+  cursor: pointer;
+  /* Show pointer on hover */
   transition: background-color 0.2s ease;
 }
 
@@ -532,7 +443,8 @@ a:hover {
 
 /* Currently highlighted (click‐or‐being‐read) sentence */
 .highlighted-sentence {
-  background-color: yellow;  /* Or your chosen highlightColor */
+  background-color: yellow;
+  /* Or your chosen highlightColor */
 }
 
 /* Remove any #text:hover rule if you added one earlier that shaded the entire container */
@@ -665,21 +577,24 @@ a:hover {
 }
 
 .correct {
-  color: #28a745; /* softer green */
+  color: #28a745;
+  /* softer green */
   font-weight: 600;
   margin-top: 6px;
   transition: all 0.3s ease;
 }
 
 .incorrect {
-  color: #dc3545; /* softer red */
+  color: #dc3545;
+  /* softer red */
   font-weight: 600;
   margin-top: 6px;
   transition: all 0.3s ease;
 }
 
 .warning {
-  color: #ff9800; /* stronger orange */
+  color: #ff9800;
+  /* stronger orange */
   font-weight: 600;
   margin-top: 6px;
   transition: all 0.3s ease;
@@ -935,6 +850,7 @@ details summary:hover {
    - Override or adjust layouts on smaller screens
    ============================================================================= */
 @media (max-width: 768px) {
+
   /* Adjust global padding */
   body {
     padding: 0 15px;
