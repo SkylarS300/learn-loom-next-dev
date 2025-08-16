@@ -1,0 +1,228 @@
+/* app/home.module.css */
+
+/* ---- Layout ---- */
+.wrap {
+    max-width: 72rem;
+    /* ~1152px (tailwind's 7xl) */
+    margin: 4rem auto 0;
+    padding: 0 1.5rem;
+}
+
+.hero {
+    text-align: center;
+    display: grid;
+    gap: 1.25rem;
+    place-items: center;
+}
+
+.heroTitle {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 600;
+    color: #333;
+    line-height: 1.15;
+}
+
+.heroSub {
+    font-size: 18px;
+    color: #666;
+    max-width: 48rem;
+}
+
+.gifCard {
+    width: 100%;
+    margin-top: .75rem;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e5e5e5;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.gifCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .08);
+}
+
+.divider {
+    margin: 5rem 0;
+    height: 1px;
+    background: #e0e0e0;
+}
+
+/* ---- Steps ---- */
+.stepsRow {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+    .stepsRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stepCard {
+    text-align: center;
+    max-width: 20rem;
+    margin: 0 auto;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.stepCard:hover {
+    transform: translateY(-2px);
+}
+
+.stepNumber {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--color-periwinkle, #788cfc);
+    margin-bottom: .25rem;
+}
+
+.stepTitle {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+
+.stepText {
+    font-size: .95rem;
+    color: #555;
+}
+
+/* ---- Feature / FAQ shared ---- */
+.sectionTitle {
+    font-size: 28px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.pill {
+    display: inline-block;
+    margin: .25rem auto .5rem;
+    padding: 6px 18px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    background: #e8e8ff;
+    color: #738afd;
+}
+
+.sectionIntro {
+    color: #666;
+    text-align: center;
+}
+
+/* ---- Features ---- */
+.featuresGrid {
+    display: grid;
+    gap: 2.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 1.25rem;
+    max-width: 64rem;
+    margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+    .featuresGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.featureCard {
+    text-align: center;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+
+.featureCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .06);
+}
+
+.featureTitle {
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+
+.featureText {
+    font-size: .95rem;
+    color: #555;
+}
+
+/* ---- FAQ ---- */
+.faqGrid {
+    display: grid;
+    gap: 1.5rem 2rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 72rem;
+}
+
+@media (max-width: 900px) {
+    .faqGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.faqItem {
+    text-align: center;
+}
+
+.faqQ {
+    font-weight: 600;
+}
+
+.faqA {
+    font-size: .95rem;
+    color: #555;
+}
+
+/* ---- Footer CTA ---- */
+.footerCta {
+    text-align: center;
+    margin-bottom: 5rem;
+}
+
+.footerRow {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr auto;
+    place-items: center;
+}
+
+@media (max-width: 800px) {
+    .footerRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+.siteFooter {
+    margin-top: 3rem;
+    color: #777;
+    text-align: center;
+    font-size: .9rem;
+}
+
+/* ---- Nice, subtle load-in ---- */
+@media (prefers-reduced-motion: no-preference) {
+    .fadeUp {
+        opacity: 0;
+        transform: translateY(8px);
+        animation: fadeUp .6s ease forwards;
+        animation-delay: var(--ad, 0s);
+    }
+
+    @keyframes fadeUp {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}
