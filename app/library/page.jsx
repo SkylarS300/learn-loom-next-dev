@@ -37,24 +37,41 @@ function UploadCard({ id, title, locked }) {
 }
 
 export default function LibraryPage() {
-  const [uploads, setUploads] = useState([]);
-  const [community, setCommunity] = useState([]);
+  const [uploads, setUploads] = useState([]);       // YOUR uploads
+  const [community, setCommunity] = useState([]);   // PUBLIC/CODED community
   const [nextCursor, setNextCursor] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState("");
   const [shareCode, setShareCode] = useState("");
   const [savedCodes, setSavedCodes] = useState([]);
-  // bump this whenever codes change so community re-fetches
-  const [codesVersion, setCodesVersion] = useState(0);
+  const [codesVersion, setCodesVersion] = useState(0); // bump to refetch community
   const [err, setErr] = useState("");
 
+  // --- Load YOUR uploads (scope=mine). If your API differs, tell me and I’ll adjust.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch("/api/uploadedtext");
+        const r = await fetch("/api/uploadedtext?scope=mine");
         const j = await r.json().catch(() => ({}));
-        // Accept either {ok,data} or a raw array (dev convenience)
+        const list = Array.isArray(j) ? j : j?.data ?? [];
+        if (!cancelled) setUploads(list);
+      } catch {
+        // fall back; section will just show "No matches"
+        if (!cancelled) setUploads([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Initial community load (PUBLIC) with pagination support
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ scope: "public", limit: "24" });
+        const r = await fetch(`/api/uploadedtext?${qs.toString()}`);
+        const j = await r.json().catch(() => ({}));
         const list = Array.isArray(j) ? j : j?.data ?? [];
         if (!cancelled) {
           setCommunity(list);
@@ -67,25 +84,22 @@ export default function LibraryPage() {
         if (!cancelled) setErr("Failed to load uploads");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  // Load saved codes once (for display) and whenever we modify them
+  // Load saved codes (chips)
   async function refreshSavedCodes() {
     try {
       const r = await fetch("/api/sharecode");
       const j = await r.json();
       if (j?.ok) setSavedCodes(j.data || []);
-    } catch { }
+    } catch { /* no-op */ }
   }
   useEffect(() => {
     refreshSavedCodes();
   }, []);
 
-
-  // Load community (PUBLIC + any saved codes cookie + optional typed code)
+  // Re-load community when share code or codesVersion changes
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -95,13 +109,15 @@ export default function LibraryPage() {
         const r = await fetch(`/api/uploadedtext?${qs.toString()}`);
         const j = await r.json().catch(() => ({}));
         const list = Array.isArray(j) ? j : j?.data ?? [];
-        if (!cancelled) setCommunity(list);
-        // keep local chip list in sync
+        if (!cancelled) {
+          setCommunity(list);
+          setNextCursor(j?.nextCursor || null); // keep pagination in sync
+        }
         if (!cancelled) refreshSavedCodes();
       } catch { /* no-op */ }
     })();
     return () => { cancelled = true; };
-  }, [shareCode, codesVersion]); // reset list when codes change
+  }, [shareCode, codesVersion]);
 
   async function loadMore() {
     if (!nextCursor) return;
@@ -130,14 +146,14 @@ export default function LibraryPage() {
       kind: "upload",
       id: u.id,
       title: u.title,
-      locked: !!u.locked, // server should send locked boolean (derived from password)
+      locked: !!u.locked,
     }));
     const comm = (community || []).map((u) => ({
       id: u.id,
       title: u.title,
       locked: !!u.locked,
       visibility: u.visibility,
-      shareCode: u.shareCode || null,   // available only for matched CODED items
+      shareCode: u.shareCode || null,
     }));
 
     const q = query.trim().toLowerCase();
@@ -147,10 +163,9 @@ export default function LibraryPage() {
     return {
       curated: curated.filter((x) => match(x.title) || match(x.author)),
       ups: ups.filter((x) => match(x.title)),
-      // allow searching by title OR matched share code
       comm: comm.filter((x) => match(x.title) || match(x.shareCode)),
     };
-  }, [uploads, query]);
+  }, [uploads, community, query]);
 
   const openBook = (idx) => {
     window.location.href = `/readingpal?bookIndex=${idx}`;
@@ -161,9 +176,7 @@ export default function LibraryPage() {
       <div className={styles.headerRow}>
         <h1 className={styles.title}>Library</h1>
         <div className={styles.actions}>
-          <a className={styles.btn} href="/uploads/new">
-            + New Upload
-          </a>
+          <a className={styles.btn} href="/uploads/new">+ New Upload</a>
         </div>
       </div>
 
@@ -176,8 +189,9 @@ export default function LibraryPage() {
           aria-label="Search titles"
         />
       </div>
-      {err && <p style={{ color: "#d33" }}>{err}</p>}
+      {err && <p style={{ color: "#d33" }} aria-live="polite">{err}</p>}
 
+      {/* Curated books */}
       <section>
         <h3 className={styles.sectionTitle}>Curated books</h3>
         <div className={styles.grid}>
@@ -205,7 +219,7 @@ export default function LibraryPage() {
         )}
       </section>
 
-
+      {/* Community uploads */}
       <section style={{ marginTop: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Community uploads</h3>
@@ -231,9 +245,8 @@ export default function LibraryPage() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ code }),
                 });
-                // re-fetch happens automatically due to shareCode dep above
                 refreshSavedCodes();
-                setCodesVersion((v) => v + 1); // trigger community refresh
+                setCodesVersion((v) => v + 1);
               }}
               aria-label="Save share code"
             >
@@ -245,9 +258,8 @@ export default function LibraryPage() {
                 onClick={async () => {
                   await fetch("/api/sharecode", { method: "DELETE" });
                   setSavedCodes([]);
-                  // community will show only PUBLIC on next fetch
-                  setShareCode(""); // clear input too
-                  setCodesVersion((v) => v + 1); // trigger community refresh
+                  setShareCode("");
+                  setCodesVersion((v) => v + 1);
                 }}
                 aria-label="Clear all saved codes"
               >
@@ -256,9 +268,11 @@ export default function LibraryPage() {
             )}
           </div>
         </div>
+
         <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
           Shows PUBLIC uploads from everyone. Enter a code to reveal a CODED title.
         </p>
+
         {savedCodes.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 12px" }}>
             {savedCodes.map((c) => (
@@ -268,9 +282,8 @@ export default function LibraryPage() {
                   onClick={async () => {
                     await fetch(`/api/sharecode?code=${encodeURIComponent(c)}`, { method: "DELETE" });
                     setSavedCodes((prev) => prev.filter((x) => x !== c));
-                    // let the next community fetch show fewer CODED items
-                    setShareCode(""); // decouple input from removed chip
-                    setCodesVersion((v) => v + 1); // trigger community refresh
+                    setShareCode("");
+                    setCodesVersion((v) => v + 1);
                   }}
                   aria-label={`Remove code ${c}`}
                   style={{ marginLeft: 6, border: "none", background: "transparent", cursor: "pointer" }}
@@ -282,9 +295,10 @@ export default function LibraryPage() {
             ))}
           </div>
         )}
+
         <div className={styles.grid}>
-          {filtered.comm.length > 0 ? (
-            filtered.comm.map((u) => {
+          {community.length > 0 ? (
+            community.map((u) => {
               const href =
                 u.visibility === "CODED" && shareCode.trim()
                   ? `/uploads/${u.id}?code=${encodeURIComponent(shareCode.trim())}`
@@ -306,23 +320,19 @@ export default function LibraryPage() {
         </div>
       </section>
 
+      {/* Your uploads */}
       <section style={{ marginTop: 24 }}>
         <h3 className={styles.sectionTitle}>Your uploads</h3>
         <div className={styles.grid}>
           {filtered.ups.length > 0 ? (
             filtered.ups.map((u) => (
-              <UploadCard
-                key={`u-${u.id}`}
-                id={u.id}
-                title={u.title}
-                locked={u.locked}
-              />
+              <UploadCard key={`u-${u.id}`} id={u.id} title={u.title} locked={u.locked} />
             ))
           ) : (
             <p className={styles.dim}>No matches</p>
           )}
         </div>
       </section>
-    </main >
+    </main>
   );
 }

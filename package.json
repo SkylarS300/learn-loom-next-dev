@@ -21,6 +21,15 @@
     "recharts": "^2.15.4",
     "uuid": "^11.1.0"
   },
+  "knip": {
+    "entry": [
+      "app/**/*.{js,jsx,ts,tsx}",
+      "src/**/*.{js,jsx,ts,tsx}"
+    ],
+    "ignore": [
+      "**/*.d.ts"
+    ]
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.15.21",
