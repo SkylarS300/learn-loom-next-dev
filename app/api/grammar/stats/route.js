@@ -51,6 +51,20 @@ export async function GET(req) {
                     return { concept, subTopic, latestScore, last3, series: entry.series };
                 });
 
+            // Optional: return ALL recent subtopics (for the “Show more” modal)
+            if (url.searchParams.get("all") === "1") {
+                const all = Array.from(latest.values())
+                    .sort((a, b) => b.lastAt - a.lastAt)
+                    .map(({ concept, subTopic }) => {
+                        const k = `${concept}:::${subTopic}`;
+                        const entry = byKey.get(k) ?? { series: [] };
+                        const last3 = entry.series.slice(-3).map(d => d.score);
+                        const latestScore = last3.length ? last3[last3.length - 1] : null;
+                        return { concept, subTopic, latestScore, last3, series: entry.series };
+                    });
+                return Response.json({ ok: true, data: { topThree: all.slice(0, 3), all } });
+            }
+
             return Response.json({ ok: true, data: { topThree } });
         }
     } catch (e) {
