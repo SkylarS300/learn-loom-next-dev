@@ -87,7 +87,7 @@ export default function Grammar() {
   const [mode, setMode] = useState("landing"); // landing | running | results | resume
   const [quiz, setQuiz] = useState(null);      // { concept, subTopic, items }
   const [result, setResult] = useState(null);  // { scorePct, numCorrect, total, durationMs }
-  const [report, setReport] = useState(null);  // { prompt, concept, subTopic } 
+  const [report, setReport] = useState(null);  // { prompt, concept, subTopic }
   const SESSION_KEY = "grammarSessionV1";
 
   // Prevent multiple auto-starts
@@ -106,31 +106,27 @@ export default function Grammar() {
     } catch { }
   }, []);
 
-
-  // Deep-link handler (canonical):
+  // Deep-link handler:
   //   /grammar?concept=...&subTopic=...&start=1
-  // Back-compat also supported:
+  // Back-compat:
   //   /grammar?start=Concept|Subtopic
   useEffect(() => {
     let c = search.get("concept");
     let s = search.get("subTopic");
     const startRaw = search.get("start");
 
-    // Legacy: if concept/subTopic missing, accept start="Concept|Subtopic"
     if ((!c || !s) && startRaw && startRaw.includes("|")) {
       const [cRaw, sRaw] = String(startRaw).split("|");
       c = decodeURIComponent(cRaw || "");
       s = decodeURIComponent(sRaw || "");
     }
     if (!c || !s) return;
-    if (deepLinkRan.current) return;        // already handled
-    if (mode !== "landing") return;         // don't override resume/results
+    if (deepLinkRan.current) return;
+    if (mode !== "landing") return;
 
-    // preselect UI for consistency
     setConcept(c);
     setSubTopic(s);
 
-    // Autostart if start=1 or the legacy start payload was used
     if (startRaw === "1" || (startRaw && startRaw.includes("|"))) {
       setTimeout(() => startQuizFrom(c, s), 80);
     }
@@ -138,13 +134,11 @@ export default function Grammar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, mode]);
 
-  // Optional deep-link: /grammar?start=Concept|Subtopic
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const startArg = sp.get("start");
       if (!startArg) return;
-      // do not auto-start if a resume session is present
       if (mode !== "landing") return;
       const [cRaw, sRaw] = String(startArg).split("|");
       const c = decodeURIComponent(cRaw || "");
@@ -160,8 +154,6 @@ export default function Grammar() {
       setAiMsg("");
       setAiLoading(true);
       try {
-
-        // session cache to avoid repeat calls on same input
         const cacheKey = `aiQuizCache::${c}|${s}|${diff}|${n}|${fnv1a(aiText)}`;
         try {
           const cached = sessionStorage.getItem(cacheKey);
@@ -189,7 +181,6 @@ export default function Grammar() {
         if (r.status === 501) {
           setAiMsg(j?.error || "AI quiz is disabled by the server.");
         } else if (j?.ok && Array.isArray(j.items) && j.items.length) {
-          // cache for this tab/session
           try { sessionStorage.setItem(cacheKey, JSON.stringify(j.items)); } catch { }
           setQuiz({ concept: c, subTopic: s, items: j.items });
           setResult(null);
@@ -200,7 +191,6 @@ export default function Grammar() {
           } catch { }
           return;
         } else {
-          // Show specific message inline (we still fall back below)
           setAiMsg(
             r.status === 429
               ? (j?.error || "AI is rate-limited right now. Falling back to built-in questions.")
@@ -212,13 +202,13 @@ export default function Grammar() {
       } finally {
         setAiLoading(false);
       }
-      // If AI path failed, fall back to the bank below.
-    } const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
+      // If AI path failed, we fall back to the bank below.
+    }
+    const q = buildQuiz({ concept: c, subTopic: s, difficulty: diff, count: n, allowShort: false, seed: Date.now() % 100000 });
     if (!q.items?.length) return alert("Not enough questions yet in this area.");
     setQuiz(q);
     setResult(null);
     setMode("running");
-    // seed fresh session
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify({ concept: q.concept, subTopic: q.subTopic, items: q.items, index: 0, correct: 0, elapsed: 0 }));
     } catch { }
@@ -245,19 +235,22 @@ export default function Grammar() {
   }
 
   return (
-    <div id="main-content" className="grammar-layout">
+    <div id="main-content">
       <NavbarGuard>
         <Navbar />
       </NavbarGuard>
-      <div className="grammar-columns">
-        {/* ---- Sidebar: topics from bank (keeps your two-column layout) ---- */}
-        <aside id="quizList" className={`grammar-sidebar ${styles.sidebar}`}>
+
+      <div className={styles.columns}>
+        {/* ---- Sidebar ---- */}
+        <aside id="quizList" className={styles.sidebar}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
               <input type="checkbox" checked={focusWeak} onChange={e => setFocusWeak(e.target.checked)} />
               <span>Focus weak areas</span>
             </label>
-          </div>          {concepts.map((c) => (
+          </div>
+
+          {concepts.map((c) => (
             <div key={c} style={{ marginBottom: 12 }}>
               <h2 className={styles.sidebarHeading}>{humanize(c)}</h2>
               {(bank[c] ? Object.keys(bank[c]) : []).map((s) => {
@@ -269,7 +262,7 @@ export default function Grammar() {
                 return (
                   <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <a
-                      className={`subsection-link ${styles.sidebarLink}`}
+                      className={styles.sidebarLink}
                       onClick={() => startQuizFrom(c, s)}
                       style={{
                         cursor: "pointer",
@@ -302,15 +295,15 @@ export default function Grammar() {
         </aside>
 
         {/* ---- Content ---- */}
-        <div id="textContainer" className="grammar-content">
+        <div id="textContainer" className={styles.content}>
           {mode === "resume" && quiz && (
-            <section style={{ ...cardWrap, textAlign: "center" }}>
+            <section className={styles.card} style={{ textAlign: "center" }}>
               <h2 style={{ marginTop: 0 }}>Resume your last quiz?</h2>
               <p><strong>{quiz.concept}</strong> — {quiz.subTopic}</p>
               <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                <button style={btnPrimary} onClick={() => setMode("running")}>Resume</button>
+                <button className={styles.btnPrimary} onClick={() => setMode("running")}>Resume</button>
                 <button
-                  style={btn}
+                  className={styles.btn}
                   onClick={() => {
                     try { localStorage.removeItem(SESSION_KEY); } catch { }
                     setMode("landing");
@@ -322,13 +315,15 @@ export default function Grammar() {
               </div>
             </section>
           )}
+
           {mode === "landing" && (
             <>
               {/* Recommended panel */}
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>Recommended</h2>
-                {recLoading && <p className="dim">Loading…</p>}
+                {recLoading && <p className={styles.dim}>Loading…</p>}
                 {recErr && <p style={{ color: "#c0392b" }}>{recErr}</p>}
+
                 {!recLoading && !recErr && (recs?.length ? (
                   <div className={styles.grid3}>
                     {recs.map((r, i) => (
@@ -351,61 +346,56 @@ export default function Grammar() {
                             Limited data — do a few more rounds for better recommendations
                           </div>
                         )}
-                        <button className={styles.btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>                        Start practice
+                        <button className={styles.btn} onClick={() => startQuizFrom(r.concept, r.subTopic)}>
+                          Start practice
                         </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="dim">No history yet. Try a starter quiz below.</p>
+                  <p className={styles.dim}>No history yet. Try a starter quiz below.</p>
                 ))}
               </section>
 
               {/* Custom quiz */}
               <section className={styles.card} style={{ marginTop: 16 }}>
                 <h2 className={styles.cardTitle}>Custom quiz</h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 12,
-                    gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-                    marginTop: 12,
-                  }}
-                >
-                  <label style={label}>
+                <div className={styles.formGrid}>
+                  <label className={styles.formLabel}>
                     <span>Concept</span>
-                    <select value={concept} onChange={(e) => setConcept(e.target.value)} style={input}>
+                    <select value={concept} onChange={(e) => setConcept(e.target.value)} className={styles.input}>
                       {concepts.map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
                   </label>
-                  <label style={label}>
+                  <label className={styles.formLabel}>
                     <span>Subtopic</span>
-                    <select value={subTopic} onChange={(e) => setSubTopic(e.target.value)} style={input}>
+                    <select value={subTopic} onChange={(e) => setSubTopic(e.target.value)} className={styles.input}>
                       {subTopics.map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
                   </label>
-                  <label style={label}>
+                  <label className={styles.formLabel}>
                     <span>Difficulty</span>
-                    <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} style={input}>
+                    <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={styles.input}>
                       <option value="mixed">Mixed</option>
                       <option value="easy">Easy</option>
                       <option value="medium">Medium</option>
                       <option value="hard">Hard</option>
                     </select>
                   </label>
-                  <label style={label}>
+                  <label className={styles.formLabel}>
                     <span>Questions</span>
-                    <select value={count} onChange={(e) => setCount(Number(e.target.value))} style={input}>
+                    <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={styles.input}>
                       <option value={5}>5</option>
                       <option value={10}>10</option>
                       <option value={15}>15</option>
                     </select>
                   </label>
                 </div>
+
                 {/* AI generator */}
                 <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -422,7 +412,8 @@ export default function Grammar() {
                       onChange={(e) => setAiText(e.target.value)}
                       placeholder="Paste a short passage to generate questions from…"
                       rows={5}
-                      style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: 8 }}
+                      className={styles.textarea}
+                      style={{ minHeight: 120 }}
                     />
                   ) : null}
                 </div>
@@ -466,7 +457,8 @@ export default function Grammar() {
                 try { localStorage.removeItem(SESSION_KEY); } catch { }
                 setMode("landing");
               }}
-            />)}
+            />
+          )}
 
           {mode === "results" && result && (
             <section className={styles.card}>
@@ -486,7 +478,8 @@ export default function Grammar() {
                 )}
               </div>
               <p style={{ fontSize: 18, margin: 0 }}>
-                <strong>{humanize(quiz.concept)}</strong> — {humanize(quiz.subTopic)}              </p>
+                <strong>{humanize(quiz.concept)}</strong> — {humanize(quiz.subTopic)}
+              </p>
               <div style={{ textAlign: "center" }}>
                 <p style={{ fontSize: 48, margin: "8px 0" }}>
                   {Math.round(result.scorePct)}%
@@ -564,11 +557,11 @@ export default function Grammar() {
           )}
         </div>
       </div>
-    </div >
+    </div>
   );
 }
 
-// Humanize "SentenceStructure" -> "Sentence Structure", "verbTenses" -> "Verb Tenses"
+// Humanize helpers
 function humanize(s = "") {
   return String(s)
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -604,7 +597,6 @@ function ReportModal({ data, onClose, onSubmit }) {
   );
 }
 
-
 // ---- Quiz Runner (accessible + keyboard) ----
 function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const [i, setI] = useState(0);
@@ -613,16 +605,15 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
   const [correctCount, setCorrectCount] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [hintOpen, setHintOpen] = useState(false);
-  const [hintsUsed, setHintsUsed] = useState(0);       // NEW: count hints shown
-  const hintedSetRef = useRef(new Set());              // NEW: track per-question hint usage
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const hintedSetRef = useRef(new Set());
   const [paused, setPaused] = useState(false);
   const startRef = useRef(0);
   const lastTickRef = useRef(0);
   const elapsedRef = useRef(0);
-  const [, forceTick] = useState(0); // for visible timer
-  const [answers, setAnswers] = useState([]); // { index, sel, correct }
+  const [, forceTick] = useState(0);
+  const [answers, setAnswers] = useState([]);
 
-  // Local miss history helpers (privacy-first)
   const MISS_KEY = "grammarMistakesV1";
   function bumpMiss(prompt, delta) {
     if (typeof window === "undefined") return;
@@ -652,8 +643,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         }
       }
     } catch { }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionKey]);
 
   const q = quiz.items[i];
   const total = quiz.items.length;
@@ -666,7 +656,6 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         const now = performance.now();
         elapsedRef.current += now - lastTickRef.current;
         lastTickRef.current = now;
-        // trigger re-render for timer
         forceTick((x) => (x + 1) % 1_000_000);
       } else {
         lastTickRef.current = performance.now();
@@ -703,7 +692,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         JSON.stringify({
           concept: quiz.concept,
           subTopic: quiz.subTopic,
-          items: quiz.items, // lightweight MCQs; no PII
+          items: quiz.items,
           index: i,
           correct: correctCount,
           elapsed: elapsedRef.current,
@@ -711,7 +700,6 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
       );
     } catch { }
   }, [i, correctCount, quiz, sessionKey]);
-
 
   function handleCheck() {
     if (q.kind !== "mcq" || sel == null) return;
@@ -721,10 +709,10 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
     setFeedback(isCorrect ? "Correct!" : "Try again next time.");
     setChecked(true);
     setAnswers((arr) => [...arr, { index: i, sel, correct: isCorrect }]);
-    // Update miss history
-    if (!isCorrect) bumpMiss(q.prompt, +1);      // missed: increase weight
-    else bumpMiss(q.prompt, -1);                 // correct: gentle decay / clear over time
+    if (!isCorrect) bumpMiss(q.prompt, +1);
+    else bumpMiss(q.prompt, -1);
   }
+
   function next() {
     if (i + 1 < total) {
       setI(i + 1);
@@ -741,11 +729,11 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
 
   if (paused) {
     return (
-      <section style={{ ...cardWrap, textAlign: "center" }}>
+      <section className={styles.card} style={{ textAlign: "center" }}>
         <h2>Paused</h2>
         <p>Press <kbd>Esc</kbd> to resume.</p>
-        <button style={btn} onClick={() => setPaused(false)}>Resume</button>
-        <button style={btn} onClick={onCancel}>Exit</button>
+        <button className={styles.btn} onClick={() => setPaused(false)}>Resume</button>
+        <button className={styles.btn} onClick={onCancel}>Exit</button>
       </section>
     );
   }
@@ -779,8 +767,8 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
               aria-checked={isSel}
               onClick={() => setSel(idx)}
               disabled={checked}
+              className={styles.choiceBtn}
               style={{
-                ...choiceStyle,
                 borderColor: isSel ? "#3b82f6" : "#ddd",
                 outline: isSel ? "2px solid #93c5fd" : "none",
                 background: isCorrectChoice ? "#ecfdf5" : isWrongSel ? "#fef2f2" : "white",
@@ -791,7 +779,8 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
           );
         })}
       </div>
-      {/* Hint (does not grade; shows explanation if available) */}
+
+      {/* Hint (no grading impact; counts once per question) */}
       {q.explanation && !checked && (
         <div style={{ margin: "8px 0" }}>
           <button
@@ -799,7 +788,6 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
             onClick={() => {
               setHintOpen((open) => {
                 const next = !open;
-                // Count once per question when user first opens the hint
                 if (next && !hintedSetRef.current.has(i)) {
                   hintedSetRef.current.add(i);
                   setHintsUsed((h) => h + 1);
@@ -817,6 +805,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
           )}
         </div>
       )}
+
       <div className={styles.controlsRow}>
         {!checked ? (
           <button className={styles.btnPrimary} disabled={sel == null} onClick={handleCheck}>
@@ -830,6 +819,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         <button className={styles.btn} onClick={() => setPaused(true)}>Pause <span style={{ opacity: 0.6 }}>(Esc)</span></button>
         <button className={styles.btn} onClick={onCancel}>Exit</button>
       </div>
+
       {checked && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontWeight: 700 }}>{feedback}</div>
@@ -839,13 +829,3 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
     </section>
   );
 }
-
-// ---- styles ----
-const cardWrap = { background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: 16, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" };
-const grid3 = { display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", marginTop: 12 };
-const card = { ...cardWrap, padding: 12 };
-const label = { display: "grid", gap: 6, fontSize: 14 };
-const input = { padding: "8px 10px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14 };
-const btn = { background: "#f3f4f6", border: "1px solid #e5e7eb", padding: "8px 12px", borderRadius: 6, cursor: "pointer" };
-const btnPrimary = { ...btn, background: "#0070f3", color: "#fff", border: "none" };
-const choiceStyle = { ...btn, textAlign: "left" };

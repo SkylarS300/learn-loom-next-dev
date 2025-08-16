@@ -1,4 +1,15 @@
 /* Compact sidebar & clean cards; vanilla CSS */
+
+/* -------- Layout (moved from globals) -------- */
+.columns {
+    display: flex;
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+    gap: 40px;
+    align-items: flex-start;
+}
+
 .sidebar {
     position: sticky;
     top: 84px;
@@ -6,6 +17,11 @@
     max-height: calc(100vh - 100px);
     overflow: auto;
     padding-right: 8px;
+
+    flex: 1;
+    min-width: 240px;
+    max-width: 300px;
+    font-family: 'Poppins', sans-serif;
 }
 
 .sidebarHeading {
@@ -15,14 +31,34 @@
 }
 
 .sidebarLink {
+    display: block;
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    margin-bottom: 6px;
     color: #1f4ad3;
     text-decoration: none;
+    transition: all 0.2s ease;
 }
 
 .sidebarLink:hover {
     text-decoration: underline;
+    color: #3e4fbb;
+    transform: translateX(2px);
 }
 
+.content {
+    flex: 2.5;
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 14px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+    font-family: 'Roboto', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* -------- Cards / grids / text -------- */
 .card {
     background: #fff;
     border: 1px solid #e5e5e5;
@@ -75,6 +111,7 @@
     margin-top: 6px;
 }
 
+/* -------- Buttons & controls -------- */
 .btn {
     background: #f3f4f6;
     border: 1px solid #e5e7eb;
@@ -100,6 +137,16 @@
     margin-top: 12px;
 }
 
+/* Choice button base (dynamic state via inline style) */
+.choiceBtn {
+    text-align: left;
+    background: white;
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
 .runnerTop {
     display: flex;
     align-items: baseline;
@@ -113,6 +160,7 @@
     color: #6b7280;
 }
 
+/* -------- Review list -------- */
 .reviewList {
     display: grid;
     gap: 10px;
@@ -169,6 +217,7 @@
     margin-top: 6px;
 }
 
+/* -------- Modal -------- */
 .modalBackdrop {
     position: fixed;
     inset: 0;
@@ -193,4 +242,52 @@
     border-radius: 8px;
     padding: 8px 10px;
     font: inherit;
+}
+
+/* -------- Form controls -------- */
+.formGrid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin-top: 12px;
+}
+
+.formLabel {
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.input {
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* -------- Utilities -------- */
+.dim {
+    color: #6b7280;
+}
+
+/* -------- Responsive -------- */
+@media (max-width: 768px) {
+    .columns {
+        flex-direction: column;
+        padding: 20px;
+    }
+
+    .sidebar {
+        position: static;
+        max-height: none;
+        width: 100%;
+        margin-bottom: 30px;
+    }
+
+    .content {
+        width: 100%;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: none;
+    }
 }
