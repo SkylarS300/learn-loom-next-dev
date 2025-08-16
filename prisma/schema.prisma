@@ -286,6 +286,7 @@ model Note {
   anchorText    String?
   body          String
   tagsJson      Json     @default("[]") // JSON array of strings (portable)
+  color         String? // optional note color (e.g. '#F59E0B' or a token)
   isBookmark    Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

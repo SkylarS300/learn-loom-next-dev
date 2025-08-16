@@ -7,14 +7,14 @@ function unauthorized() {
 }
 
 export async function GET(req) {
-    const cookieStore = await cookies();
-    const anonId = cookieStore.get("learnloomId")?.value;
+    const anonId = cookies().get("learnloomId")?.value;
     if (!anonId) return unauthorized();
 
     const url = new URL(req.url);
     const scope = url.searchParams.get("scope"); // "current" or null
-    const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-    const q = (url.searchParams.get("q") || "").trim();
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50), 1), 200);
+    const qRaw = (url.searchParams.get("q") || "").trim();
+    const q = qRaw.toLowerCase();
     const tagsParam = (url.searchParams.get("tags") || "").trim();
     const tags = tagsParam ? tagsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
@@ -36,28 +36,36 @@ export async function GET(req) {
 
     if (concept) where.concept = String(concept);
     if (subTopic) where.subTopic = String(subTopic);
-
-    if (tags.length) {
-        // Postgres array operator
-        where.tags = { hasSome: tags };
-    }
-    where.OR = [
-        { body: { contains: q, mode: "insensitive" } },
-        { anchorText: { contains: q, mode: "insensitive" } },
-        { tags: { has: q } }, // also match direct tag
-    ];
+    // We deliberately avoid DB-level JSON tag filters for MySQL portability.
+    // Fetch a larger page and filter in-process by tags and q-in-tags.
     const rows = await prisma.note.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        take: limit,
+        take: Math.min(limit * 4, 400),
+        select: {
+            id: true, targetType: true, bookIndex: true, uploadId: true,
+            chapterIndex: true, sentenceIndex: true, wordIndex: true,
+            concept: true, subTopic: true, promptHash: true,
+            anchorText: true, body: true, tagsJson: true, color: true,
+            isBookmark: true, createdAt: true, updatedAt: true,
+        },
     });
-    return Response.json({ ok: true, data: rows });
+    const filtered = rows.filter((r) => {
+        const tagList = Array.isArray(r.tagsJson) ? r.tagsJson : [];
+        const matchesTags = tags.length ? tags.every((t) => tagList.includes(t)) : true;
+        const qHit =
+            !q ||
+            r.body?.toLowerCase().includes(q) ||
+            r.anchorText?.toLowerCase().includes(q) ||
+            tagList.some((t) => String(t).toLowerCase().includes(q));
+        return matchesTags && qHit;
+    });
+    return Response.json({ ok: true, data: filtered.slice(0, limit) });
 }
 
 
 export async function POST(req) {
-    const cookieStore = await cookies();
-    const anonId = cookieStore.get("learnloomId")?.value;
+    const anonId = cookies().get("learnloomId")?.value;
     if (!anonId) return unauthorized();
 
     const payload = await req.json().catch(() => ({}));
@@ -97,7 +105,7 @@ export async function POST(req) {
             promptHash: promptHash || null,
             anchorText: anchorText?.slice(0, 200) || null,
             body: body.trim(),
-            tags: cleanTags,
+            tagsJson: cleanTags,
             color: color || null,
             isBookmark: !!isBookmark,
         },
