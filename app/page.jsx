@@ -70,11 +70,16 @@ export default function Home() {
 
         {/* FEATURES */}
         <section id="features" className={styles.fadeUp} style={{ "--ad": ".05s" }}>
-          <h2 className={styles.sectionTitle}>Features</h2>
-          <div className={styles.pill} aria-hidden>Features</div>
-          <p className={styles.sectionIntro}>
-            Explore the key features that make LearnLoom a powerful reading companion.
-          </p>
+          {/* center the heading/pill/intro */}
+          <div style={{ display: "grid", justifyItems: "center", textAlign: "center", gap: 6 }}>
+            <h2 className={styles.sectionTitle}>Features</h2>
+            <div className={styles.pill} aria-hidden style={{ width: "fit-content" }}>
+              Features
+            </div>
+            <p className={styles.sectionIntro}>
+              Explore the key features that make LearnLoom a powerful reading companion.
+            </p>
+          </div>
 
           <div className={styles.featuresGrid}>
             {[
@@ -110,11 +115,16 @@ export default function Home() {
 
         {/* FAQ */}
         <section id="faq" className={styles.fadeUp} style={{ "--ad": ".05s" }}>
-          <h2 className={styles.sectionTitle}>Frequently Asked Questions</h2>
-          <div className={styles.pill} aria-hidden>FAQ</div>
-          <p className={styles.sectionIntro} style={{ maxWidth: "40rem", margin: "0 auto" }}>
-            Let us help answer the most common questions you might have.
-          </p>
+          {/* center the heading/pill/intro */}
+          <div style={{ display: "grid", justifyItems: "center", textAlign: "center", gap: 6 }}>
+            <h2 className={styles.sectionTitle}>Frequently Asked Questions</h2>
+            <div className={styles.pill} aria-hidden style={{ width: "fit-content" }}>
+              FAQ
+            </div>
+            <p className={styles.sectionIntro} style={{ maxWidth: "40rem", margin: "0 auto" }}>
+              Let us help answer the most common questions you might have.
+            </p>
+          </div>
 
           <div className={styles.faqGrid} role="list">
             {[
