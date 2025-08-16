@@ -168,7 +168,7 @@ export default function ReadingPalClient() {
         if (autoJump && textRef.current) {
           sentenceIndexRef.current = idx;
           setHighlight(idx);
-          const spans = Array.from(textRef.current.querySelectorAll(".sentence"));
+          const spans = Array.from(textRef.current.querySelectorAll(`.${styles.sentence}`));
           if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
           setResumePromptOpen(false);
         } else {
@@ -403,7 +403,7 @@ export default function ReadingPalClient() {
             const idx = serverBookmark.sentenceIndex;
             sentenceIndexRef.current = idx;
             setHighlight(idx);
-            const spans = Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+            const spans = Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
             if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
           }
           break;
@@ -478,32 +478,35 @@ export default function ReadingPalClient() {
     const sentences = (container.innerText || "")
       .match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [];
     container.innerHTML = sentences
-      .map((s, i) => `<span class="sentence" data-index="${i}">${s.trim()} </span>`)
+      .map((s, i) => `<span class="${styles.sentence}" data-index="${i}">${s.trim()} </span>`)
       .join("");
   }
+
   function currentSpans() {
-    return Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+    return Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
   }
+
   function setHighlight(idx) {
     const spans = currentSpans();
     spans.forEach((sp) => {
-      sp.classList.remove("highlighted-sentence");
+      sp.classList.remove(styles.highlightedSentence);
       sp.style.backgroundColor = "";
     });
     const t = spans[idx];
     if (t) {
-      t.classList.add("highlighted-sentence");
-      t.style.backgroundColor = highlightedColor;
+      t.classList.add(styles.highlightedSentence);
+      t.style.backgroundColor = highlightedColor; // keep your color palette override
       t.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }
+
 
   /* ---------- click‑to‑play ---------- */
   useEffect(() => {
     const container = textRef.current;
     if (!container) return;
     const handler = (e) => {
-      const span = e.target.closest(".sentence");
+      const span = e.target.closest(`.${styles.sentence}`);
       if (!span) return;
       const idx = Number(span.getAttribute("data-index"));
       if (!Number.isInteger(idx)) return;
@@ -770,7 +773,7 @@ export default function ReadingPalClient() {
                 const idx = serverBookmark.sentenceIndex;
                 sentenceIndexRef.current = idx;
                 setHighlight(idx);
-                const spans = Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+                const spans = Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
                 if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
                 setResumePromptOpen(false);
               }}
@@ -851,7 +854,7 @@ export default function ReadingPalClient() {
                 const idx = serverBookmark.sentenceIndex;
                 sentenceIndexRef.current = idx;
                 setHighlight(idx);
-                const spans = Array.from(textRef.current?.querySelectorAll(".sentence") || []);
+                const spans = Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
                 if (spans[idx]) spans[idx].scrollIntoView({ behavior: "smooth", block: "center" });
               }}
               title={`Jump to sentence ${serverBookmark.sentenceIndex + 1}`}
