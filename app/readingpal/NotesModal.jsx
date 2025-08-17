@@ -6,20 +6,33 @@ import styles from "./readingpal.module.css";
 
 const PALETTE = ["#F59E0B", "#3B82F6", "#10B981", "#FDE047", "#F97316", "#EC4899", "#8B5CF6"];
 
-export default function NotesModal({ open, seed, onClose, onSave }) {
+// Props:
+// - open: boolean
+// - seed: { anchorText?, defaultTags?, defaultColor?, isBookmark?, initialBody? }
+// - onClose: () => void
+// - onSave: ({ body, tags, color, isBookmark, targetType? }) => void
+// - typePicker?: boolean  (when true, show a type <select> at top)
+// - initialType?: 'book'|'upload'|'grammar'
+export default function NotesModal({ open, seed, onClose, onSave, typePicker = false, initialType = "grammar" }) {
     const [body, setBody] = useState("");
     const [tagsStr, setTagsStr] = useState("");
     const [color, setColor] = useState(PALETTE[0]);
     const [isBookmark, setIsBookmark] = useState(false);
+    const [targetType, setTargetType] = useState(initialType);
 
-    // seed: { anchorText, defaultTags, defaultColor, isBookmark }
+    // seed: { anchorText, defaultTags, defaultColor, isBookmark, initialBody }
     useEffect(() => {
         if (!open) return;
-        setBody(seed?.anchorText ? `${seed.anchorText}\n\n` : "");
+        setBody(
+            typeof seed?.initialBody === "string"
+                ? seed.initialBody
+                : (seed?.anchorText ? `${seed.anchorText}\n\n` : "")
+        );
         setTagsStr((seed?.defaultTags || []).join(", "));
         setColor(seed?.defaultColor || PALETTE[0]);
         setIsBookmark(!!seed?.isBookmark);
-    }, [open, seed]);
+        setTargetType(initialType);
+    }, [open, seed, initialType]);
 
     const charCount = body.length;
     const over = charCount > 2000;
@@ -37,12 +50,35 @@ export default function NotesModal({ open, seed, onClose, onSave }) {
     if (!open) return null;
 
     return (
-        <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-label="Add note">
+        <div
+            className={styles.modalBackdrop}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add note"
+            onKeyDown={(e) => { if (e.key === "Escape") onClose?.(); }}
+        >
             <div className={styles.modalCard}>
                 <div className={styles.modalHeader}>
                     <h3 className={styles.modalTitle}>Add a note</h3>
                     <button className={styles.closeBtn} onClick={onClose} aria-label="Close">✖</button>
                 </div>
+
+                {typePicker && (
+                    <label className={styles.label}>
+                        <span>Type</span>
+                        <select
+                            className={styles.input}
+                            value={targetType}
+                            onChange={(e) => setTargetType(e.target.value)}
+                            aria-label="Note type"
+                        >
+                            <option value="grammar">Grammar</option>
+                            <option value="book">Book</option>
+                            <option value="upload">Upload</option>
+                        </select>
+                    </label>
+                )}
+
 
                 {seed?.anchorText && (
                     <div className={styles.anchorBox} title="Selected text">
@@ -58,6 +94,7 @@ export default function NotesModal({ open, seed, onClose, onSave }) {
                         value={body}
                         onChange={(e) => setBody(e.target.value)}
                         placeholder="Write your note…"
+                        autoFocus
                     />
                     <div className={over ? styles.countOver : styles.count}>{charCount}/2000</div>
                 </label>
@@ -107,8 +144,7 @@ export default function NotesModal({ open, seed, onClose, onSave }) {
                     <button className={styles.secondaryBtn} onClick={onClose}>Cancel</button>
                     <button
                         className={styles.primaryBtn}
-                        onClick={() => onSave({ body, tags: parsedTags, color, isBookmark })}
-                        disabled={!body.trim() || over}
+                        onClick={() => onSave({ body, tags: parsedTags, color, isBookmark, targetType })} disabled={!body.trim() || over}
                     >
                         Save note
                     </button>
