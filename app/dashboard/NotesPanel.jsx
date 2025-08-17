@@ -90,6 +90,10 @@ export default function NotesPanel() {
         return notes.filter((n) => n.targetType === type);
     }, [notes, type]);
 
+    // any active filters/search?
+    const hasActiveFilters = Boolean(debouncedQ || tagFilter || (type !== "all"));
+
+
     // simple highlighter for query matches
     function highlight(text, query) {
         if (!text || !query) return text;
@@ -233,6 +237,62 @@ export default function NotesPanel() {
                         Create your first note
                     </button>
                 </div>
+
+            ) : filtered.length === 0 ? (
+                <>
+                    {notes.length === 0 ? (
+                        // Truly no notes exist yet
+                        <div className={styles.empty}>
+                            <p>No notes yet. Double-click in ReadingPal or press “N” in Grammar.</p>
+                            <button className={styles.btn} onClick={() => setNewOpen(true)}>
+                                Create your first note
+                            </button>
+                        </div>
+                    ) : (
+                        // Notes exist, but filters/search resulted in 0 matches
+                        <div className={styles.empty}>
+                            <p>
+                                No results
+                                {debouncedQ ? <> for “<strong>{debouncedQ}</strong>”</> : null}
+                                {type !== "all" ? <> in <strong>{type}</strong></> : null}
+                                {tagFilter ? <> with tag <strong>#{tagFilter}</strong></> : null}
+                                .
+                            </p>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                                {debouncedQ ? (
+                                    <button
+                                        className={styles.btnSecondary}
+                                        onClick={() => setQ("")}
+                                        aria-label="Clear search"
+                                    >
+                                        Clear search
+                                    </button>
+                                ) : null}
+                                {tagFilter ? (
+                                    <button
+                                        className={styles.btnSecondary}
+                                        onClick={() => setTagFilter("")}
+                                        aria-label="Clear tag filter"
+                                    >
+                                        Clear tag
+                                    </button>
+                                ) : null}
+                                {type !== "all" || hasActiveFilters ? (
+                                    <button
+                                        className={styles.btnSecondary}
+                                        onClick={() => { setQ(""); setTagFilter(""); setType("all"); setLimit(50); }}
+                                        aria-label="Reset all filters"
+                                    >
+                                        Reset filters
+                                    </button>
+                                ) : null}
+                                <button className={styles.btn} onClick={() => setNewOpen(true)}>
+                                    Create note
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             ) : (
                 <>
                     <div className={styles.line1} style={{ marginBottom: 6 }}>
