@@ -28,20 +28,32 @@ export default function NotesPanel() {
     const [notes, setNotes] = useState([]);
     const [limit, setLimit] = useState(50);
     const [q, setQ] = useState("");
-    const [type, setType] = useState("all");        // all | book | upload | grammar
+    const [debouncedQ, setDebouncedQ] = useState("");
+    const [type, setType] = useState("all"); // all | book | upload | grammar
     const [tagFilter, setTagFilter] = useState("");
-    const [editing, setEditing] = useState(null);   // note object being edited via modal
+    const [editing, setEditing] = useState(null); // note object being edited via modal
     const [newOpen, setNewOpen] = useState(false);
-    const [newType, setNewType] = useState("grammar"); // default
+
+    // true debounce for search input
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+        return () => clearTimeout(t);
+    }, [q]);
 
     // fetch notes
     async function fetchNotes() {
-        setLoading(true); setErr("");
+        setLoading(true);
+        setErr("");
         try {
             const params = new URLSearchParams();
             params.set("limit", String(limit));
-            params.set("fields", "lite");
-            if (q.trim()) params.set("q", q.trim());
+            // Only request full fields (including `body`) when searching; otherwise keep payload light.
+            if (debouncedQ) {
+                params.set("q", debouncedQ);
+                // omit fields=lite to include `body`
+            } else {
+                params.set("fields", "lite");
+            }
             if (tagFilter.trim()) params.set("tags", tagFilter.trim());
             const r = await fetch(`/api/notes?${params.toString()}`, { cache: "no-store" });
             const j = await r.json();
@@ -53,12 +65,12 @@ export default function NotesPanel() {
             setLoading(false);
         }
     }
-    useEffect(() => { fetchNotes(); }, []); // initial
     useEffect(() => {
-        const t = setTimeout(fetchNotes, 200);
-        return () => clearTimeout(t);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [limit, q, tagFilter]);
+        fetchNotes();
+    }, []); // initial
+    useEffect(() => {
+        fetchNotes(); /* debounced via debouncedQ */
+    }, [limit, debouncedQ, tagFilter]);
 
     // tag cloud
     const allTags = useMemo(() => {
@@ -67,7 +79,9 @@ export default function NotesPanel() {
             const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
             for (const t of tags) m.set(t, (m.get(t) || 0) + 1);
         }
-        return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20);
+        return Array.from(m.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20);
     }, [notes]);
 
     // filter by type
@@ -75,6 +89,21 @@ export default function NotesPanel() {
         if (type === "all") return notes;
         return notes.filter((n) => n.targetType === type);
     }, [notes, type]);
+
+    // simple highlighter for query matches
+    function highlight(text, query) {
+        if (!text || !query) return text;
+        try {
+            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig");
+            const parts = String(text).split(re);
+            return parts.map((p, i) => (re.test(p) ? <mark key={i}>{p}</mark> : <span key={i}>{p}</span>));
+        } catch {
+            return text;
+        }
+    }
+
+    // `Load more` availability heuristic: if API returned `limit` items, assume there may be more.
+    const canLoadMore = filtered.length === limit;
 
     function openAnchor(n) {
         if (n.targetType === "book" && Number.isInteger(n.bookIndex)) {
@@ -106,7 +135,9 @@ export default function NotesPanel() {
     return (
         <section className={styles.card}>
             <div className={styles.headerRow} style={{ marginBottom: 8 }}>
-                <h3 className={styles.h4} style={{ margin: 0 }}>📝 Notes</h3>
+                <h3 className={styles.h4} style={{ margin: 0 }}>
+                    📝 Notes
+                </h3>
                 <div className={styles.growRight}>
                     <input
                         className={styles.search}
@@ -138,7 +169,7 @@ export default function NotesPanel() {
                 <NotesModal
                     open={true}
                     onClose={() => setNewOpen(false)}
-                    seed={{}}  // no anchor/defaults for dashboard-created notes
+                    seed={{}} // no anchor/defaults for dashboard-created notes
                     typePicker={true}
                     initialType="grammar"
                     onSave={async ({ body, tags, color, isBookmark, targetType }) => {
@@ -175,13 +206,17 @@ export default function NotesPanel() {
                             className={styles.chip}
                             title={`${count} note${count === 1 ? "" : "s"}`}
                             onClick={() => setTagFilter((prev) => (prev === t ? "" : t))}
-                            style={tagFilter === t ? { background: "#e9eefc", borderColor: "#c9d7fb", color: "#0b3b9f" } : undefined}
+                            style={
+                                tagFilter === t ? { background: "#e9eefc", borderColor: "#c9d7fb", color: "#0b3b9f" } : undefined
+                            }
                         >
                             #{t}
                         </button>
                     ))}
                     {tagFilter && (
-                        <button className={styles.btnSecondary} onClick={() => setTagFilter("")}>Clear tag</button>
+                        <button className={styles.btnSecondary} onClick={() => setTagFilter("")}>
+                            Clear tag
+                        </button>
                     )}
                 </div>
             )}
@@ -192,54 +227,70 @@ export default function NotesPanel() {
             ) : err ? (
                 <p style={{ color: "#b91c1c" }}>{err}</p>
             ) : filtered.length === 0 ? (
-                <p className={styles.dim}>No notes yet. Double-click in ReadingPal or press “N” in Grammar.</p>
+                <div className={styles.empty}>
+                    <p>No notes yet. Double-click in ReadingPal or press “N” in Grammar.</p>
+                    <button className={styles.btn} onClick={() => setNewOpen(true)}>
+                        Create your first note
+                    </button>
+                </div>
             ) : (
-                <ul className={styles.noteList} role="list">
-                    {filtered.slice(0, limit).map((n) => {
-                        const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
-                        return (
-                            <li key={n.id} className={styles.noteItem} role="listitem">
-                                <div
-                                    className={styles.noteColor}
-                                    style={{ background: n.color || "#e5e7eb" }}
-                                    aria-hidden="true"
-                                />
-                                <div className={styles.noteBody}>
-                                    <div className={styles.noteTopRow}>
-                                        <button className={styles.noteTitleBtn} onClick={() => openAnchor(n)} title="Open">
-                                            {titleForNote(n)}
-                                        </button>
-                                        <span className={styles.dim} style={{ marginLeft: "auto" }}>
-                                            {new Date(n.createdAt).toLocaleString()}
-                                        </span>
-                                    </div>
-
-                                    {n.anchorText && (
-                                        <div className={styles.noteAnchor} title="Anchor text">
-                                            “{n.anchorText}”
+                <>
+                    <div className={styles.line1} style={{ marginBottom: 6 }}>
+                        <span className={styles.dim}>
+                            Showing <strong>{filtered.length}</strong>
+                            {canLoadMore ? " (more available…)" : ""}
+                            {debouncedQ ? ` for “${debouncedQ}”` : ""}
+                        </span>
+                    </div>
+                    <ul className={styles.noteList} role="list">
+                        {filtered.slice(0, limit).map((n) => {
+                            const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
+                            return (
+                                <li key={n.id} className={styles.noteItem} role="listitem">
+                                    <div className={styles.noteColor} style={{ background: n.color || "#e5e7eb" }} aria-hidden="true" />
+                                    <div className={styles.noteBody}>
+                                        <div className={styles.noteTopRow}>
+                                            <button className={styles.noteTitleBtn} onClick={() => openAnchor(n)} title="Open">
+                                                {titleForNote(n)}
+                                            </button>
+                                            <span className={styles.dim} style={{ marginLeft: "auto" }}>
+                                                {new Date(n.createdAt).toLocaleString()}
+                                            </span>
                                         </div>
-                                    )}
 
-                                    <div className={styles.noteText}>{n.body}</div>
+                                        {n.anchorText && (
+                                            <div className={styles.noteAnchor} title="Anchor text">
+                                                “{highlight(n.anchorText, debouncedQ)}”
+                                            </div>
+                                        )}
 
-                                    {tags.length > 0 && (
-                                        <div className={styles.tagRow}>
-                                            {tags.map((t) => (
-                                                <span key={t} className={styles.tagPill}>#{t}</span>
-                                            ))}
-                                            {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
+                                        <div className={styles.noteText}>{debouncedQ ? highlight(n.body, debouncedQ) : n.body}</div>
+
+                                        {tags.length > 0 && (
+                                            <div className={styles.tagRow}>
+                                                {tags.map((t) => (
+                                                    <span key={t} className={styles.tagPill}>
+                                                        {debouncedQ ? highlight(`#${t}`, debouncedQ) : `#${t}`}
+                                                    </span>
+                                                ))}
+                                                {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
+                                            </div>
+                                        )}
+
+                                        <div className={styles.noteActions}>
+                                            <button className={styles.btn} onClick={() => setEditing(n)}>
+                                                Edit
+                                            </button>
+                                            <button className={styles.btnDanger} onClick={() => deleteNote(n.id)}>
+                                                Delete
+                                            </button>
                                         </div>
-                                    )}
-
-                                    <div className={styles.noteActions}>
-                                        <button className={styles.btn} onClick={() => setEditing(n)}>Edit</button>
-                                        <button className={styles.btnDanger} onClick={() => deleteNote(n.id)}>Delete</button>
                                     </div>
-                                </div>
-                            </li>
-                        );
-                    })}
-                </ul>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </>
             )}
 
             {/* Load more */}
@@ -251,11 +302,8 @@ export default function NotesPanel() {
                 >
                     Show fewer
                 </button>
-                <button
-                    className={styles.btn}
-                    onClick={() => setLimit((v) => v + 50)}
-                >
-                    Load more
+                <button className={styles.btn} onClick={() => setLimit((v) => v + 50)} disabled={!canLoadMore}>
+                    {canLoadMore ? "Load more" : "No more results"}
                 </button>
             </div>
 
@@ -268,7 +316,7 @@ export default function NotesPanel() {
                         anchorText: editing.anchorText || "",
                         defaultTags: Array.isArray(editing.tagsJson) ? editing.tagsJson : [],
                         defaultColor: editing.color || undefined,
-                        initialBody: editing.body || "",   // now supported
+                        initialBody: editing.body || "",
                         isBookmark: !!editing.isBookmark,
                     }}
                     onSave={async ({ body, tags, color, isBookmark }) => {
