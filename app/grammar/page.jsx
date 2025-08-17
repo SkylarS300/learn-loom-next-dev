@@ -13,6 +13,7 @@ export default function Grammar() {
   const [recs, setRecs] = useState([]);
   const [recErr, setRecErr] = useState("");
   const [recLoading, setRecLoading] = useState(true);
+
   useEffect(() => {
     let dead = false;
     (async () => {
@@ -61,6 +62,8 @@ export default function Grammar() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMsg, setAiMsg] = useState(""); // shows inline banner (errors/info)
   const isAiRef = useRef(false);
+  // — Notes modal state —
+  const [noteData, setNoteData] = useState(null); // { concept, subTopic, anchorText, promptHash }
 
   // Sticky AI form (localStorage)
   useEffect(() => {
@@ -148,6 +151,33 @@ export default function Grammar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  async function saveGrammarNote(payload) {
+    try {
+      if (!noteData) return;
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetType: "grammar",
+          concept: noteData.concept,
+          subTopic: noteData.subTopic,
+          promptHash: noteData.promptHash,
+          anchorText: noteData.anchorText || "",
+          body: payload.body,
+          tags: payload.tags,
+          color: payload.color,
+          isBookmark: false,
+        }),
+      });
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "Failed to save note");
+      alert("Note saved!");
+      setNoteData(null);
+    } catch (e) {
+      alert(e.message || "Failed to save note");
+    }
+  }
+
   async function startQuizFrom(c, s, diff = difficulty, n = count) {
     isAiRef.current = false;
     if (aiMode) {
@@ -234,6 +264,70 @@ export default function Grammar() {
     } catch { }
   }
 
+  function GrammarNoteModal({ data, onClose, onSubmit }) {
+    const [body, setBody] = useState("");
+    const [tags, setTags] = useState("");
+    const [color, setColor] = useState("#F59E0B"); // amber default
+
+
+    return (
+      <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
+        <div className={styles.modalCard}>
+          <h3 style={{ marginTop: 0 }}>Add a note</h3>
+          <p style={{ fontSize: 14, color: "#555", marginTop: 4 }}>
+            <strong>{humanize(data.concept)}</strong> — {humanize(data.subTopic)}
+          </p>
+          <p style={{ fontSize: 13, color: "#666" }}>
+            Anchor: “{data.anchorText.slice(0, 160)}{data.anchorText.length > 160 ? "…" : ""}”
+          </p>
+          <textarea
+            className={styles.textarea}
+            placeholder="Write your note… (max 2000 chars)"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={5}
+          />
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 160px" }}>
+            <input
+              className={styles.textarea}
+              placeholder="tags, comma,separated"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+            />
+            <input
+              className={styles.textarea}
+              placeholder="#F59E0B"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+            <button className={styles.btn} onClick={onClose}>Cancel</button>
+            <button
+              className={styles.btnPrimary}
+              disabled={!body.trim()}
+              onClick={() =>
+                onSubmit({
+                  body: body.trim(),
+                  tags: tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .slice(0, 10),
+                  color: color || null,
+                })
+              }
+            >
+              Save note
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+
   return (
     <div id="main-content">
       <NavbarGuard>
@@ -296,23 +390,17 @@ export default function Grammar() {
 
         {/* ---- Content ---- */}
         <div id="textContainer" className={styles.content}>
+          {/* Global note modal (always available regardless of mode) */}
+          {noteData && (
+            <GrammarNoteModal
+              data={noteData}
+              onClose={() => setNoteData(null)}
+              onSubmit={saveGrammarNote}
+            />
+          )}
           {mode === "resume" && quiz && (
             <section className={styles.card} style={{ textAlign: "center" }}>
-              <h2 style={{ marginTop: 0 }}>Resume your last quiz?</h2>
-              <p><strong>{quiz.concept}</strong> — {quiz.subTopic}</p>
-              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                <button className={styles.btnPrimary} onClick={() => setMode("running")}>Resume</button>
-                <button
-                  className={styles.btn}
-                  onClick={() => {
-                    try { localStorage.removeItem(SESSION_KEY); } catch { }
-                    setMode("landing");
-                    setQuiz(null);
-                  }}
-                >
-                  Discard
-                </button>
-              </div>
+              ...
             </section>
           )}
 
@@ -457,6 +545,10 @@ export default function Grammar() {
                 try { localStorage.removeItem(SESSION_KEY); } catch { }
                 setMode("landing");
               }}
+              openNote={(data) => {
+                console.log("[Grammar] openNote called:", data);
+                setNoteData(data);
+              }} hashFn={fnv1a}
             />
           )}
 
@@ -520,6 +612,22 @@ export default function Grammar() {
                         >
                           Report an issue
                         </button>
+                        <button
+                          className={styles.linkBtn}
+                          onClick={() => {
+                            setReport(null);
+                            setNoteData({
+                              concept: quiz.concept,
+                              subTopic: quiz.subTopic,
+                              anchorText: item.prompt || "",
+                              promptHash: fnv1a(item.prompt || ""),
+                            });
+                          }}
+                          style={{ marginLeft: 8 }}
+                        >
+                          Add note
+                        </button>
+
                       </div>
                     );
                   })}
@@ -598,7 +706,7 @@ function ReportModal({ data, onClose, onSubmit }) {
 }
 
 // ---- Quiz Runner (accessible + keyboard) ----
-function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
+function QuizRunner({ quiz, sessionKey, onFinish, onCancel, openNote, hashFn }) {
   const [i, setI] = useState(0);
   const [sel, setSel] = useState(null);
   const [checked, setChecked] = useState(false);
@@ -675,6 +783,18 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         const n = Number(e.key);
         if (n >= 1 && n <= 9 && q?.choices?.[n - 1]) setSel(n - 1);
         if (e.key === "Enter") handleCheck();
+        if (e.key.toLowerCase() === "n") {
+          // open Grammar note modal for the current question
+          const h = (hashFn ? hashFn(q?.prompt || "") : String((q?.prompt || "").length));
+          console.log("[QuizRunner] N pressed");
+          openNote && openNote({
+            targetType: "grammar",
+            concept: quiz.concept,
+            subTopic: quiz.subTopic,
+            anchorText: q?.prompt || "",
+            promptHash: h,
+          });
+        }
       } else if (e.key === "Enter") {
         next();
       }
@@ -682,7 +802,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checked, paused, q]);
+  }, [checked, paused, q, openNote, hashFn]);
 
   // Persist minimal session state
   useEffect(() => {
@@ -734,6 +854,21 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
         <p>Press <kbd>Esc</kbd> to resume.</p>
         <button className={styles.btn} onClick={() => setPaused(false)}>Resume</button>
         <button className={styles.btn} onClick={onCancel}>Exit</button>
+        {!checked && (
+          <button
+            className={styles.btn}
+            onClick={() => openNote?.({
+              targetType: "grammar",
+              concept: quiz.concept,
+              subTopic: quiz.subTopic,
+              anchorText: q?.prompt || "",
+              promptHash: (typeof hashFn === "function" ? hashFn(q?.prompt || "") : String((q?.prompt || "").length)),
+            })}
+            title="Add a quick note (N)"
+          >
+            Add note (N)
+          </button>
+        )}
       </section>
     );
   }
@@ -807,6 +942,24 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
       )}
 
       <div className={styles.controlsRow}>
+        {typeof openNote === "function" && (
+          <button
+            className={styles.btn}
+            title="Add a note (N)"
+            onClick={() => {
+              const h = (typeof hashFn === "function" ? hashFn(q?.prompt || "") : String((q?.prompt || "").length));
+              openNote({
+                targetType: "grammar",
+                concept: quiz.concept,
+                subTopic: quiz.subTopic,
+                anchorText: q?.prompt || "",
+                promptHash: h,
+              });
+            }}
+          >
+            📝 Note
+          </button>
+        )}
         {!checked ? (
           <button className={styles.btnPrimary} disabled={sel == null} onClick={handleCheck}>
             Check <span style={{ opacity: 0.6 }}>(Enter)</span>
@@ -826,6 +979,7 @@ function QuizRunner({ quiz, sessionKey, onFinish, onCancel }) {
           {q.explanation && <div style={{ color: "#555", marginTop: 4 }}>{q.explanation}</div>}
         </div>
       )}
+
     </section>
   );
 }
