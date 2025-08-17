@@ -127,18 +127,6 @@ export default function NotesPanel() {
                         <option value="upload">Uploads</option>
                         <option value="grammar">Grammar</option>
                     </select>
-                    {/* New note controls */}
-                    <select
-                        className={styles.btnSecondary}
-                        aria-label="New note type"
-                        value={newType}
-                        onChange={(e) => setNewType(e.target.value)}
-                        title="Choose a note type for the new note"
-                    >
-                        <option value="grammar">Grammar</option>
-                        <option value="book">Book</option>
-                        <option value="upload">Upload</option>
-                    </select>
                     <button className={styles.btn} onClick={() => setNewOpen(true)}>
                         New note
                     </button>
@@ -151,13 +139,15 @@ export default function NotesPanel() {
                     open={true}
                     onClose={() => setNewOpen(false)}
                     seed={{}}  // no anchor/defaults for dashboard-created notes
-                    onSave={async ({ body, tags, color, isBookmark }) => {
+                    typePicker={true}
+                    initialType="grammar"
+                    onSave={async ({ body, tags, color, isBookmark, targetType }) => {
                         try {
                             const r = await fetch("/api/notes", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({
-                                    targetType: newType,   // <- pick from dropdown
+                                    targetType: targetType || "grammar",
                                     anchorText: "",
                                     body,
                                     tags,
