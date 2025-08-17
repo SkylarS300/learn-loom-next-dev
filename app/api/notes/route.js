@@ -21,7 +21,7 @@ export async function GET(req) {
     // optional anchors
     const bookIndex = url.searchParams.get("bookIndex");
     const chapterIndex = url.searchParams.get("chapterIndex");
-    const uploadId = url.searchParams.get("uploadId");
+    const uploadIdParam = url.searchParams.get("uploadId");
     const concept = url.searchParams.get("concept");
     const subTopic = url.searchParams.get("subTopic");
 
@@ -31,7 +31,10 @@ export async function GET(req) {
     if (scope === "current") {
         if (bookIndex != null) where.bookIndex = Number(bookIndex);
         if (chapterIndex != null) where.chapterIndex = Number(chapterIndex);
-        if (uploadId) where.uploadId = String(uploadId);
+        if (uploadIdParam != null && uploadIdParam !== "") {
+            const upId = Number(uploadIdParam);
+            if (!Number.isNaN(upId)) where.uploadId = upId;
+        }
     }
 
     if (concept) where.concept = String(concept);
@@ -52,8 +55,8 @@ export async function GET(req) {
     });
     const filtered = rows.filter((r) => {
         const tagList = Array.isArray(r.tagsJson) ? r.tagsJson : [];
-        const matchesTags = tags.length ? tags.every((t) => tagList.includes(t)) : true;
-        const qHit =
+        // "ANY" semantics: show if it has at least one of the requested tags
+        const matchesTags = tags.length ? tags.some((t) => tagList.includes(t)) : true; const qHit =
             !q ||
             r.body?.toLowerCase().includes(q) ||
             r.anchorText?.toLowerCase().includes(q) ||
@@ -91,12 +94,20 @@ export async function POST(req) {
         ? tags.map((t) => String(t).slice(0, 24)).filter(Boolean).slice(0, 10)
         : [];
 
+    const uploadIdNum =
+        uploadId === 0 || uploadId === "0"
+            ? 0
+            : uploadId != null && uploadId !== "" && !Number.isNaN(Number(uploadId))
+                ? Number(uploadId)
+                : null;
+
+
     const row = await prisma.note.create({
         data: {
             anonId,
             targetType,
             bookIndex: Number.isInteger(bookIndex) ? Number(bookIndex) : null,
-            uploadId: uploadId ? String(uploadId) : null,
+            uploadId: uploadIdNum,
             chapterIndex: Number.isInteger(chapterIndex) ? Number(chapterIndex) : null,
             sentenceIndex: Number.isInteger(sentenceIndex) ? Number(sentenceIndex) : null,
             wordIndex: Number.isInteger(wordIndex) ? Number(wordIndex) : null,
