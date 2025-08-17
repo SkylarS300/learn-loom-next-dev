@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import books from "../../src/content/book-content.js";
 import styles from "./readingpal.module.css";
+import NotesModal from "./NotesModal";
 
 /* ------- helpers ------- */
 function saveBookmark({ type, id, chapterIndex, scrollY }) {
@@ -85,6 +86,10 @@ export default function ReadingPalClient() {
   const [pitch, setPitch] = useState(1);
   const [volume, setVolume] = useState(1);
   const [autoAdvance, setAutoAdvance] = useState(true);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteSeed, setNoteSeed] = useState(null);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   const currentBookRef = useRef(null);
   const chapterIndexRef = useRef(0);
@@ -129,7 +134,16 @@ export default function ReadingPalClient() {
     setTimeout(() => el.remove(), 1800);
   }
 
-
+  // show one-time keyboard hint
+  useEffect(() => {
+    try {
+      const k = "rpHintV1";
+      if (!localStorage.getItem(k)) {
+        setShowHint(true);
+        localStorage.setItem(k, "1");
+      }
+    } catch { }
+  }, []);
 
   // ------- Server bookmark helpers (books only, not uploads) -------
   async function saveServerBookmark() {
@@ -440,6 +454,17 @@ export default function ReadingPalClient() {
           e.preventDefault();
           stopReading();
           break;
+        case "n":
+        case "N":
+          // open note at current sentence
+          e.preventDefault();
+          {
+            const spans = currentSpans();
+            const idx = Math.min(sentenceIndexRef.current || 0, Math.max(spans.length - 1, 0));
+            const anchorText = spans[idx]?.innerText?.trim().slice(0, 160) || "";
+            openNoteAt(idx, anchorText);
+          }
+          break;
         default:
           break;
       }
@@ -500,11 +525,61 @@ export default function ReadingPalClient() {
   }
 
 
+  function openNoteAt(idx, anchorText) {
+    try {
+      sentenceIndexRef.current = idx;
+      setHighlight(idx);
+    } catch { }
+    const isUpload = !!uploadId;
+    setNoteSeed({
+      anchorText,
+      defaultTags: [],
+      defaultColor: "#F59E0B",
+      isBookmark: false,
+      // we keep anchors in outer scope when saving
+    });
+    setNoteOpen(true);
+  }
+
+  async function saveNote({ body, tags, color, isBookmark }) {
+    if (!body?.trim()) return;
+    setNoteSaving(true);
+    try {
+      const payload = {
+        targetType: uploadId ? "upload" : "book",
+        bookIndex: uploadId ? null : Number(bookIndex),
+        uploadId: uploadId ? Number(uploadId) : null,
+        chapterIndex: uploadId ? null : Number(chapterIndexRef.current || 0),
+        sentenceIndex: Number(sentenceIndexRef.current || 0),
+        wordIndex: null,
+        anchorText: noteSeed?.anchorText || null,
+        body: body.trim(),
+        tags,
+        color,
+        isBookmark: !!isBookmark,
+      };
+      const r = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = await r.json();
+      if (!j?.ok) throw new Error(j?.error || "Failed to save note");
+      toast("✅ Note saved");
+      setNoteOpen(false);
+    } catch (e) {
+      toast("⚠️ Could not save note");
+    } finally {
+      setNoteSaving(false);
+    }
+  }
+
+
   /* ---------- click‑to‑play ---------- */
   useEffect(() => {
     const container = textRef.current;
     if (!container) return;
-    const handler = (e) => {
+    const clickHandler = (e) => {
       const span = e.target.closest(`.${styles.sentence}`);
       if (!span) return;
       const idx = Number(span.getAttribute("data-index"));
@@ -513,8 +588,21 @@ export default function ReadingPalClient() {
       setHighlight(idx);
       speakSentencesFrom(idx);
     };
-    container.addEventListener("click", handler);
-    return () => container.removeEventListener("click", handler);
+    const dblHandler = (e) => {
+      const span = e.target.closest(`.${styles.sentence}`);
+      if (!span) return;
+      const idx = Number(span.getAttribute("data-index"));
+      if (!Number.isInteger(idx)) return;
+      const sel = window.getSelection?.()?.toString().trim();
+      const anchorText = sel || span.innerText.trim().slice(0, 160);
+      openNoteAt(idx, anchorText);
+    };
+    container.addEventListener("click", clickHandler);
+    container.addEventListener("dblclick", dblHandler);
+    return () => {
+      container.removeEventListener("click", clickHandler);
+      container.removeEventListener("dblclick", dblHandler);
+    };
   }, [selectedVoice, rate, pitch, volume]);
 
   /* ---------- jump helper ---------- */
@@ -748,6 +836,14 @@ export default function ReadingPalClient() {
       </div>
       <h2 className={styles.chapter} ref={chapterTitleRef}>Chapter Title</h2>
 
+
+      {showHint && (
+        <div className={styles.hintBar} role="note">
+          <span>💡 Tip: Double-click any word (or press <kbd>N</kbd>) to add a note. Press <kbd>B</kbd> to bookmark.</span>
+          <button className={styles.hintClose} onClick={() => setShowHint(false)} aria-label="Dismiss">Got it</button>
+        </div>
+      )}
+
       {/* Resume prompt (only when a server bookmark exists and we haven't acted yet) */}
       {resumePromptOpen && serverBookmark && Number.isInteger(serverBookmark.sentenceIndex) && (
         <div
@@ -800,6 +896,12 @@ export default function ReadingPalClient() {
         <button className={styles.secondaryBtn} onClick={pauseReading}>⏸ Pause</button>
         <button className={styles.secondaryBtn} onClick={resumeReading}>🔁 Resume</button>
         <button className={styles.secondaryBtn} onClick={() => { stopReading(); sentenceIndexRef.current = 0; setHighlight(0); }}>🔄 Restart</button>
+        <button className={styles.secondaryBtn} onClick={() => {
+          const spans = currentSpans();
+          const idx = Math.min(sentenceIndexRef.current || 0, Math.max(spans.length - 1, 0));
+          const anchorText = spans[idx]?.innerText?.trim().slice(0, 160) || "";
+          openNoteAt(idx, anchorText);
+        }}>📝 Add note (N)</button>
       </div>
 
       <details>
@@ -953,6 +1055,14 @@ export default function ReadingPalClient() {
         <button ref={prevChapterRef} className={styles.secondaryBtn}>⬅ Previous Chapter</button>
         <button ref={nextChapterRef} className={styles.secondaryBtn}>Next Chapter ➡</button>
       </div>
+
+
+      <NotesModal
+        open={noteOpen}
+        seed={noteSeed}
+        onClose={() => setNoteOpen(false)}
+        onSave={saveNote}
+      />
     </div>
   );
 }
