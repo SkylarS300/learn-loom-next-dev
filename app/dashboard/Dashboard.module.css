@@ -101,3 +101,113 @@
 .dim {
     color: #6b7280;
 }
+
+/* Notes panel */
+.search {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+}
+
+.noteList {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    gap: 10px;
+}
+
+.noteItem {
+    display: grid;
+    grid-template-columns: 8px 1fr;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.noteColor {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.noteBody {
+    padding: 10px 12px;
+}
+
+.noteTopRow {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.noteTitleBtn {
+    background: transparent;
+    border: none;
+    color: #0b3b9f;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+}
+
+.noteTitleBtn:hover {
+    text-decoration: underline;
+}
+
+.noteAnchor {
+    color: #374151;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.noteText {
+    color: #111827;
+    font-size: 14px;
+    margin-bottom: 6px;
+    white-space: pre-wrap;
+}
+
+.noteActions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.editWrap {
+    display: grid;
+    gap: 8px;
+}
+
+.editRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.input,
+.textarea {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font: inherit;
+}
+
+.tagRow {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.tagPill {
+    font-size: 12px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    border-radius: 999px;
+    padding: 2px 8px;
+}

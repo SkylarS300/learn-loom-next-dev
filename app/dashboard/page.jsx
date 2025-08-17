@@ -1,7 +1,7 @@
 "use client";
 
 import RecentGrammarCard from "./RecentGrammarCard";
-import { useEffect, useState } from "react";
+import NotesPanel from "./NotesPanel"; import { useEffect, useState } from "react";
 import books from "@/src/content/book-content.js";
 import {
   ResponsiveContainer,
@@ -181,6 +181,11 @@ export default function DashboardPage() {
       {/* Recent grammar mini-card */}
       <section className={styles.sectionTight}>
         <RecentGrammarCard />
+      </section>
+
+      {/* Notes panel */}
+      <section className={styles.section}>
+        <NotesPanel />
       </section>
 
       {/* Progress charts */}
