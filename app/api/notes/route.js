@@ -18,6 +18,7 @@ export async function GET(req) {
     const q = qRaw.toLowerCase();
     const tagsParam = (url.searchParams.get("tags") || "").trim();
     const tags = tagsParam ? tagsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    const fields = (url.searchParams.get("fields") || "").trim(); // e.g., "lite"
 
     // optional anchors
     const bookIndex = url.searchParams.get("bookIndex");
@@ -42,24 +43,36 @@ export async function GET(req) {
     if (subTopic) where.subTopic = String(subTopic);
     // We deliberately avoid DB-level JSON tag filters for MySQL portability.
     // Fetch a larger page and filter in-process by tags and q-in-tags.
+    const select =
+        fields === "lite"
+            ? {
+                id: true, targetType: true, bookIndex: true, uploadId: true,
+                chapterIndex: true, sentenceIndex: true, wordIndex: true,
+                concept: true, subTopic: true, promptHash: true,
+                anchorText: true, /* body omitted in lite */ tagsJson: true, color: true,
+                isBookmark: true, createdAt: true, updatedAt: true,
+            }
+            : {
+                id: true, targetType: true, bookIndex: true, uploadId: true,
+                chapterIndex: true, sentenceIndex: true, wordIndex: true,
+                concept: true, subTopic: true, promptHash: true,
+                anchorText: true, body: true, tagsJson: true, color: true,
+                isBookmark: true, createdAt: true, updatedAt: true,
+            };
+
     const rows = await prisma.note.findMany({
+
         where,
         orderBy: { createdAt: "desc" },
         take: Math.min(limit * 4, 400),
-        select: {
-            id: true, targetType: true, bookIndex: true, uploadId: true,
-            chapterIndex: true, sentenceIndex: true, wordIndex: true,
-            concept: true, subTopic: true, promptHash: true,
-            anchorText: true, body: true, tagsJson: true, color: true,
-            isBookmark: true, createdAt: true, updatedAt: true,
-        },
+        select,
     });
     const filtered = rows.filter((r) => {
         const tagList = Array.isArray(r.tagsJson) ? r.tagsJson : [];
         // "ANY" semantics: show if it has at least one of the requested tags
         const matchesTags = tags.length ? tags.some((t) => tagList.includes(t)) : true; const qHit =
             !q ||
-            r.body?.toLowerCase().includes(q) ||
+            (r.body?.toLowerCase?.().includes(q) ?? false) ||
             r.anchorText?.toLowerCase().includes(q) ||
             tagList.some((t) => String(t).toLowerCase().includes(q));
         return matchesTags && qHit;

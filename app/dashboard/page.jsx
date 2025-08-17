@@ -1,7 +1,8 @@
 "use client";
 
 import RecentGrammarCard from "./RecentGrammarCard";
-import NotesPanel from "./NotesPanel"; import { useEffect, useState } from "react";
+import NotesPanel from "./NotesPanel"
+import { useEffect, useState } from "react";
 import books from "@/src/content/book-content.js";
 import {
   ResponsiveContainer,
@@ -9,6 +10,7 @@ import {
   CartesianGrid, XAxis, YAxis, Tooltip,
 } from "recharts";
 import styles from "./Dashboard.module.css";
+
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
