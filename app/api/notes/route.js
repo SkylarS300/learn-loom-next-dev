@@ -7,7 +7,8 @@ function unauthorized() {
 }
 
 export async function GET(req) {
-    const anonId = cookies().get("learnloomId")?.value;
+    const cookieStore = await cookies();
+    const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return unauthorized();
 
     const url = new URL(req.url);
@@ -68,7 +69,8 @@ export async function GET(req) {
 
 
 export async function POST(req) {
-    const anonId = cookies().get("learnloomId")?.value;
+    const cookieStore = await cookies();
+    const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return unauthorized();
 
     const payload = await req.json().catch(() => ({}));

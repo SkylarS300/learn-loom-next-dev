@@ -6,10 +6,11 @@ function unauthorized() {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
-export async function PATCH(req, { params }) {
-    const anonId = cookies().get("learnloomId")?.value;
+export async function PATCH(req, ctx) {
+    const cookieStore = await cookies();
+    const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return unauthorized();
-    const id = params?.id;
+    const { id } = await ctx.params;
     if (!id) return Response.json({ ok: false, error: "Missing id" }, { status: 400 });
 
     const payload = await req.json().catch(() => ({}));
@@ -35,10 +36,11 @@ export async function PATCH(req, { params }) {
     return Response.json({ ok: true, data: fresh });
 }
 
-export async function DELETE(_req, { params }) {
-    const anonId = cookies().get("learnloomId")?.value;
+export async function DELETE(_req, ctx) {
+    const cookieStore = await cookies();
+    const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return unauthorized();
-    const id = params?.id;
+    const { id } = await ctx.params;
     if (!id) return Response.json({ ok: false, error: "Missing id" }, { status: 400 });
 
     // enforce ownership

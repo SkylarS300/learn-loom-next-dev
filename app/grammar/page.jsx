@@ -6,6 +6,8 @@ import Navbar from "../Navbar";
 import NavbarGuard from "../components/NavbarGuard";
 import bank, { buildQuiz } from "@/src/grammar/buildQuiz";
 import styles from "./grammar.module.css";
+import NotesModal from "../readingpal/NotesModal";
+
 
 export default function Grammar() {
   // ----- Recommendations -----
@@ -264,69 +266,6 @@ export default function Grammar() {
     } catch { }
   }
 
-  function GrammarNoteModal({ data, onClose, onSubmit }) {
-    const [body, setBody] = useState("");
-    const [tags, setTags] = useState("");
-    const [color, setColor] = useState("#F59E0B"); // amber default
-
-
-    return (
-      <div className={styles.modalBackdrop} role="dialog" aria-modal="true">
-        <div className={styles.modalCard}>
-          <h3 style={{ marginTop: 0 }}>Add a note</h3>
-          <p style={{ fontSize: 14, color: "#555", marginTop: 4 }}>
-            <strong>{humanize(data.concept)}</strong> — {humanize(data.subTopic)}
-          </p>
-          <p style={{ fontSize: 13, color: "#666" }}>
-            Anchor: “{data.anchorText.slice(0, 160)}{data.anchorText.length > 160 ? "…" : ""}”
-          </p>
-          <textarea
-            className={styles.textarea}
-            placeholder="Write your note… (max 2000 chars)"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={5}
-          />
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 160px" }}>
-            <input
-              className={styles.textarea}
-              placeholder="tags, comma,separated"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-            <input
-              className={styles.textarea}
-              placeholder="#F59E0B"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-            <button className={styles.btn} onClick={onClose}>Cancel</button>
-            <button
-              className={styles.btnPrimary}
-              disabled={!body.trim()}
-              onClick={() =>
-                onSubmit({
-                  body: body.trim(),
-                  tags: tags
-                    .split(",")
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                    .slice(0, 10),
-                  color: color || null,
-                })
-              }
-            >
-              Save note
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
 
   return (
     <div id="main-content">
@@ -390,14 +329,41 @@ export default function Grammar() {
 
         {/* ---- Content ---- */}
         <div id="textContainer" className={styles.content}>
-          {/* Global note modal (always available regardless of mode) */}
-          {noteData && (
-            <GrammarNoteModal
-              data={noteData}
-              onClose={() => setNoteData(null)}
-              onSubmit={saveGrammarNote}
-            />
-          )}
+          {/* Shared NotesModal from ReadingPal (unified UI) */}
+          <NotesModal
+            open={!!noteData}
+            seed={{
+              anchorText: noteData?.anchorText || "",
+              defaultTags: [noteData?.concept, noteData?.subTopic].filter(Boolean),
+              defaultColor: "#F59E0B",
+              isBookmark: false,
+            }}
+            onClose={() => setNoteData(null)}
+            onSave={async ({ body, tags, color, isBookmark }) => {
+              try {
+                const res = await fetch("/api/notes", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    targetType: "grammar",
+                    concept: noteData.concept,
+                    subTopic: noteData.subTopic,
+                    promptHash: noteData.promptHash,
+                    anchorText: noteData.anchorText || "",
+                    body,
+                    tags,
+                    color,
+                    isBookmark,
+                  }),
+                });
+                const j = await res.json();
+                if (!j?.ok) throw new Error(j?.error || "Failed to save note");
+                setNoteData(null);
+              } catch (e) {
+                alert(e.message || "Failed to save note");
+              }
+            }}
+          />
           {mode === "resume" && quiz && (
             <section className={styles.card} style={{ textAlign: "center" }}>
               ...

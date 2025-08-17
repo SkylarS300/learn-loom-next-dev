@@ -193,7 +193,7 @@ export default function NotesPanel() {
             ) : err ? (
                 <p style={{ color: "#b91c1c" }}>{err}</p>
             ) : filtered.length === 0 ? (
-                <p className={styles.dim}>No notes yet. Double-click in ReadingPal or press “N” to add one.</p>
+                <p className={styles.dim}>No notes yet. Double-click in ReadingPal or press “N." You can also add notes in Grammar Quizzes.</p>
             ) : (
                 <ul className={styles.noteList} role="list">
                     {filtered.map((n) => {
