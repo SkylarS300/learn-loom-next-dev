@@ -46,6 +46,13 @@ export async function GET(req) {
 
     if (concept) where.concept = String(concept);
     if (subTopic) where.subTopic = String(subTopic);
+    // Server-side pushdown for text search on body/anchor (keeps tag matching client-side)
+    if (qRaw) {
+        where.OR = [
+            { body: { contains: qRaw } },
+            { anchorText: { contains: qRaw } },
+        ];
+    }
     // We deliberately avoid DB-level JSON tag filters for MySQL portability.
     // Fetch a larger page and filter in-process by tags and q-in-tags.
     const select =
@@ -81,7 +88,9 @@ export async function GET(req) {
     const filtered = rows.filter((r) => {
         const tagList = Array.isArray(r.tagsJson) ? r.tagsJson : [];
         // "ANY" semantics: show if it has at least one of the requested tags
-        const matchesTags = tags.length ? tags.some((t) => tagList.includes(t)) : true; const qHit =
+        const matchesTags = tags.length ? tags.some((t) => tagList.includes(t)) : true;
+        // Keep q-in-tags behavior client-side (pushdown handled body/anchor above)
+        const qHit =
             !q ||
             (r.body?.toLowerCase?.().includes(q) ?? false) ||
             r.anchorText?.toLowerCase().includes(q) ||

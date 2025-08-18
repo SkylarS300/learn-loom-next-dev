@@ -1,7 +1,7 @@
 // app/dashboard/NotesPanel.jsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./Dashboard.module.css";
 import books from "@/src/content/book-content.js";
 import NotesModal from "../readingpal/NotesModal";
@@ -28,13 +28,14 @@ export default function NotesPanel() {
     const [err, setErr] = useState("");
     const [notes, setNotes] = useState([]);
     const [limit, setLimit] = useState(50);
-    const pageSize = 50;
     const [q, setQ] = useState("");
     const [debouncedQ, setDebouncedQ] = useState("");
     const [type, setType] = useState("all"); // all | book | upload | grammar
     const [tagFilter, setTagFilter] = useState("");
     const [editing, setEditing] = useState(null); // note object being edited via modal
     const [newOpen, setNewOpen] = useState(false);
+    const loadMoreRef = useRef(null);
+    const pageSize = 50;
     const [nextCursor, setNextCursor] = useState(null);
     const [loadingMore, setLoadingMore] = useState(false);
 
@@ -94,6 +95,12 @@ export default function NotesPanel() {
         // reset list on filter/search changes
         setNextCursor(null);
         fetchNotes({ append: false }); /* debounced via debouncedQ */
+    }, [limit, debouncedQ, tagFilter]);
+
+
+    // Reset paging when filters change
+    useEffect(() => {
+        setLimit(pageSize);
     }, [debouncedQ, tagFilter, type]);
 
     // tag cloud
@@ -130,8 +137,28 @@ export default function NotesPanel() {
         }
     }
 
-    // Load more when the API gave us a nextCursor
-    const canLoadMore = Boolean(nextCursor);
+    // Heuristic: if we show `limit` items, there may be more on the server.
+    const canLoadMore = filtered.length === limit;
+
+    // Infinite scroll: grow `limit` when the sentinel enters viewport
+    useEffect(() => {
+        if (!canLoadMore || loading) return;
+        const el = loadMoreRef.current;
+        if (!el) return;
+        let seenOnce = false;
+        const obs = new IntersectionObserver(
+            (entries) => {
+                const e = entries[0];
+                if (e?.isIntersecting && !seenOnce) {
+                    seenOnce = true; // simple throttle
+                    setLimit((v) => v + pageSize);
+                }
+            },
+            { root: null, rootMargin: "200px 0px", threshold: 0.1 }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, [canLoadMore, loading, limit, debouncedQ, tagFilter, type]);
 
     function openAnchor(n) {
         if (n.targetType === "book" && Number.isInteger(n.bookIndex)) {
@@ -366,6 +393,8 @@ export default function NotesPanel() {
                             );
                         })}
                     </ul>
+                    {/* Infinite scroll sentinel */}
+                    <div ref={loadMoreRef} aria-hidden="true" style={{ height: 1 }} />
                 </>
             )}
 
