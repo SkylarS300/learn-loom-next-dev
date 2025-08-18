@@ -27,7 +27,6 @@ export default function NotesPanel() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
     const [notes, setNotes] = useState([]);
-    const [limit, setLimit] = useState(50);
     const [q, setQ] = useState("");
     const [debouncedQ, setDebouncedQ] = useState("");
     const [type, setType] = useState("all"); // all | book | upload | grammar
@@ -35,7 +34,7 @@ export default function NotesPanel() {
     const [editing, setEditing] = useState(null); // note object being edited via modal
     const [newOpen, setNewOpen] = useState(false);
     const loadMoreRef = useRef(null);
-    const pageSize = 50;
+    const PAGE_SIZE = 50;
     const [nextCursor, setNextCursor] = useState(null);
     const [loadingMore, setLoadingMore] = useState(false);
 
@@ -52,7 +51,7 @@ export default function NotesPanel() {
         setErr("");
         try {
             const params = new URLSearchParams();
-            params.set("limit", String(pageSize));
+            params.set("limit", String(PAGE_SIZE));
             // Only request full fields (including `body`) when searching; otherwise keep payload light.
             if (debouncedQ) {
                 params.set("q", debouncedQ);
@@ -67,8 +66,16 @@ export default function NotesPanel() {
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to load notes");
             const incoming = j.data || [];
-            if (append) setNotes((prev) => [...prev, ...incoming]);
-            else setNotes(incoming);
+            if (append) {
+                // Dedup by id in case the API window overlaps
+                setNotes((prev) => {
+                    const seen = new Set(prev.map((x) => x.id));
+                    const add = incoming.filter((x) => !seen.has(x.id));
+                    return [...prev, ...add];
+                });
+            } else {
+                setNotes(incoming);
+            }
             setNextCursor(j.nextCursor || null);
             // first meaningful notes paint
             if (!append && (incoming.length || debouncedQ || tagFilter)) {
@@ -92,15 +99,9 @@ export default function NotesPanel() {
         fetchNotes({ append: false });
     }, []); // initial
     useEffect(() => {
-        // reset list on filter/search changes
+        // reset list on filter/search/type changes
         setNextCursor(null);
         fetchNotes({ append: false }); /* debounced via debouncedQ */
-    }, [limit, debouncedQ, tagFilter]);
-
-
-    // Reset paging when filters change
-    useEffect(() => {
-        setLimit(pageSize);
     }, [debouncedQ, tagFilter, type]);
 
     // tag cloud
@@ -137,28 +138,28 @@ export default function NotesPanel() {
         }
     }
 
-    // Heuristic: if we show `limit` items, there may be more on the server.
-    const canLoadMore = filtered.length === limit;
+    // Use API truth: only load more if server returned a cursor
+    const canLoadMore = Boolean(nextCursor);
 
-    // Infinite scroll: grow `limit` when the sentinel enters viewport
+    // Infinite scroll: append a page when the sentinel enters viewport
     useEffect(() => {
-        if (!canLoadMore || loading) return;
+        if (!canLoadMore || loading || loadingMore) return;
         const el = loadMoreRef.current;
         if (!el) return;
-        let seenOnce = false;
+        let fired = false;
         const obs = new IntersectionObserver(
             (entries) => {
                 const e = entries[0];
-                if (e?.isIntersecting && !seenOnce) {
-                    seenOnce = true; // simple throttle
-                    setLimit((v) => v + pageSize);
+                if (e?.isIntersecting && !fired) {
+                    fired = true; // throttle per visibility
+                    fetchNotes({ append: true });
                 }
             },
             { root: null, rootMargin: "200px 0px", threshold: 0.1 }
         );
         obs.observe(el);
         return () => obs.disconnect();
-    }, [canLoadMore, loading, limit, debouncedQ, tagFilter, type]);
+    }, [canLoadMore, loading, loadingMore, debouncedQ, tagFilter, type, nextCursor]);
 
     function openAnchor(n) {
         if (n.targetType === "book" && Number.isInteger(n.bookIndex)) {

@@ -1,17 +1,12 @@
 "use client";
 
+import styles from "./Dashboard.module.css";
 import dynamic from "next/dynamic";
-const RecentGrammarCard = dynamic(() => import("./RecentGrammarCard"), {
-  ssr: false,
-  loading: () => <div className={styles.card}><h4 className={styles.h4}>Loading…</h4></div>,
-});
 import RecommendedChips from "./RecommendedChips";
-import NotesPanel from "./NotesPanel"
+import NotesPanel from "./NotesPanel";
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import books from "@/src/content/book-content.js";
 import { track } from "@/lib/rum";
-import styles from "./Dashboard.module.css";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -20,6 +15,16 @@ const LineCard = dynamic(() => import("./_charts/LineCard"), {
     <div className={styles.card}>
       <h4 className={styles.h4}>Loading chart…</h4>
       <div className={styles.chart} aria-busy="true" />
+    </div>
+  ),
+});
+
+
+const RecentGrammarCard = dynamic(() => import("./RecentGrammarCard"), {
+  ssr: false,
+  loading: () => (
+    <div className={styles.card}>
+      <h4 className={styles.h4}>Loading…</h4>
     </div>
   ),
 });
