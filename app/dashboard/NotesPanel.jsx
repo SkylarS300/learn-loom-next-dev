@@ -37,6 +37,25 @@ export default function NotesPanel() {
     const PAGE_SIZE = 50;
     const [nextCursor, setNextCursor] = useState(null);
     const [loadingMore, setLoadingMore] = useState(false);
+    // keyboard shortcuts: '/' focuses search, 'n' opens modal
+    useEffect(() => {
+        function onKey(e) {
+            if (e.defaultPrevented) return;
+            const tag = document.activeElement?.tagName?.toLowerCase();
+            if (tag === "input" || tag === "textarea") return;
+            if (e.key === "/") {
+                e.preventDefault();
+                const el = document.querySelector('input[aria-label="Search notes"]');
+                if (el) el.focus();
+            } else if (e.key?.toLowerCase() === "n") {
+                e.preventDefault();
+                setNewOpen(true);
+            }
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
+
 
     // true debounce for search input
     useEffect(() => {
@@ -368,7 +387,11 @@ export default function NotesPanel() {
                                             </div>
                                         )}
 
-                                        <div className={styles.noteText}>{debouncedQ ? highlight(n.body, debouncedQ) : n.body}</div>
+                                        <div className={styles.noteText}>
+                                            {debouncedQ
+                                                ? highlight(n.body || "", debouncedQ)
+                                                : (typeof n.body === "string" ? n.body : "")}
+                                        </div>
 
                                         {tags.length > 0 && (
                                             <div className={styles.tagRow}>
