@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import styles from "./Dashboard.module.css";
 import books from "@/src/content/book-content.js";
 import NotesModal from "../readingpal/NotesModal";
+import { track } from "@/lib/rum"
 
 function titleForNote(n) {
     if (n.targetType === "book" && Number.isInteger(n.bookIndex)) {
@@ -68,6 +69,17 @@ export default function NotesPanel() {
             if (append) setNotes((prev) => [...prev, ...incoming]);
             else setNotes(incoming);
             setNextCursor(j.nextCursor || null);
+            // first meaningful notes paint
+            if (!append && (incoming.length || debouncedQ || tagFilter)) {
+                track("notes_loaded", {
+                    ms_from_mount: Math.round(performance.now() - (window.__dashStart || 0)),
+                    count: incoming.length,
+                    q: debouncedQ ? 1 : 0,
+                    tags: tagFilter ? 1 : 0,
+                    type: type === "all" ? "all" : type,
+                    lite: debouncedQ ? 0 : 1,
+                });
+            }
         } catch (e) {
             setErr(e.message || "Failed to load notes");
         } finally {

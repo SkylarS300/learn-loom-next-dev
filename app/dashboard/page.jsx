@@ -3,14 +3,21 @@
 import RecentGrammarCard from "./RecentGrammarCard";
 import NotesPanel from "./NotesPanel"
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import books from "@/src/content/book-content.js";
-import {
-  ResponsiveContainer,
-  LineChart, Line,
-  CartesianGrid, XAxis, YAxis, Tooltip,
-} from "recharts";
+import { track } from "@/lib/rum";
 import styles from "./Dashboard.module.css";
 
+// Lazy-load the chart card to keep initial bundle small.
+const LineCard = dynamic(() => import("./_charts/LineCard"), {
+  ssr: false,
+  loading: () => (
+    <div className={styles.card}>
+      <h4 className={styles.h4}>Loading chart…</h4>
+      <div className={styles.chart} aria-busy="true" />
+    </div>
+  ),
+});
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
@@ -24,12 +31,20 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
+    // mark dashboard start once per mount
+    if (typeof window !== "undefined" && !window.__dashStart) {
+      window.__dashStart = performance.now();
+      track("dash_mount", { t: Math.round(window.__dashStart) });
+    }
     (async () => {
       try {
         const r = await fetch("/api/quickresume");
         const j = await r.json();
         if (!j.ok) throw new Error(j.error || "Failed");
         setData(j.data);
+        track("dash_quickresume_loaded", {
+          ms_from_mount: Math.round(performance.now() - (window.__dashStart || 0)),
+        });
       } catch (e) {
         setErr(e.message);
       }
@@ -207,95 +222,76 @@ export default function DashboardPage() {
         </div>
 
         {/* Reading minutes */}
-        <div className={styles.card}>
-          <h4 className={styles.h4}>Reading time (minutes / day)</h4>
-          <div className={styles.chart}>
-            <ResponsiveContainer>
-              <LineChart data={metrics.readingDaily}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis width={40} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="minutes" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <LineCard
+          title="Reading time (minutes / day)"
+          data={metrics.readingDaily}
+          yKey="minutes"
+          yAxisWidth={40}
+        />
 
         {/* Grammar average score */}
+        <div style={{ marginTop: 12 }}>
+          <LineCard
+            title="Grammar average score (/ day)"
+            data={metrics.grammarDaily}
+            yKey="avg"
+            yDomain={[0, 100]}
+            yAxisWidth={40}
+          />
+        </div>
+
+        {/* Grammar pace (sec / question) */}
+        <div style={{ marginTop: 12 }}>
+          <LineCard
+            title="Grammar pace (sec / question)"
+            data={metrics.grammarPaceDaily}
+            yKey="secPerQ"
+            yAxisWidth={40}
+          />
+        </div>
+
+        {/* Grammar insights (top weak areas) */}
         <div className={styles.card} style={{ marginTop: 12 }}>
-          <h4 className={styles.h4}>Grammar average score (/ day)</h4>
-          <div className={styles.chart}>
-            <ResponsiveContainer>
-              <LineChart data={metrics.grammarDaily}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis width={40} domain={[0, 100]} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="avg" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Grammar pace (sec / question) */}
-          <div className={styles.card} style={{ marginTop: 12 }}>
-            <h4 className={styles.h4}>Grammar pace (sec / question)</h4>
-            <div className={styles.chart}>
-              <ResponsiveContainer>
-                <LineChart data={metrics.grammarPaceDaily}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis width={40} domain={[0, "auto"]} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="secPerQ" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Grammar insights (top weak areas) */}
-          <div className={styles.card} style={{ marginTop: 12 }}>
-            <h4 className={styles.h4}>Grammar insights</h4>
-            {metrics.topWeakAreas?.length ? (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {metrics.topWeakAreas.map((r, i) => (
-                  <li key={i} style={{ marginBottom: 8 }}>
-                    <strong>{r.concept}</strong> — {r.subTopic}
-                    {" · "}
-                    Acc: <strong>{Math.round((r.weightedAccuracy || 0) * 100)}%</strong>
-                    {" · "}
-                    <button
-                      onClick={() =>
-                      (window.location.href =
-                        `/grammar?start=${encodeURIComponent(r.concept)}|${encodeURIComponent(r.subTopic)}`)}
-                      className={styles.btnSecondary}
-                      style={{ marginLeft: 6 }}
-                    >
-                      Practice
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={styles.dim}>No insights yet. Take a quiz to get started.</p>
-            )}
-          </div>
+          <h4 className={styles.h4}>Grammar insights</h4>
+          {metrics.topWeakAreas?.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {metrics.topWeakAreas.map((r, i) => (
+                <li key={i} style={{ marginBottom: 8 }}>
+                  <strong>{r.concept}</strong> — {r.subTopic}
+                  {" · "}
+                  Acc: <strong>{Math.round((r.weightedAccuracy || 0) * 100)}%</strong>
+                  {" · "}
+                  <button
+                    onClick={() =>
+                    (window.location.href =
+                      `/grammar?start=${encodeURIComponent(r.concept)}|${encodeURIComponent(r.subTopic)}`)}
+                    className={styles.btnSecondary}
+                    style={{ marginLeft: 6 }}
+                  >
+                    Practice
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.dim}>No insights yet. Take a quiz to get started.</p>
+          )}
         </div>
-      </section>
 
-      {/* Export Data */}
-      <section className={styles.section}>
-        <h3 style={{ marginTop: 0 }}>⬇️ Export Data</h3>
-        <p style={{ color: "#555", marginTop: 4, marginBottom: 12 }}>
-          Exports include only your anonymous activity tied to your browser’s cookie.
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-          <a href="/api/export?kind=reading" download="reading.csv" className={styles.btn}>Reading CSV</a>
-          <a href="/api/export?kind=grammar" download="grammar.csv" className={styles.btn}>Grammar CSV</a>
-          <a href="/api/export?kind=uploads" download="uploads.csv" className={styles.btn}>Uploads CSV</a>
-          <a href="/api/export?kind=all" download="all_exports.zip" className={styles.btnSecondary}>All (ZIP)</a>
-        </div>
+        {/* Export Data */}
+        <section className={styles.section}>
+          <h3 style={{ marginTop: 0 }}>⬇️ Export Data</h3>
+          <p style={{ color: "#555", marginTop: 4, marginBottom: 12 }}>
+            Exports include only your anonymous activity tied to your browser’s cookie.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <a href="/api/export?kind=reading" download="reading.csv" className={styles.btn}>Reading CSV</a>
+            <a href="/api/export?kind=grammar" download="grammar.csv" className={styles.btn}>Grammar CSV</a>
+            <a href="/api/export?kind=uploads" download="uploads.csv" className={styles.btn}>Uploads CSV</a>
+            <a href="/api/export?kind=all" download="all_exports.zip" className={styles.btnSecondary}>All (ZIP)</a>
+          </div>
+        </section>
       </section>
-    </main>
+    </main >
   );
 }
