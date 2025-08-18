@@ -1,6 +1,11 @@
 "use client";
 
-import RecentGrammarCard from "./RecentGrammarCard";
+import dynamic from "next/dynamic";
+const RecentGrammarCard = dynamic(() => import("./RecentGrammarCard"), {
+  ssr: false,
+  loading: () => <div className={styles.card}><h4 className={styles.h4}>Loading…</h4></div>,
+});
+import RecommendedChips from "./RecommendedChips";
 import NotesPanel from "./NotesPanel"
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
@@ -70,35 +75,6 @@ export default function DashboardPage() {
     return books?.[idx]?.title || `Book #${idx}`;
   }
 
-  function RecommendedChips() {
-    const [rows, setRows] = useState([]);
-    useEffect(() => {
-      (async () => {
-        try {
-          const r = await fetch("/api/grammar/recommendations");
-          const j = await r.json();
-          if (j?.ok) setRows(j.data || []);
-        } catch { }
-      })();
-    }, []);
-    if (!rows.length) return null;
-    return (
-      <div className={styles.chips}>
-        {rows.map((r, i) => {
-          const href = `/grammar?concept=${encodeURIComponent(r.concept)}&subTopic=${encodeURIComponent(r.subTopic)}&start=1`;
-          const title =
-            `Attempts ${r.attempts} · Acc ${Math.round((r.accuracy || 0) * 100)}%` +
-            (typeof r.avgSecPerQ === "number" ? ` · Pace ${r.avgSecPerQ.toFixed(1)}s/q` : "") +
-            (typeof r.avgHintsPerQ === "number" && r.avgHintsPerQ > 0 ? ` · Hints ${r.avgHintsPerQ.toFixed(2)}/q` : "");
-          return (
-            <a key={i} href={href} title={title} className={styles.chip}>
-              {r.concept} — {r.subTopic}
-            </a>
-          );
-        })}
-      </div>
-    );
-  }
 
   return (
     <main className={styles.main}>
