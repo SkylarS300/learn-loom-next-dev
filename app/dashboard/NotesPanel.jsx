@@ -74,7 +74,7 @@ export default function NotesPanel() {
             } else {
                 setNotes(incoming);
             }
-            setNextCursor(j.nextCursor || null);
+            setNextCursor(j.nextCursor ?? null);
 
             if (!append && (incoming.length || debouncedQ || tagFilter)) {
                 track("notes_loaded", {
@@ -94,16 +94,11 @@ export default function NotesPanel() {
         }
     }
 
-    // initial + react to filters
+    useEffect(() => { fetchNotes({ append: false }); }, []); // initial
     useEffect(() => {
-        fetchNotes({ append: false });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // initial
-
-    useEffect(() => {
+        // reset list on filter/search/type changes
         setNextCursor(null);
-        fetchNotes({ append: false }); // re-fetch on changes
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        fetchNotes({ append: false }); /* debounced via debouncedQ */
     }, [debouncedQ, tagFilter, type]);
 
     // tag cloud
@@ -358,7 +353,10 @@ export default function NotesPanel() {
                                     <div
                                         key={n.id}
                                         role="listitem"
-                                        ref={rowVirtualizer.measureElement}
+                                        ref={(el) => {
+                                            if (!el) return; // ignore null on unmount
+                                            rowVirtualizer.measureElement(el);
+                                        }}
                                         style={{
                                             position: "absolute",
                                             top: 0,
@@ -462,7 +460,8 @@ export default function NotesPanel() {
     function highlight(text, query) {
         if (!text || !query) return text;
         try {
-            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")})`, "ig");
+            // escape: . * + ? ^ $ { } ( ) | [ ] \
+            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")})`, "ig");
             const parts = String(text).split(re);
             return parts.map((p, i) => (re.test(p) ? <mark key={i}>{p}</mark> : <span key={i}>{p}</span>));
         } catch {

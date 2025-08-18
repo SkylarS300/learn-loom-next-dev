@@ -14,13 +14,13 @@ export async function GET(req) {
     const url = new URL(req.url);
     const scope = url.searchParams.get("scope"); // "current" or null
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50), 1), 200);
-    const qRaw = (url.searchParams.get("q") || "").trim();
-    const q = qRaw.toLowerCase();
+    const cursorParam = url.searchParams.get("cursor"); // id (no q) OR numeric offset (with q)
+    const typeParam = (url.searchParams.get("type") || "").trim(); // 'book' | 'upload' | 'grammar' | 'all'
+    // sanitize q: keep as-is for MySQL boolean mode, but trim & cap length
+    const q = (url.searchParams.get("q") || "").trim().slice(0, 100);
     const tagsParam = (url.searchParams.get("tags") || "").trim();
     const tags = tagsParam ? tagsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
     const fields = (url.searchParams.get("fields") || "").trim(); // e.g., "lite"
-    const typeParam = (url.searchParams.get("type") || "").trim(); // 'book' | 'upload' | 'grammar' | ''
-    const cursorParam = (url.searchParams.get("cursor") || "").trim(); // ISO createdAt
 
     // optional anchors
     const bookIndex = url.searchParams.get("bookIndex");
@@ -29,23 +29,22 @@ export async function GET(req) {
     const concept = url.searchParams.get("concept");
     const subTopic = url.searchParams.get("subTopic");
 
-    const where = { anonId };
-    if (typeParam && ["book", "upload", "grammar"].includes(typeParam)) {
-        where.targetType = typeParam;
-    }
+    const whereBase = { anonId };
+    if (typeParam && typeParam !== "all") whereBase.targetType = typeParam;
 
     // Narrow to current reading location if provided
     if (scope === "current") {
-        if (bookIndex != null) where.bookIndex = Number(bookIndex);
-        if (chapterIndex != null) where.chapterIndex = Number(chapterIndex);
+        if (bookIndex != null) whereBase.bookIndex = Number(bookIndex);
+        if (chapterIndex != null) whereBase.chapterIndex = Number(chapterIndex);
         if (uploadIdParam != null && uploadIdParam !== "") {
             const upId = Number(uploadIdParam);
-            if (!Number.isNaN(upId)) where.uploadId = upId;
+            if (!Number.isNaN(upId)) whereBase.uploadId = upId;
         }
     }
 
-    if (concept) where.concept = String(concept);
-    if (subTopic) where.subTopic = String(subTopic);
+    if (concept) whereBase.concept = String(concept);
+    if (subTopic) whereBase.subTopic = String(subTopic);
+
     // Server-side pushdown for text search on body/anchor (keeps tag matching client-side)
     if (qRaw) {
         where.OR = [
@@ -53,8 +52,7 @@ export async function GET(req) {
             { anchorText: { contains: qRaw } },
         ];
     }
-    // We deliberately avoid DB-level JSON tag filters for MySQL portability.
-    // Fetch a larger page and filter in-process by tags and q-in-tags.
+    // We'll over-fetch and filter in-process for tags (and when fields=lite).
     const select =
         fields === "lite"
             ? {
@@ -78,25 +76,125 @@ export async function GET(req) {
             ? { createdAt: { lt: new Date(cursorParam) } }
             : {};
 
-    const rows = await prisma.note.findMany({
-        where: { ...where, ...cursorWhere },
-        orderBy: { createdAt: "desc" },
-        take,
-        select,
-    });
+    // helpers
+    const tagMatch = (row) => {
+        if (!tags.length) return true;
+        const tagList = Array.isArray(row.tagsJson) ? row.tagsJson : [];
+        return tags.some((t) => tagList.includes(t)); // ANY semantics
+    };
 
-    const filtered = rows.filter((r) => {
-        const tagList = Array.isArray(r.tagsJson) ? r.tagsJson : [];
-        // "ANY" semantics: show if it has at least one of the requested tags
-        const matchesTags = tags.length ? tags.some((t) => tagList.includes(t)) : true;
-        // Keep q-in-tags behavior client-side (pushdown handled body/anchor above)
-        const qHit =
-            !q ||
-            (r.body?.toLowerCase?.().includes(q) ?? false) ||
-            r.anchorText?.toLowerCase().includes(q) ||
-            tagList.some((t) => String(t).toLowerCase().includes(q));
-        return matchesTags && qHit;
-    });
+    // --- Two modes: (A) q empty -> id cursor; (B) q present -> offset cursor with relevance order ---
+    try {
+        if (!q) {
+            // A) No search term: createdAt desc, id desc, stable id cursor
+            const pageTake = Math.min(limit * 3, 300); // over-fetch to survive tag filtering
+            let cursorId = cursorParam || null;
+            let collected = [];
+            let safety = 0;
+            let lastBatchLastId = null;
+            while (collected.length < limit && safety < 6) {
+                safety++;
+                const batch = await prisma.note.findMany({
+                    where: whereBase,
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select,
+                    take: pageTake,
+                    ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+                });
+                if (!batch.length) break;
+                lastBatchLastId = batch[batch.length - 1].id;
+                for (const row of batch) {
+                    if (tagMatch(row)) collected.push(row);
+                    if (collected.length >= limit) break;
+                }
+                cursorId = lastBatchLastId;
+                if (batch.length < pageTake) break; // end of data
+            }
+            const hasMore = Boolean(lastBatchLastId);
+            return Response.json({
+                ok: true,
+                data: collected.slice(0, limit),
+                nextCursor: hasMore ? lastBatchLastId : null,
+            });
+        }
+
+        // B) Search term present: MySQL FTS with relevance; use numeric offset cursor
+        const offset = Number.isFinite(Number(cursorParam)) ? Number(cursorParam) : 0;
+        const pageTake = Math.min(limit * 3, 300); // over-fetch to survive tag filtering
+        const buildSearchWhere = () => ({
+            AND: [
+                whereBase,
+                {
+                    OR: [
+                        { body: { search: q } },
+                        { anchorText: { search: q } },
+                    ],
+                },
+            ],
+        });
+        let collected = [];
+        let runningOffset = offset;
+        let safety = 0;
+
+        while (collected.length < limit && safety < 4) {
+            safety++;
+            const rows = await prisma.note.findMany({
+                where: buildSearchWhere(),
+                orderBy: [
+                    { _relevance: { fields: ["body", "anchorText"], search: q, sort: "desc" } },
+                    { createdAt: "desc" },
+                ],
+                select,
+                skip: runningOffset,
+                take: pageTake,
+            });
+            if (!rows.length) break;
+            const filtered = rows.filter(tagMatch);
+            collected.push(...filtered);
+            runningOffset += rows.length; // advance offset by raw rows
+            if (rows.length < pageTake) break; // end of data
+        }
+
+        const nextCursor = collected.length >= limit ? String(runningOffset) : null;
+        return Response.json({ ok: true, data: collected.slice(0, limit), nextCursor });
+    } catch (e) {
+        // Known Prisma error when FT index is missing -> fall back to slow "contains" search
+        if (e?.code === "P2030") {
+            const offset = Number.isFinite(Number(cursorParam)) ? Number(cursorParam) : 0;
+            const pageTake = Math.min(limit * 3, 300);
+            let collected = [];
+            let runningOffset = offset;
+            let safety = 0;
+            while (collected.length < limit && safety < 4) {
+                safety++;
+                const rows = await prisma.note.findMany({
+                    where: {
+                        AND: [
+                            whereBase,
+                            {
+                                OR: [
+                                    { body: { contains: q } },
+                                    { anchorText: { contains: q } },
+                                ],
+                            },
+                        ],
+                    },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    select,
+                    skip: runningOffset,
+                    take: pageTake,
+                });
+                if (!rows.length) break;
+                collected.push(...rows.filter(tagMatch));
+                runningOffset += rows.length;
+                if (rows.length < pageTake) break;
+            }
+            const nextCursor = collected.length >= limit ? String(runningOffset) : null;
+            return Response.json({ ok: true, data: collected.slice(0, limit), nextCursor, degraded: true });
+        }
+        return Response.json({ ok: false, error: e?.message || "Search failed" }, { status: 500 });
+    }
+
     const items = filtered.slice(0, limit);
     // nextCursor logic:
     // - If we had >limit filtered items, advance to the createdAt of the last included item.

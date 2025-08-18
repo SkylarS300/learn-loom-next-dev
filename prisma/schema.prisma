@@ -295,6 +295,8 @@ model Note {
   @@index([anonId, targetType, bookIndex, chapterIndex, sentenceIndex])
   @@index([anonId, targetType, uploadId])
   @@index([anonId, targetType, concept, subTopic])
+  // Needed for MySQL full-text search on notes:
+  @@fulltext([body, anchorText])
 }
 
 model UserCode {
