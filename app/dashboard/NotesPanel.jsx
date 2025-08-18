@@ -27,12 +27,15 @@ export default function NotesPanel() {
     const [err, setErr] = useState("");
     const [notes, setNotes] = useState([]);
     const [limit, setLimit] = useState(50);
+    const pageSize = 50;
     const [q, setQ] = useState("");
     const [debouncedQ, setDebouncedQ] = useState("");
     const [type, setType] = useState("all"); // all | book | upload | grammar
     const [tagFilter, setTagFilter] = useState("");
     const [editing, setEditing] = useState(null); // note object being edited via modal
     const [newOpen, setNewOpen] = useState(false);
+    const [nextCursor, setNextCursor] = useState(null);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     // true debounce for search input
     useEffect(() => {
@@ -40,13 +43,14 @@ export default function NotesPanel() {
         return () => clearTimeout(t);
     }, [q]);
 
-    // fetch notes
-    async function fetchNotes() {
-        setLoading(true);
+    // fetch notes (supports initial load, refresh, and append)
+    async function fetchNotes({ append = false } = {}) {
+        if (append) setLoadingMore(true);
+        else setLoading(true);
         setErr("");
         try {
             const params = new URLSearchParams();
-            params.set("limit", String(limit));
+            params.set("limit", String(pageSize));
             // Only request full fields (including `body`) when searching; otherwise keep payload light.
             if (debouncedQ) {
                 params.set("q", debouncedQ);
@@ -55,22 +59,30 @@ export default function NotesPanel() {
                 params.set("fields", "lite");
             }
             if (tagFilter.trim()) params.set("tags", tagFilter.trim());
+            if (type !== "all") params.set("type", type);
+            if (append && nextCursor) params.set("cursor", nextCursor);
             const r = await fetch(`/api/notes?${params.toString()}`, { cache: "no-store" });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to load notes");
-            setNotes(j.data || []);
+            const incoming = j.data || [];
+            if (append) setNotes((prev) => [...prev, ...incoming]);
+            else setNotes(incoming);
+            setNextCursor(j.nextCursor || null);
         } catch (e) {
             setErr(e.message || "Failed to load notes");
         } finally {
-            setLoading(false);
+            if (append) setLoadingMore(false);
+            else setLoading(false);
         }
     }
     useEffect(() => {
-        fetchNotes();
+        fetchNotes({ append: false });
     }, []); // initial
     useEffect(() => {
-        fetchNotes(); /* debounced via debouncedQ */
-    }, [limit, debouncedQ, tagFilter]);
+        // reset list on filter/search changes
+        setNextCursor(null);
+        fetchNotes({ append: false }); /* debounced via debouncedQ */
+    }, [debouncedQ, tagFilter, type]);
 
     // tag cloud
     const allTags = useMemo(() => {
@@ -84,7 +96,7 @@ export default function NotesPanel() {
             .slice(0, 20);
     }, [notes]);
 
-    // filter by type
+    // final list (server already filters by type, but keep client guard)
     const filtered = useMemo(() => {
         if (type === "all") return notes;
         return notes.filter((n) => n.targetType === type);
@@ -106,8 +118,8 @@ export default function NotesPanel() {
         }
     }
 
-    // `Load more` availability heuristic: if API returned `limit` items, assume there may be more.
-    const canLoadMore = filtered.length === limit;
+    // Load more when the API gave us a nextCursor
+    const canLoadMore = Boolean(nextCursor);
 
     function openAnchor(n) {
         if (n.targetType === "book" && Number.isInteger(n.bookIndex)) {
@@ -231,14 +243,6 @@ export default function NotesPanel() {
             ) : err ? (
                 <p style={{ color: "#b91c1c" }}>{err}</p>
             ) : filtered.length === 0 ? (
-                <div className={styles.empty}>
-                    <p>No notes yet. Double-click in ReadingPal or press “N” in Grammar.</p>
-                    <button className={styles.btn} onClick={() => setNewOpen(true)}>
-                        Create your first note
-                    </button>
-                </div>
-
-            ) : filtered.length === 0 ? (
                 <>
                     {notes.length === 0 ? (
                         // Truly no notes exist yet
@@ -277,10 +281,10 @@ export default function NotesPanel() {
                                         Clear tag
                                     </button>
                                 ) : null}
-                                {type !== "all" || hasActiveFilters ? (
+                                {hasActiveFilters ? (
                                     <button
                                         className={styles.btnSecondary}
-                                        onClick={() => { setQ(""); setTagFilter(""); setType("all"); setLimit(50); }}
+                                        onClick={() => { setQ(""); setTagFilter(""); setType("all"); }}
                                         aria-label="Reset all filters"
                                     >
                                         Reset filters
@@ -303,7 +307,7 @@ export default function NotesPanel() {
                         </span>
                     </div>
                     <ul className={styles.noteList} role="list">
-                        {filtered.slice(0, limit).map((n) => {
+                        {filtered.map((n) => {
                             const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
                             return (
                                 <li key={n.id} className={styles.noteItem} role="listitem">
@@ -355,15 +359,8 @@ export default function NotesPanel() {
 
             {/* Load more */}
             <div className={styles.headerRow} style={{ justifyContent: "flex-end", marginTop: 8 }}>
-                <button
-                    className={styles.btnSecondary}
-                    onClick={() => setLimit((v) => Math.max(10, v - 25))}
-                    disabled={limit <= 25}
-                >
-                    Show fewer
-                </button>
-                <button className={styles.btn} onClick={() => setLimit((v) => v + 50)} disabled={!canLoadMore}>
-                    {canLoadMore ? "Load more" : "No more results"}
+                <button className={styles.btn} onClick={() => fetchNotes({ append: true })} disabled={!canLoadMore || loadingMore}>
+                    {loadingMore ? "Loading…" : canLoadMore ? "Load more" : "No more results"}
                 </button>
             </div>
 

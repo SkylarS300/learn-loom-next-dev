@@ -19,6 +19,8 @@ export async function GET(req) {
     const tagsParam = (url.searchParams.get("tags") || "").trim();
     const tags = tagsParam ? tagsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
     const fields = (url.searchParams.get("fields") || "").trim(); // e.g., "lite"
+    const typeParam = (url.searchParams.get("type") || "").trim(); // 'book' | 'upload' | 'grammar' | ''
+    const cursorParam = (url.searchParams.get("cursor") || "").trim(); // ISO createdAt
 
     // optional anchors
     const bookIndex = url.searchParams.get("bookIndex");
@@ -28,6 +30,9 @@ export async function GET(req) {
     const subTopic = url.searchParams.get("subTopic");
 
     const where = { anonId };
+    if (typeParam && ["book", "upload", "grammar"].includes(typeParam)) {
+        where.targetType = typeParam;
+    }
 
     // Narrow to current reading location if provided
     if (scope === "current") {
@@ -60,13 +65,19 @@ export async function GET(req) {
                 isBookmark: true, createdAt: true, updatedAt: true,
             };
 
-    const rows = await prisma.note.findMany({
+    const take = Math.min(limit * 4, 400);
+    const cursorWhere =
+        cursorParam
+            ? { createdAt: { lt: new Date(cursorParam) } }
+            : {};
 
-        where,
+    const rows = await prisma.note.findMany({
+        where: { ...where, ...cursorWhere },
         orderBy: { createdAt: "desc" },
-        take: Math.min(limit * 4, 400),
+        take,
         select,
     });
+
     const filtered = rows.filter((r) => {
         const tagList = Array.isArray(r.tagsJson) ? r.tagsJson : [];
         // "ANY" semantics: show if it has at least one of the requested tags
@@ -77,7 +88,17 @@ export async function GET(req) {
             tagList.some((t) => String(t).toLowerCase().includes(q));
         return matchesTags && qHit;
     });
-    return Response.json({ ok: true, data: filtered.slice(0, limit) });
+    const items = filtered.slice(0, limit);
+    // nextCursor logic:
+    // - If we had >limit filtered items, advance to the createdAt of the last included item.
+    // - Else, if we hit our take window exactly, advance to last row's createdAt to keep scanning older pages.
+    let nextCursor = null;
+    if (filtered.length > limit && items.length) {
+        nextCursor = items[items.length - 1]?.createdAt?.toISOString?.() || null;
+    } else if (rows.length === take && rows.length > 0) {
+        nextCursor = rows[rows.length - 1]?.createdAt?.toISOString?.() || null;
+    }
+    return Response.json({ ok: true, data: items, nextCursor });
 }
 
 
