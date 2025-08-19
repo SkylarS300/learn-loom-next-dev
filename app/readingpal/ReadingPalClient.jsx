@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import books from "../../src/content/book-content.js";
 import styles from "./readingpal.module.css";
-import NotesModal from "./NotesModal";
+import NotesModal from "../components/NotesModal";
 import NotesSidePanel from "./NotesSidePanel";
 
 /* ------- helpers ------- */

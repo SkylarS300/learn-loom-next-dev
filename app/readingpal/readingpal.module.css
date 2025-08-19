@@ -318,17 +318,32 @@
     cursor: pointer;
 }
 
+/* Make the scroll container a clear containing block for absolutely-positioned rows */
 .sideScroll {
+    position: relative;
+    /* already set via inline, make sure it's here too */
     max-height: 60vh;
     overflow: auto;
+    contain: layout;
+    /* isolates layout; helps react-virtual */
+    -webkit-overflow-scrolling: touch;
 }
 
+/* Each virtual row must be box-sized and non-zero height for first paint */
 .sideNoteItem {
     display: grid;
     grid-template-columns: 6px 1fr;
     gap: 8px;
     padding: 8px 6px;
     border-bottom: 1px solid #f3f4f6;
+    box-sizing: border-box;
+    /* ensure padding/border included in height */
+    min-height: 48px;
+    /* guarantees measurable height on mount */
+    will-change: transform;
+    /* smoother translateY and fewer reflows */
+    contain: layout paint;
+    /* isolates row layout/paint so remeasure is stable */
 }
 
 .noteColor {
@@ -336,7 +351,9 @@
     border-radius: 3px;
 }
 
-.noteBody {}
+.noteBody {
+    overflow-wrap: anywhere;
+}
 
 .noteTopRow {
     display: flex;
@@ -375,4 +392,16 @@
 .h4 {
     font-size: 16px;
     font-weight: 700;
+}
+
+.sideNoteItem {
+    margin: 0;
+}
+
+.sideNoteItem .noteBody {
+    padding-bottom: 8px;
+}
+
+.sideNoteItem {
+    box-sizing: border-box;
 }

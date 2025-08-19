@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import styles from "./Dashboard.module.css";
 import books from "@/src/content/book-content.js";
-import NotesModal from "../readingpal/NotesModal";
+import NotesModal from "../components/NotesModal";
 import { track } from "@/lib/rum";
 
 function titleForNote(n) {
@@ -473,8 +473,7 @@ export default function NotesPanel() {
     function highlight(text, query) {
         if (!text || !query) return text;
         try {
-            // escape: . * + ? ^ $ { } ( ) | [ ] \
-            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")})`, "ig");
+            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig");
             const parts = String(text).split(re);
             return parts.map((p, i) => (re.test(p) ? <mark key={i}>{p}</mark> : <span key={i}>{p}</span>));
         } catch {

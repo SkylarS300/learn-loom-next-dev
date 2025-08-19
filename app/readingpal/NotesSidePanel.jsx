@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import styles from "./readingpal.module.css";
-import NotesModal from "./NotesModal";
+import NotesModal from "../components/NotesModal";
 
 export default function NotesSidePanel({
     bookIndex = null,
@@ -21,7 +21,8 @@ export default function NotesSidePanel({
     const [editing, setEditing] = useState(null);
 
     async function fetchNotes() {
-        setLoading(true); setErr("");
+        setLoading(true);
+        setErr("");
         try {
             const params = new URLSearchParams();
             params.set("limit", "200");
@@ -41,7 +42,10 @@ export default function NotesSidePanel({
         }
     }
 
-    useEffect(() => { fetchNotes(); /* eslint-disable-next-line */ }, [bookIndex, chapterIndex, uploadId]);
+    useEffect(() => {
+        fetchNotes();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bookIndex, chapterIndex, uploadId]);
 
     const tagsAll = useMemo(() => {
         const m = new Map();
@@ -54,13 +58,13 @@ export default function NotesSidePanel({
 
     const filtered = useMemo(() => {
         const ql = q.trim().toLowerCase();
-        return notes.filter(n => {
+        return notes.filter((n) => {
             const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
             const tagOK = tagFilter ? tags.includes(tagFilter) : true;
             if (!ql) return tagOK;
             const inBody = n.body?.toLowerCase?.().includes(ql);
             const inAnchor = n.anchorText?.toLowerCase?.().includes(ql);
-            const inTags = tags.some(t => String(t).toLowerCase().includes(ql));
+            const inTags = tags.some((t) => String(t).toLowerCase().includes(ql));
             return tagOK && (inBody || inAnchor || inTags);
         });
     }, [notes, q, tagFilter]);
@@ -71,22 +75,106 @@ export default function NotesSidePanel({
             const r = await fetch(`/api/notes/${id}`, { method: "DELETE" });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to delete");
-            const next = notes.filter(n => n.id !== id);
-            setNotes(next); onChanged(next);
+            const next = notes.filter((n) => n.id !== id);
+            setNotes(next);
+            onChanged(next);
         } catch (e) {
             alert(e.message || "Failed to delete");
         }
     }
 
-    // --- virtualization ---
+    // -------- Virtualization (with safe dynamic measuring) --------
     const parentRef = useRef(null);
+    const rosRef = useRef(new Map()); // Map<Element, ResizeObserver>
+
     const rowVirtualizer = useVirtualizer({
         count: filtered.length,
         getScrollElement: () => parentRef.current,
-        estimateSize: () => 110,
+        estimateSize: () => 110, // baseline; we re-measure real size below
         overscan: 6,
+        measureElement: (el) => el?.getBoundingClientRect?.().height || 110,
     });
+
+    // Needed in render
     const virtualItems = rowVirtualizer.getVirtualItems();
+
+    // Ref callback that keeps a ResizeObserver per row and re-measures safely
+    function setMeasuredRow(el) {
+        // When React unmounts/changes the ref, el may be null — prune old observers
+        if (!el) {
+            for (const [node, ro] of rosRef.current.entries()) {
+                if (!node.isConnected || !node.parentNode) {
+                    try {
+                        ro.disconnect();
+                    } catch { }
+                    rosRef.current.delete(node);
+                }
+            }
+            return;
+        }
+
+        // initial measure
+        try {
+            rowVirtualizer.measureElement(el);
+        } catch { }
+
+        // (re)attach observer
+        let ro = rosRef.current.get(el);
+        if (ro) {
+            try {
+                ro.disconnect();
+            } catch { }
+        } else {
+            ro = new ResizeObserver(() => {
+                // Ignore detached nodes to avoid "parentNode is null" errors
+                if (!el.isConnected || !el.parentNode) {
+                    try {
+                        ro.disconnect();
+                    } catch { }
+                    rosRef.current.delete(el);
+                    return;
+                }
+                try {
+                    rowVirtualizer.measureElement(el);
+                    rowVirtualizer.measure(); // recompute offsets
+                } catch { }
+            });
+            rosRef.current.set(el, ro);
+        }
+        ro.observe(el);
+    }
+
+    // Cleanup all observers
+    useEffect(() => {
+        return () => {
+            rosRef.current.forEach((ro) => {
+                try {
+                    ro.disconnect();
+                } catch { }
+            });
+            rosRef.current.clear();
+        };
+    }, []);
+
+    // Nudge measurements when data/search changes
+    useEffect(() => {
+        try {
+            rowVirtualizer.measure();
+        } catch { }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filtered.length, q, tagFilter, notes.length, editing]);
+
+    // Remeasure once fonts are ready (line wraps can change)
+    useEffect(() => {
+        if (document.fonts?.ready) {
+            document.fonts.ready.then(() => {
+                try {
+                    rowVirtualizer.measure();
+                } catch { }
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <aside className={styles.sidePanel}>
@@ -96,7 +184,11 @@ export default function NotesSidePanel({
                 </h3>
                 <div style={{ display: "flex", gap: 8 }}>
                     {tagFilter && (
-                        <button className={styles.secondaryBtn} onClick={() => setTagFilter("")} title="Clear tag">
+                        <button
+                            className={styles.secondaryBtn}
+                            onClick={() => setTagFilter("")}
+                            title="Clear tag"
+                        >
                             Clear tag
                         </button>
                     )}
@@ -120,9 +212,13 @@ export default function NotesSidePanel({
                         <button
                             key={t}
                             className={styles.chip}
-                            onClick={() => setTagFilter(prev => prev === t ? "" : t)}
+                            onClick={() => setTagFilter((prev) => (prev === t ? "" : t))}
                             title={`${c} note${c === 1 ? "" : "s"}`}
-                            style={tagFilter === t ? { background: "#e9eefc", borderColor: "#c9d7fb", color: "#0b3b9f" } : undefined}
+                            style={
+                                tagFilter === t
+                                    ? { background: "#e9eefc", borderColor: "#c9d7fb", color: "#0b3b9f" }
+                                    : undefined
+                            }
                         >
                             #{t}
                         </button>
@@ -147,24 +243,22 @@ export default function NotesSidePanel({
                     style={{ position: "relative" }}
                 >
                     <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
-                        {virtualItems.map(vi => {
+                        {virtualItems.map((vi) => {
                             const n = filtered[vi.index];
                             if (!n) return null;
                             const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
 
-                            // --- NEW: prevent duplicate body when same as anchor (incl. legacy seeded) ---
+                            // Avoid duplicate body when it equals the anchor (incl. legacy seeded)
                             const anchor = (n.anchorText || "").trim();
                             const body = (typeof n.body === "string" ? n.body : "").trim();
                             const bodyIsDistinct =
-                                body &&
-                                body !== anchor &&
-                                !body.startsWith(anchor + "\n");
+                                body && body !== anchor && !body.startsWith(anchor + "\n");
 
                             return (
                                 <div
                                     key={n.id}
                                     role="listitem"
-                                    ref={rowVirtualizer.measureElement}
+                                    ref={setMeasuredRow}
                                     className={styles.sideNoteItem}
                                     style={{
                                         position: "absolute",
@@ -174,15 +268,29 @@ export default function NotesSidePanel({
                                         transform: `translateY(${vi.start}px)`,
                                     }}
                                 >
-                                    <div className={styles.noteColor} style={{ background: n.color || "#e5e7eb" }} aria-hidden="true" />
+                                    <div
+                                        className={styles.noteColor}
+                                        style={{ background: n.color || "#e5e7eb" }}
+                                        aria-hidden="true"
+                                    />
                                     <div className={styles.noteBody}>
                                         <div className={styles.noteTopRow}>
                                             <button
                                                 className={styles.linkBtn}
-                                                onClick={() => Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)}
-                                                title={Number.isInteger(n.sentenceIndex) ? `Jump to sentence ${n.sentenceIndex + 1}` : "Jump"}
+                                                onClick={() =>
+                                                    Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)
+                                                }
+                                                title={
+                                                    Number.isInteger(n.sentenceIndex)
+                                                        ? `Jump to sentence ${n.sentenceIndex + 1}`
+                                                        : "Jump"
+                                                }
                                             >
-                                                {anchor ? (anchor.length > 80 ? anchor.slice(0, 80) + "…" : anchor) : "(no anchor)"}
+                                                {anchor
+                                                    ? anchor.length > 80
+                                                        ? anchor.slice(0, 80) + "…"
+                                                        : anchor
+                                                    : "(no anchor)"}
                                             </button>
                                             <span className={styles.dim} style={{ marginLeft: "auto" }}>
                                                 {new Date(n.createdAt).toLocaleString()}
@@ -197,17 +305,30 @@ export default function NotesSidePanel({
 
                                         {!!tags.length && (
                                             <div className={styles.tagRow} style={{ marginTop: 4 }}>
-                                                {tags.map(t => (
-                                                    <span key={t} className={styles.tagPill}>#{t}</span>
+                                                {tags.map((t) => (
+                                                    <span key={t} className={styles.tagPill}>
+                                                        #{t}
+                                                    </span>
                                                 ))}
                                                 {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
                                             </div>
                                         )}
 
                                         <div className={styles.noteActions}>
-                                            <button className={styles.secondaryBtn} onClick={() => setEditing(n)}>Edit</button>
-                                            <button className={styles.secondaryBtn} onClick={() => Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)}>Jump</button>
-                                            <button className={styles.btnDanger} onClick={() => remove(n.id)}>Delete</button>
+                                            <button className={styles.secondaryBtn} onClick={() => setEditing(n)}>
+                                                Edit
+                                            </button>
+                                            <button
+                                                className={styles.secondaryBtn}
+                                                onClick={() =>
+                                                    Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)
+                                                }
+                                            >
+                                                Jump
+                                            </button>
+                                            <button className={styles.btnDanger} onClick={() => remove(n.id)}>
+                                                Delete
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -237,8 +358,9 @@ export default function NotesSidePanel({
                             });
                             const j = await r.json();
                             if (!j?.ok) throw new Error(j?.error || "Failed to update");
-                            const next = notes.map(x => (x.id === editing.id ? j.data : x));
-                            setNotes(next); onChanged(next);
+                            const next = notes.map((x) => (x.id === editing.id ? j.data : x));
+                            setNotes(next);
+                            onChanged(next);
                             setEditing(null);
                         } catch (e) {
                             alert(e.message || "Failed to update");
