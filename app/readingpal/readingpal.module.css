@@ -327,6 +327,7 @@
     contain: layout;
     /* isolates layout; helps react-virtual */
     -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable both-edges;
 }
 
 /* Each virtual row must be box-sized and non-zero height for first paint */
