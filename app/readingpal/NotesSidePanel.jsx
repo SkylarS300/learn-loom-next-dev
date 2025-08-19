@@ -1,10 +1,9 @@
 // app/readingpal/NotesSidePanel.jsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./readingpal.module.css";
-import NotesModal from "../components/NotesModal";
+import NotesModal from "./NotesModal";
 
 export default function NotesSidePanel({
     bookIndex = null,
@@ -83,99 +82,6 @@ export default function NotesSidePanel({
         }
     }
 
-    // -------- Virtualization (with safe dynamic measuring) --------
-    const parentRef = useRef(null);
-    const rosRef = useRef(new Map()); // Map<Element, ResizeObserver>
-
-    const rowVirtualizer = useVirtualizer({
-        count: filtered.length,
-        getScrollElement: () => parentRef.current,
-        estimateSize: () => 110, // baseline; we re-measure real size below
-        overscan: 6,
-        measureElement: (el) => el?.getBoundingClientRect?.().height || 110,
-    });
-
-    // Needed in render
-    const virtualItems = rowVirtualizer.getVirtualItems();
-
-    // Ref callback that keeps a ResizeObserver per row and re-measures safely
-    function setMeasuredRow(el) {
-        // When React unmounts/changes the ref, el may be null — prune old observers
-        if (!el) {
-            for (const [node, ro] of rosRef.current.entries()) {
-                if (!node.isConnected || !node.parentNode) {
-                    try {
-                        ro.disconnect();
-                    } catch { }
-                    rosRef.current.delete(node);
-                }
-            }
-            return;
-        }
-
-        // initial measure
-        try {
-            rowVirtualizer.measureElement(el);
-        } catch { }
-
-        // (re)attach observer
-        let ro = rosRef.current.get(el);
-        if (ro) {
-            try {
-                ro.disconnect();
-            } catch { }
-        } else {
-            ro = new ResizeObserver(() => {
-                // Ignore detached nodes to avoid "parentNode is null" errors
-                if (!el.isConnected || !el.parentNode) {
-                    try {
-                        ro.disconnect();
-                    } catch { }
-                    rosRef.current.delete(el);
-                    return;
-                }
-                try {
-                    rowVirtualizer.measureElement(el);
-                    rowVirtualizer.measure(); // recompute offsets
-                } catch { }
-            });
-            rosRef.current.set(el, ro);
-        }
-        ro.observe(el);
-    }
-
-    // Cleanup all observers
-    useEffect(() => {
-        return () => {
-            rosRef.current.forEach((ro) => {
-                try {
-                    ro.disconnect();
-                } catch { }
-            });
-            rosRef.current.clear();
-        };
-    }, []);
-
-    // Nudge measurements when data/search changes
-    useEffect(() => {
-        try {
-            rowVirtualizer.measure();
-        } catch { }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtered.length, q, tagFilter, notes.length, editing]);
-
-    // Remeasure once fonts are ready (line wraps can change)
-    useEffect(() => {
-        if (document.fonts?.ready) {
-            document.fonts.ready.then(() => {
-                try {
-                    rowVirtualizer.measure();
-                } catch { }
-            });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     return (
         <aside className={styles.sidePanel}>
             <div className={styles.sideHeader}>
@@ -235,106 +141,86 @@ export default function NotesSidePanel({
                     {notes.length ? "No matches." : "No notes in this location yet."}
                 </p>
             ) : (
-                <div
-                    ref={parentRef}
-                    className={styles.sideScroll}
-                    role="list"
-                    aria-label="Notes list"
-                    style={{ position: "relative" }}
-                >
-                    <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
-                        {virtualItems.map((vi) => {
-                            const n = filtered[vi.index];
-                            if (!n) return null;
-                            const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
+                // SIMPLE SCROLL LIST — no absolute positioning, no transforms
+                <div className={styles.sideScroll} role="list" aria-label="Notes list">
+                    {filtered.map((n) => {
+                        const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
+                        const anchor = (n.anchorText || "").trim();
+                        const body = (typeof n.body === "string" ? n.body : "").trim();
+                        const bodyIsDistinct =
+                            body && body !== anchor && !body.startsWith(anchor + "\n");
 
-                            // Avoid duplicate body when it equals the anchor (incl. legacy seeded)
-                            const anchor = (n.anchorText || "").trim();
-                            const body = (typeof n.body === "string" ? n.body : "").trim();
-                            const bodyIsDistinct =
-                                body && body !== anchor && !body.startsWith(anchor + "\n");
-
-                            return (
+                        return (
+                            <div key={n.id} role="listitem" className={styles.sideNoteItem}>
                                 <div
-                                    key={n.id}
-                                    role="listitem"
-                                    ref={setMeasuredRow}
-                                    className={styles.sideNoteItem}
-                                    style={{
-                                        position: "absolute",
-                                        top: 0,
-                                        left: 0,
-                                        width: "100%",
-                                        transform: `translateY(${vi.start}px)`,
-                                    }}
-                                >
-                                    <div
-                                        className={styles.noteColor}
-                                        style={{ background: n.color || "#e5e7eb" }}
-                                        aria-hidden="true"
-                                    />
-                                    <div className={styles.noteBody}>
-                                        <div className={styles.noteTopRow}>
-                                            <button
-                                                className={styles.linkBtn}
-                                                onClick={() =>
-                                                    Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)
-                                                }
-                                                title={
-                                                    Number.isInteger(n.sentenceIndex)
-                                                        ? `Jump to sentence ${n.sentenceIndex + 1}`
-                                                        : "Jump"
-                                                }
-                                            >
-                                                {anchor
-                                                    ? anchor.length > 80
-                                                        ? anchor.slice(0, 80) + "…"
-                                                        : anchor
-                                                    : "(no anchor)"}
-                                            </button>
-                                            <span className={styles.dim} style={{ marginLeft: "auto" }}>
-                                                {new Date(n.createdAt).toLocaleString()}
-                                            </span>
+                                    className={styles.noteColor}
+                                    style={{ background: n.color || "#e5e7eb" }}
+                                    aria-hidden="true"
+                                />
+                                <div className={styles.noteBody}>
+                                    <div className={styles.noteTopRow}>
+                                        <button
+                                            className={styles.linkBtn}
+                                            onClick={() =>
+                                                Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)
+                                            }
+                                            title={
+                                                Number.isInteger(n.sentenceIndex)
+                                                    ? `Jump to sentence ${n.sentenceIndex + 1}`
+                                                    : "Jump"
+                                            }
+                                            // clamp long anchors so layout stays stable
+                                            style={{
+                                                flex: "1 1 auto",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {anchor || "(no anchor)"}
+                                        </button>
+                                        <span className={styles.dim} style={{ marginLeft: "auto" }}>
+                                            {new Date(n.createdAt).toLocaleString()}
+                                        </span>
+                                    </div>
+
+                                    {bodyIsDistinct && (
+                                        <div className={styles.noteText} style={{ marginTop: 4 }}>
+                                            {body}
                                         </div>
+                                    )}
 
-                                        {bodyIsDistinct && (
-                                            <div className={styles.noteText} style={{ marginTop: 4 }}>
-                                                {body.length > 160 ? body.slice(0, 160) + "…" : body}
-                                            </div>
-                                        )}
-
-                                        {!!tags.length && (
-                                            <div className={styles.tagRow} style={{ marginTop: 4 }}>
-                                                {tags.map((t) => (
-                                                    <span key={t} className={styles.tagPill}>
-                                                        #{t}
-                                                    </span>
-                                                ))}
-                                                {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
-                                            </div>
-                                        )}
-
-                                        <div className={styles.noteActions}>
-                                            <button className={styles.secondaryBtn} onClick={() => setEditing(n)}>
-                                                Edit
-                                            </button>
-                                            <button
-                                                className={styles.secondaryBtn}
-                                                onClick={() =>
-                                                    Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)
-                                                }
-                                            >
-                                                Jump
-                                            </button>
-                                            <button className={styles.btnDanger} onClick={() => remove(n.id)}>
-                                                Delete
-                                            </button>
+                                    {!!tags.length && (
+                                        <div className={styles.tagRow} style={{ marginTop: 4 }}>
+                                            {tags.map((t) => (
+                                                <span key={t} className={styles.tagPill}>
+                                                    #{t}
+                                                </span>
+                                            ))}
+                                            {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
                                         </div>
+                                    )}
+
+                                    <div className={styles.noteActions}>
+                                        <button className={styles.secondaryBtn} onClick={() => setEditing(n)}>
+                                            Edit
+                                        </button>
+                                        <button
+                                            className={styles.secondaryBtn}
+                                            onClick={() =>
+                                                Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)
+                                            }
+                                        >
+                                            Jump
+                                        </button>
+                                        <button className={styles.btnDanger} onClick={() => remove(n.id)}>
+                                            Delete
+                                        </button>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 

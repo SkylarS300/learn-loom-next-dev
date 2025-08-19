@@ -368,6 +368,14 @@
     cursor: pointer;
     padding: 0;
     text-align: left;
+    flex: 1 1 auto;
+    /* NEW */
+    overflow: hidden;
+    /* NEW */
+    text-overflow: ellipsis;
+    /* NEW */
+    white-space: nowrap;
+    /* NEW */
 }
 
 .noteText {
@@ -378,6 +386,7 @@
     display: flex;
     gap: 6px;
     margin-top: 6px;
+    flex-wrap: wrap;
 }
 
 .btnDanger {
