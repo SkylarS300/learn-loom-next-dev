@@ -18,6 +18,7 @@ export default function NotesModal({ open, seed, onClose, onSave, typePicker = f
     const [body, setBody] = useState("");
     const [tagsStr, setTagsStr] = useState("");
     const [color, setColor] = useState(PALETTE[0]);
+    const [highlight, setHighlight] = useState(true);
     const [isBookmark, setIsBookmark] = useState(false);
     const [targetType, setTargetType] = useState(initialType);
 
@@ -27,7 +28,9 @@ export default function NotesModal({ open, seed, onClose, onSave, typePicker = f
         // Do NOT pre-fill the body with anchor text; anchor is already shown separately.
         setBody(typeof seed?.initialBody === "string" ? seed.initialBody : "");
         setTagsStr((seed?.defaultTags || []).join(", "));
-        setColor(seed?.defaultColor || PALETTE[0]);
+        const seedColor = seed?.defaultColor ?? null;
+        setHighlight(seedColor != null);
+        setColor(seedColor ?? PALETTE[0]);
         setIsBookmark(!!seed?.isBookmark);
         setTargetType(initialType);
     }, [open, seed, initialType]);
@@ -123,9 +126,14 @@ export default function NotesModal({ open, seed, onClose, onSave, typePicker = f
                     )}
                 </label>
 
+                <label className={styles.checkboxRow}>
+                    <input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} />
+                    <span>Highlight this note</span>
+                </label>
+
                 <div className={styles.colorPickerRow}>
                     <span className={styles.labelText}>Color</span>
-                    <div className={styles.colorRow}>
+                    <div className={styles.colorRow} style={{ opacity: highlight ? 1 : .45, pointerEvents: highlight ? 'auto' : 'none' }}>
                         {PALETTE.map((c) => (
                             <button
                                 key={c}
@@ -149,7 +157,7 @@ export default function NotesModal({ open, seed, onClose, onSave, typePicker = f
                     </button>
                     <button
                         className={styles.primaryBtn}
-                        onClick={() => onSave({ body, tags: parsedTags, color, isBookmark, targetType })}
+                        onClick={() => onSave({ body, tags: parsedTags, color: highlight ? color : null, isBookmark, targetType })}
                         disabled={!body.trim() || over}
                     >
                         Save note

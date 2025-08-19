@@ -1,16 +1,61 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Navbar from "../Navbar";
 import books from "@/src/content/book-content.js";
 import styles from "./library.module.css";
 
-function BookCard({ idx, title, author, onOpen }) {
+// Map book title → cover file in /public/assets/images
+function coverFor(book) {
+  if (book?.cover) {
+    // if your book record already has a cover path, use it
+    return book.cover.startsWith("/") ? book.cover : `/assets/images/${book.cover}`;
+  }
+  const map = {
+    "Alice's Adventures in Wonderland": "cover_alice.jpg",
+    Dracula: "cover_drac.jpg",
+    Frankenstein: "cover_frank.jpg",
+    "Great Expectations": "cover_greatexp.jpg",
+    "Jane Eyre": "cover_je.jpg",
+    Metamorphosis: "cover_m.jpg",
+    "Oliver Twist": "cover_ot.jpg",
+    "Pride and Prejudice": "cover_pap.jpg",
+    "Treasure Island": "cover_tim.jpg",
+    "The Time Machine": "cover_ttm.jpg",
+    "Wuthering Heights": "cover_wh.jpg",
+    "The War of the Worlds": "cover_witw.jpg",
+    "The Invisible Man": "cover_tim.jpg",
+    "The Wind in the Willows": "cover_witw.jpg"
+  };
+  const file = map[book?.title] || "empty-book.png";
+  return `/assets/images/${file}`;
+}
+
+function BookCard({ idx, title, author, cover, onOpen }) {
   return (
     <button
       className={styles.card}
       onClick={() => onOpen(idx)}
       aria-label={`Open ${title} by ${author}`}
     >
+      {/* Cover */}
+      <div
+        style={{
+          aspectRatio: "3 / 4",
+          overflow: "hidden",
+          borderRadius: 8,
+          background: "#f3f4f6",
+          marginBottom: 8,
+          width: "100%",
+        }}
+      >
+        <img
+          src={cover}
+          alt={`${title} cover`}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      </div>
+
       <div className={styles.cardBadge}>Book</div>
       <div className={styles.cardTitle}>{title}</div>
       <div className={styles.cardSub}>{author}</div>
@@ -47,7 +92,7 @@ export default function LibraryPage() {
   const [codesVersion, setCodesVersion] = useState(0); // bump to refetch community
   const [err, setErr] = useState("");
 
-  // --- Load YOUR uploads (scope=mine). If your API differs, tell me and I’ll adjust.
+  // --- Load YOUR uploads
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -57,7 +102,6 @@ export default function LibraryPage() {
         const list = Array.isArray(j) ? j : j?.data ?? [];
         if (!cancelled) setUploads(list);
       } catch {
-        // fall back; section will just show "No matches"
         if (!cancelled) setUploads([]);
       }
     })();
@@ -111,7 +155,7 @@ export default function LibraryPage() {
         const list = Array.isArray(j) ? j : j?.data ?? [];
         if (!cancelled) {
           setCommunity(list);
-          setNextCursor(j?.nextCursor || null); // keep pagination in sync
+          setNextCursor(j?.nextCursor || null);
         }
         if (!cancelled) refreshSavedCodes();
       } catch { /* no-op */ }
@@ -141,6 +185,7 @@ export default function LibraryPage() {
       id: i,
       title: b.title,
       author: b.author,
+      cover: coverFor(b),
     }));
     const ups = (uploads || []).map((u) => ({
       kind: "upload",
@@ -172,167 +217,171 @@ export default function LibraryPage() {
   };
 
   return (
-    <main className={styles.wrap}>
-      <div className={styles.headerRow}>
-        <h1 className={styles.title}>Library</h1>
-        <div className={styles.actions}>
-          <a className={styles.btn} href="/uploads/new">+ New Upload</a>
-        </div>
-      </div>
-
-      <div className={styles.searchRow}>
-        <input
-          className={styles.search}
-          placeholder="Search titles…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search titles"
-        />
-      </div>
-      {err && <p style={{ color: "#d33" }} aria-live="polite">{err}</p>}
-
-      {/* Curated books */}
-      <section>
-        <h3 className={styles.sectionTitle}>Curated books</h3>
-        <div className={styles.grid}>
-          {filtered.curated.length > 0 ? (
-            filtered.curated.map((b) => (
-              <BookCard
-                key={`b-${b.id}`}
-                idx={b.id}
-                title={b.title}
-                author={b.author}
-                onOpen={openBook}
-              />
-            ))
-          ) : (
-            <p className={styles.dim}>No matches</p>
-          )}
-        </div>
-
-        {nextCursor && (
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
-            <button className={styles.btn} onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more"}
-            </button>
+    <>
+      <Navbar />
+      <main className={styles.wrap}>
+        <div className={styles.headerRow}>
+          <h1 className={styles.title}>Library</h1>
+          <div className={styles.actions}>
+            <a className={styles.btn} href="/uploads/new">+ New Upload</a>
           </div>
-        )}
-      </section>
+        </div>
 
-      {/* Community uploads */}
-      <section style={{ marginTop: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Community uploads</h3>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <input
-              className={styles.search}
-              style={{ maxWidth: 200 }}
-              placeholder="Have a share code?"
-              value={shareCode}
-              onChange={(e) => {
-                const v = (e.target.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-                setShareCode(v);
-              }}
-              aria-label="Enter share code"
-            />
-            <button
-              className={styles.btn}
-              onClick={async () => {
-                const code = (shareCode || "").trim();
-                if (!code) return;
-                await fetch("/api/sharecode", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ code }),
-                });
-                refreshSavedCodes();
-                setCodesVersion((v) => v + 1);
-              }}
-              aria-label="Save share code"
-            >
-              Save code
-            </button>
-            {savedCodes.length > 0 && (
+        <div className={styles.searchRow}>
+          <input
+            className={styles.search}
+            placeholder="Search titles…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search titles"
+          />
+        </div>
+        {err && <p style={{ color: "#d33" }} aria-live="polite">{err}</p>}
+
+        {/* Curated books */}
+        <section>
+          <h3 className={styles.sectionTitle}>Curated books</h3>
+          <div className={styles.grid}>
+            {filtered.curated.length > 0 ? (
+              filtered.curated.map((b) => (
+                <BookCard
+                  key={`b-${b.id}`}
+                  idx={b.id}
+                  title={b.title}
+                  author={b.author}
+                  cover={b.cover}
+                  onOpen={openBook}
+                />
+              ))
+            ) : (
+              <p className={styles.dim}>No matches</p>
+            )}
+          </div>
+
+          {nextCursor && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+              <button className={styles.btn} onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Community uploads */}
+        <section style={{ marginTop: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Community uploads</h3>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <input
+                className={styles.search}
+                style={{ maxWidth: 200 }}
+                placeholder="Have a share code?"
+                value={shareCode}
+                onChange={(e) => {
+                  const v = (e.target.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+                  setShareCode(v);
+                }}
+                aria-label="Enter share code"
+              />
               <button
                 className={styles.btn}
                 onClick={async () => {
-                  await fetch("/api/sharecode", { method: "DELETE" });
-                  setSavedCodes([]);
-                  setShareCode("");
+                  const code = (shareCode || "").trim();
+                  if (!code) return;
+                  await fetch("/api/sharecode", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code }),
+                  });
+                  refreshSavedCodes();
                   setCodesVersion((v) => v + 1);
                 }}
-                aria-label="Clear all saved codes"
+                aria-label="Save share code"
               >
-                Clear codes
+                Save code
               </button>
-            )}
-          </div>
-        </div>
-
-        <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
-          Shows PUBLIC uploads from everyone. Enter a code to reveal a CODED title.
-        </p>
-
-        {savedCodes.length > 0 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 12px" }}>
-            {savedCodes.map((c) => (
-              <span key={c} style={{ border: "1px solid #d9e3ff", background: "#f1f5ff", color: "#0b3b9f", borderRadius: 999, padding: "2px 8px" }}>
-                {c}
+              {savedCodes.length > 0 && (
                 <button
+                  className={styles.btn}
                   onClick={async () => {
-                    await fetch(`/api/sharecode?code=${encodeURIComponent(c)}`, { method: "DELETE" });
-                    setSavedCodes((prev) => prev.filter((x) => x !== c));
+                    await fetch("/api/sharecode", { method: "DELETE" });
+                    setSavedCodes([]);
                     setShareCode("");
                     setCodesVersion((v) => v + 1);
                   }}
-                  aria-label={`Remove code ${c}`}
-                  style={{ marginLeft: 6, border: "none", background: "transparent", cursor: "pointer" }}
-                  title="Remove"
+                  aria-label="Clear all saved codes"
                 >
-                  ×
+                  Clear codes
                 </button>
-              </span>
-            ))}
+              )}
+            </div>
           </div>
-        )}
 
-        <div className={styles.grid}>
-          {community.length > 0 ? (
-            community.map((u) => {
-              const href =
-                u.visibility === "CODED" && shareCode.trim()
-                  ? `/uploads/${u.id}?code=${encodeURIComponent(shareCode.trim())}`
-                  : `/uploads/${u.id}`;
-              return (
-                <a key={`c-${u.id}`} className={styles.card} href={href}>
-                  <div className={styles.cardBadge}>
-                    {u.visibility === "PUBLIC" ? "Public" : "Code required"}
-                    {u.locked ? " • 🔒" : ""}
-                  </div>
-                  <div className={styles.cardTitle}>{u.title}</div>
-                  <div className={styles.cardSub}>{u.locked ? "Unlock to read" : "Open"}</div>
-                </a>
-              );
-            })
-          ) : (
-            <p className={styles.dim}>No matches</p>
-          )}
-        </div>
-      </section>
+          <p className={styles.dim} style={{ margin: "6px 0 10px" }}>
+            Shows PUBLIC uploads from everyone. Enter a code to reveal a CODED title.
+          </p>
 
-      {/* Your uploads */}
-      <section style={{ marginTop: 24 }}>
-        <h3 className={styles.sectionTitle}>Your uploads</h3>
-        <div className={styles.grid}>
-          {filtered.ups.length > 0 ? (
-            filtered.ups.map((u) => (
-              <UploadCard key={`u-${u.id}`} id={u.id} title={u.title} locked={u.locked} />
-            ))
-          ) : (
-            <p className={styles.dim}>No matches</p>
+          {savedCodes.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 12px" }}>
+              {savedCodes.map((c) => (
+                <span key={c} style={{ border: "1px solid #d9e3ff", background: "#f1f5ff", color: "#0b3b9f", borderRadius: 999, padding: "2px 8px" }}>
+                  {c}
+                  <button
+                    onClick={async () => {
+                      await fetch(`/api/sharecode?code=${encodeURIComponent(c)}`, { method: "DELETE" });
+                      setSavedCodes((prev) => prev.filter((x) => x !== c));
+                      setShareCode("");
+                      setCodesVersion((v) => v + 1);
+                    }}
+                    aria-label={`Remove code ${c}`}
+                    style={{ marginLeft: 6, border: "none", background: "transparent", cursor: "pointer" }}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
           )}
-        </div>
-      </section>
-    </main>
+
+          <div className={styles.grid}>
+            {community.length > 0 ? (
+              community.map((u) => {
+                const href =
+                  u.visibility === "CODED" && shareCode.trim()
+                    ? `/uploads/${u.id}?code=${encodeURIComponent(shareCode.trim())}`
+                    : `/uploads/${u.id}`;
+                return (
+                  <a key={`c-${u.id}`} className={styles.card} href={href}>
+                    <div className={styles.cardBadge}>
+                      {u.visibility === "PUBLIC" ? "Public" : "Code required"}
+                      {u.locked ? " • 🔒" : ""}
+                    </div>
+                    <div className={styles.cardTitle}>{u.title}</div>
+                    <div className={styles.cardSub}>{u.locked ? "Unlock to read" : "Open"}</div>
+                  </a>
+                );
+              })
+            ) : (
+              <p className={styles.dim}>No matches</p>
+            )}
+          </div>
+        </section>
+
+        {/* Your uploads */}
+        <section style={{ marginTop: 24 }}>
+          <h3 className={styles.sectionTitle}>Your uploads</h3>
+          <div className={styles.grid}>
+            {filtered.ups.length > 0 ? (
+              filtered.ups.map((u) => (
+                <UploadCard key={`u-${u.id}`} id={u.id} title={u.title} locked={u.locked} />
+              ))
+            ) : (
+              <p className={styles.dim}>No matches</p>
+            )}
+          </div>
+        </section>
+      </main>
+    </>
   );
 }

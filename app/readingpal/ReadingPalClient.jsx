@@ -528,9 +528,8 @@ export default function ReadingPalClient() {
           // Build map: sentenceIndex -> color
           const nextMap = {};
           for (const n of j.data) {
-            if (Number.isInteger(n?.sentenceIndex)) {
-              // last write wins if multiple notes on the same sentence
-              nextMap[n.sentenceIndex] = n.color || nextMap[n.sentenceIndex] || "#FDE047";
+            if (Number.isInteger(n?.sentenceIndex) && n?.color) {
+              nextMap[n.sentenceIndex] = n.color;
             }
           }
           noteMapRef.current = nextMap;
@@ -583,7 +582,7 @@ export default function ReadingPalClient() {
       const idx = Number(k);
       const sp = spans[idx];
       if (!sp) return;
-      sp.style.boxShadow = `inset 0 -6px 0 ${hexToRgba(color || "#FDE047", 0.5)}`;
+      sp.style.boxShadow = `inset 0 -6px 0 ${hexToRgba(color, 0.5)}`;
       // small rounding so the underline feels pill-like when text wraps
       sp.style.borderRadius = "4px";
     });
@@ -635,8 +634,8 @@ export default function ReadingPalClient() {
       // reflect decoration immediately
       try {
         const idx = Number(sentenceIndexRef.current || 0);
-        if (Number.isInteger(idx)) {
-          noteMapRef.current = { ...noteMapRef.current, [idx]: color || "#FDE047" };
+        if (Number.isInteger(idx) && color) {
+          noteMapRef.current = { ...noteMapRef.current, [idx]: color };
           applyNoteDecorations(noteMapRef.current);
         }
       } catch { }
@@ -984,8 +983,8 @@ export default function ReadingPalClient() {
             try {
               const map = {};
               for (const n of (arr || [])) {
-                if (Number.isInteger(n?.sentenceIndex)) {
-                  map[n.sentenceIndex] = n.color || map[n.sentenceIndex] || "#FDE047";
+                if (Number.isInteger(n?.sentenceIndex) && n?.color) {
+                  nextMap[n.sentenceIndex] = n.color;
                 }
               }
               noteMapRef.current = map;

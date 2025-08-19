@@ -231,7 +231,7 @@ export default function NotesSidePanel({
                     seed={{
                         anchorText: editing.anchorText || "",
                         defaultTags: Array.isArray(editing.tagsJson) ? editing.tagsJson : [],
-                        defaultColor: editing.color || undefined,
+                        defaultColor: editing.color ?? null,
                         initialBody: editing.body || "",
                         isBookmark: !!editing.isBookmark,
                     }}
