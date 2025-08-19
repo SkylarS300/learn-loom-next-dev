@@ -20,7 +20,6 @@ export default function NotesSidePanel({
     const [tagFilter, setTagFilter] = useState("");
     const [editing, setEditing] = useState(null);
 
-    // fetch full bodies for edit quality (chapter-level volume is small)
     async function fetchNotes() {
         setLoading(true); setErr("");
         try {
@@ -30,7 +29,6 @@ export default function NotesSidePanel({
             if (uploadId != null) params.set("uploadId", String(uploadId));
             if (bookIndex != null) params.set("bookIndex", String(bookIndex));
             if (chapterIndex != null) params.set("chapterIndex", String(chapterIndex));
-            // omit fields=lite so `body` is returned
             const r = await fetch(`/api/notes?${params.toString()}`, { cache: "no-store" });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed");
@@ -93,12 +91,18 @@ export default function NotesSidePanel({
     return (
         <aside className={styles.sidePanel}>
             <div className={styles.sideHeader}>
-                <h3 className={styles.h4} style={{ margin: 0 }}>Notes in this {uploadId ? "upload" : "chapter"}</h3>
+                <h3 className={styles.h4} style={{ margin: 0 }}>
+                    Notes in this {uploadId ? "upload" : "chapter"}
+                </h3>
                 <div style={{ display: "flex", gap: 8 }}>
                     {tagFilter && (
-                        <button className={styles.secondaryBtn} onClick={() => setTagFilter("")} title="Clear tag">Clear tag</button>
+                        <button className={styles.secondaryBtn} onClick={() => setTagFilter("")} title="Clear tag">
+                            Clear tag
+                        </button>
                     )}
-                    <button className={styles.secondaryBtn} onClick={fetchNotes} title="Refresh">Refresh</button>
+                    <button className={styles.secondaryBtn} onClick={fetchNotes} title="Refresh">
+                        Refresh
+                    </button>
                 </div>
             </div>
 
@@ -126,73 +130,92 @@ export default function NotesSidePanel({
                 </div>
             )}
 
-            {loading ? <p className={styles.dim}>Loading…</p> :
-                err ? <p style={{ color: "#b91c1c" }}>{err}</p> :
-                    filtered.length === 0 ? (
-                        <p className={styles.dim} style={{ marginTop: 8 }}>
-                            {notes.length ? "No matches." : "No notes in this location yet."}
-                        </p>
-                    ) : (
-                        <div
-                            ref={parentRef}
-                            className={styles.sideScroll}
-                            role="list"
-                            aria-label="Notes list"
-                            style={{ position: "relative" }}
-                        >
-                            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
-                                {virtualItems.map(vi => {
-                                    const n = filtered[vi.index];
-                                    if (!n) return null;
-                                    const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
-                                    return (
-                                        <div
-                                            key={n.id}
-                                            role="listitem"
-                                            ref={rowVirtualizer.measureElement}
-                                            className={styles.sideNoteItem}
-                                            style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
-                                        >
-                                            <div className={styles.noteColor} style={{ background: n.color || "#e5e7eb" }} aria-hidden="true" />
-                                            <div className={styles.noteBody}>
-                                                <div className={styles.noteTopRow}>
-                                                    <button
-                                                        className={styles.linkBtn}
-                                                        onClick={() => Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)}
-                                                        title={Number.isInteger(n.sentenceIndex) ? `Jump to sentence ${n.sentenceIndex + 1}` : "Jump"}
-                                                    >
-                                                        {n.anchorText ? n.anchorText.slice(0, 80) : "(no anchor)"}
-                                                    </button>
-                                                    <span className={styles.dim} style={{ marginLeft: "auto" }}>
-                                                        {new Date(n.createdAt).toLocaleString()}
-                                                    </span>
-                                                </div>
+            {loading ? (
+                <p className={styles.dim}>Loading…</p>
+            ) : err ? (
+                <p style={{ color: "#b91c1c" }}>{err}</p>
+            ) : filtered.length === 0 ? (
+                <p className={styles.dim} style={{ marginTop: 8 }}>
+                    {notes.length ? "No matches." : "No notes in this location yet."}
+                </p>
+            ) : (
+                <div
+                    ref={parentRef}
+                    className={styles.sideScroll}
+                    role="list"
+                    aria-label="Notes list"
+                    style={{ position: "relative" }}
+                >
+                    <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+                        {virtualItems.map(vi => {
+                            const n = filtered[vi.index];
+                            if (!n) return null;
+                            const tags = Array.isArray(n.tagsJson) ? n.tagsJson : [];
 
-                                                {!!n.body && (
-                                                    <div className={styles.noteText} style={{ marginTop: 4 }}>
-                                                        {n.body.length > 160 ? n.body.slice(0, 160) + "…" : n.body}
-                                                    </div>
-                                                )}
+                            // --- NEW: prevent duplicate body when same as anchor (incl. legacy seeded) ---
+                            const anchor = (n.anchorText || "").trim();
+                            const body = (typeof n.body === "string" ? n.body : "").trim();
+                            const bodyIsDistinct =
+                                body &&
+                                body !== anchor &&
+                                !body.startsWith(anchor + "\n");
 
-                                                {!!tags.length && (
-                                                    <div className={styles.tagRow} style={{ marginTop: 4 }}>
-                                                        {tags.map(t => <span key={t} className={styles.tagPill}>#{t}</span>)}
-                                                        {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
-                                                    </div>
-                                                )}
-
-                                                <div className={styles.noteActions}>
-                                                    <button className={styles.secondaryBtn} onClick={() => setEditing(n)}>Edit</button>
-                                                    <button className={styles.secondaryBtn} onClick={() => Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)}>Jump</button>
-                                                    <button className={styles.btnDanger} onClick={() => remove(n.id)}>Delete</button>
-                                                </div>
-                                            </div>
+                            return (
+                                <div
+                                    key={n.id}
+                                    role="listitem"
+                                    ref={rowVirtualizer.measureElement}
+                                    className={styles.sideNoteItem}
+                                    style={{
+                                        position: "absolute",
+                                        top: 0,
+                                        left: 0,
+                                        width: "100%",
+                                        transform: `translateY(${vi.start}px)`,
+                                    }}
+                                >
+                                    <div className={styles.noteColor} style={{ background: n.color || "#e5e7eb" }} aria-hidden="true" />
+                                    <div className={styles.noteBody}>
+                                        <div className={styles.noteTopRow}>
+                                            <button
+                                                className={styles.linkBtn}
+                                                onClick={() => Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)}
+                                                title={Number.isInteger(n.sentenceIndex) ? `Jump to sentence ${n.sentenceIndex + 1}` : "Jump"}
+                                            >
+                                                {anchor ? (anchor.length > 80 ? anchor.slice(0, 80) + "…" : anchor) : "(no anchor)"}
+                                            </button>
+                                            <span className={styles.dim} style={{ marginLeft: "auto" }}>
+                                                {new Date(n.createdAt).toLocaleString()}
+                                            </span>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
+
+                                        {bodyIsDistinct && (
+                                            <div className={styles.noteText} style={{ marginTop: 4 }}>
+                                                {body.length > 160 ? body.slice(0, 160) + "…" : body}
+                                            </div>
+                                        )}
+
+                                        {!!tags.length && (
+                                            <div className={styles.tagRow} style={{ marginTop: 4 }}>
+                                                {tags.map(t => (
+                                                    <span key={t} className={styles.tagPill}>#{t}</span>
+                                                ))}
+                                                {n.isBookmark && <span className={styles.tagPill}>bookmark</span>}
+                                            </div>
+                                        )}
+
+                                        <div className={styles.noteActions}>
+                                            <button className={styles.secondaryBtn} onClick={() => setEditing(n)}>Edit</button>
+                                            <button className={styles.secondaryBtn} onClick={() => Number.isInteger(n.sentenceIndex) && onJump(n.sentenceIndex)}>Jump</button>
+                                            <button className={styles.btnDanger} onClick={() => remove(n.id)}>Delete</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {editing && (
                 <NotesModal
@@ -214,7 +237,7 @@ export default function NotesSidePanel({
                             });
                             const j = await r.json();
                             if (!j?.ok) throw new Error(j?.error || "Failed to update");
-                            const next = notes.map(x => x.id === editing.id ? j.data : x);
+                            const next = notes.map(x => (x.id === editing.id ? j.data : x));
                             setNotes(next); onChanged(next);
                             setEditing(null);
                         } catch (e) {

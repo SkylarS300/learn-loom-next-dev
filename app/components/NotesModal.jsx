@@ -24,7 +24,8 @@ export default function NotesModal({ open, seed, onClose, onSave, typePicker = f
     // seed: { anchorText, defaultTags, defaultColor, isBookmark, initialBody }
     useEffect(() => {
         if (!open) return;
-        setBody(typeof seed?.initialBody === "string" ? seed.initialBody : (seed?.anchorText ? `${seed.anchorText}\n\n` : ""));
+        // Do NOT pre-fill the body with anchor text; anchor is already shown separately.
+        setBody(typeof seed?.initialBody === "string" ? seed.initialBody : "");
         setTagsStr((seed?.defaultTags || []).join(", "));
         setColor(seed?.defaultColor || PALETTE[0]);
         setIsBookmark(!!seed?.isBookmark);

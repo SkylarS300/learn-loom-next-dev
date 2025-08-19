@@ -378,15 +378,28 @@ export default function NotesPanel() {
                                                     </span>
                                                 </div>
 
-                                                {n.anchorText && (
-                                                    <div className={styles.noteAnchor} title="Anchor text">
-                                                        “{debouncedQ ? highlight(n.anchorText, debouncedQ) : n.anchorText}”
-                                                    </div>
-                                                )}
-
-                                                <div className={styles.noteText}>
-                                                    {debouncedQ ? highlight(n.body || "", debouncedQ) : typeof n.body === "string" ? n.body : ""}
-                                                </div>
+                                                {(() => {
+                                                    const anchor = (n.anchorText || "").trim();
+                                                    const body = (typeof n.body === "string" ? n.body : "").trim();
+                                                    const bodyIsDistinct =
+                                                        body &&
+                                                        body !== anchor &&
+                                                        !body.startsWith(anchor + "\n");
+                                                    return (
+                                                        <>
+                                                            {anchor && (
+                                                                <div className={styles.noteAnchor} title="Anchor text">
+                                                                    “{debouncedQ ? highlight(anchor, debouncedQ) : anchor}”
+                                                                </div>
+                                                            )}
+                                                            {bodyIsDistinct && (
+                                                                <div className={styles.noteText}>
+                                                                    {debouncedQ ? highlight(body, debouncedQ) : body}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
 
                                                 {tags.length > 0 && (
                                                     <div className={styles.tagRow}>
@@ -461,7 +474,7 @@ export default function NotesPanel() {
         if (!text || !query) return text;
         try {
             // escape: . * + ? ^ $ { } ( ) | [ ] \
-            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")})`, "ig");
+            const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")})`, "ig");
             const parts = String(text).split(re);
             return parts.map((p, i) => (re.test(p) ? <mark key={i}>{p}</mark> : <span key={i}>{p}</span>));
         } catch {
