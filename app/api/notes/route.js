@@ -17,7 +17,9 @@ export async function GET(req) {
     const cursorParam = url.searchParams.get("cursor"); // id (no q) OR numeric offset (with q)
     const typeParam = (url.searchParams.get("type") || "").trim(); // 'book' | 'upload' | 'grammar' | 'all'
     // sanitize q: keep as-is for MySQL boolean mode, but trim & cap length
-    const q = (url.searchParams.get("q") || "").trim().slice(0, 100);
+    // raw query and lowercase helper (safe even when empty)
+    const qRaw = (url.searchParams.get("q") || "");
+    const q = qRaw.trim().toLowerCase();
     const tagsParam = (url.searchParams.get("tags") || "").trim();
     const tags = tagsParam ? tagsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
     const fields = (url.searchParams.get("fields") || "").trim(); // e.g., "lite"
@@ -46,10 +48,11 @@ export async function GET(req) {
     if (subTopic) whereBase.subTopic = String(subTopic);
 
     // Server-side pushdown for text search on body/anchor (keeps tag matching client-side)
-    if (qRaw) {
+    if (qRaw && qRaw.trim()) {
         where.OR = [
-            { body: { contains: qRaw } },
-            { anchorText: { contains: qRaw } },
+            // case-insensitive matches
+            { body: { contains: qRaw, mode: "insensitive" } },
+            { anchorText: { contains: qRaw, mode: "insensitive" } },
         ];
     }
     // We'll over-fetch and filter in-process for tags (and when fields=lite).

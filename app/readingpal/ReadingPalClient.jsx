@@ -5,8 +5,22 @@ import { useSearchParams } from "next/navigation";
 import books from "../../src/content/book-content.js";
 import styles from "./readingpal.module.css";
 import NotesModal from "./NotesModal";
+import NotesSidePanel from "./NotesSidePanel";
 
 /* ------- helpers ------- */
+
+// convert HEX like #F59E0B -> rgba(r,g,b,a)
+function hexToRgba(hex = "#FDE047", a = 0.45) {
+  try {
+    let c = hex.replace("#", "");
+    if (c.length === 3) c = c.split("").map((x) => x + x).join("");
+    const r = parseInt(c.slice(0, 2), 16);
+    const g = parseInt(c.slice(2, 4), 16);
+    const b = parseInt(c.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  } catch { return "rgba(253,224,71,0.45)"; }
+}
+
 function saveBookmark({ type, id, chapterIndex, scrollY }) {
   const key = `bookmark-${type}-${id}`;
   localStorage.setItem(
@@ -90,6 +104,9 @@ export default function ReadingPalClient() {
   const [noteSeed, setNoteSeed] = useState(null);
   const [noteSaving, setNoteSaving] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [chapterIdx, setChapterIdx] = useState(0); // for re-render & side panel props
+  // sentenceIndex -> color (for note decorations)
+  const noteMapRef = useRef({}); // { [idx:number]: string(hex) }
 
   const currentBookRef = useRef(null);
   const chapterIndexRef = useRef(0);
@@ -478,6 +495,7 @@ export default function ReadingPalClient() {
     stopReading();
     const chapter = book.chapters[chapterIndex];
     chapterIndexRef.current = chapterIndex;
+    setChapterIdx(chapterIndex); // trigger side panel re-render
 
     if (chapterTitleRef.current) chapterTitleRef.current.innerText = chapter.chapterTitle;
     if (textRef.current) {
@@ -493,9 +511,38 @@ export default function ReadingPalClient() {
       }
     }
 
+    // Clear any stale note underlines from previous chapter.
+    clearNoteDecorations();
+
     // Check if a server bookmark exists for this chapter.
     // If resume=1 is present, jump automatically; otherwise show the prompt.
     await loadServerBookmark(resumeFlag);
+
+    // Load notes for current chapter and apply subtle underlines
+    try {
+      if (!uploadId && Number.isInteger(Number(bookIndex))) {
+        const bIdx = Number(bookIndex);
+        const r = await fetch(`/api/notes?scope=current&bookIndex=${bIdx}&chapterIndex=${chapterIndex}&fields=lite`, { cache: "no-store" });
+        const j = await r.json();
+        if (j?.ok && Array.isArray(j.data)) {
+          // Build map: sentenceIndex -> color
+          const nextMap = {};
+          for (const n of j.data) {
+            if (Number.isInteger(n?.sentenceIndex)) {
+              // last write wins if multiple notes on the same sentence
+              nextMap[n.sentenceIndex] = n.color || nextMap[n.sentenceIndex] || "#FDE047";
+            }
+          }
+          noteMapRef.current = nextMap;
+          applyNoteDecorations(noteMapRef.current);
+        } else {
+          noteMapRef.current = {};
+        }
+      }
+    } catch {
+      // non-fatal
+      noteMapRef.current = {};
+    }
   }
 
   /* ---------- sentence wrapping & highlight ---------- */
@@ -515,13 +562,31 @@ export default function ReadingPalClient() {
     const spans = currentSpans();
     spans.forEach((sp) => {
       sp.classList.remove(styles.highlightedSentence);
+      // clear only the active highlight; keep note underline boxShadow intact
       sp.style.backgroundColor = "";
     });
     const t = spans[idx];
     if (t) {
       t.classList.add(styles.highlightedSentence);
-      t.style.backgroundColor = highlightedColorRef.current; // keep your color palette override      t.scrollIntoView({ behavior: "smooth", block: "center" });
+      t.style.backgroundColor = highlightedColorRef.current;
+      t.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  }
+
+  // --- note decorations (subtle underline using box-shadow) ---
+  function clearNoteDecorations() {
+    currentSpans().forEach((sp) => { sp.style.boxShadow = ""; });
+  }
+  function applyNoteDecorations(map) {
+    const spans = currentSpans();
+    Object.entries(map || {}).forEach(([k, color]) => {
+      const idx = Number(k);
+      const sp = spans[idx];
+      if (!sp) return;
+      sp.style.boxShadow = `inset 0 -6px 0 ${hexToRgba(color || "#FDE047", 0.5)}`;
+      // small rounding so the underline feels pill-like when text wraps
+      sp.style.borderRadius = "4px";
+    });
   }
 
 
@@ -567,6 +632,14 @@ export default function ReadingPalClient() {
       if (!j?.ok) throw new Error(j?.error || "Failed to save note");
       toast("✅ Note saved");
       setNoteOpen(false);
+      // reflect decoration immediately
+      try {
+        const idx = Number(sentenceIndexRef.current || 0);
+        if (Number.isInteger(idx)) {
+          noteMapRef.current = { ...noteMapRef.current, [idx]: color || "#FDE047" };
+          applyNoteDecorations(noteMapRef.current);
+        }
+      } catch { }
     } catch (e) {
       toast("⚠️ Could not save note");
     } finally {
@@ -887,9 +960,43 @@ export default function ReadingPalClient() {
         </div>
       )}
 
-      <div id="text" ref={textRef} className={styles.text}>
-        The chapter text will appear here after selecting a book from the library.
+      <div className={styles.sideGrid}>
+        <div id="text" ref={textRef} className={styles.text}>
+          The chapter text will appear here after selecting a book from the library.
+        </div>
+
+        <NotesSidePanel
+          key={(uploadId ? `u-${uploadId}` : `b-${bookIndex}-c-${chapterIdx}`)}
+          uploadId={uploadId ? Number(uploadId) : null}
+          bookIndex={!uploadId && Number.isInteger(Number(bookIndex)) ? Number(bookIndex) : null}
+          chapterIndex={!uploadId ? chapterIdx : null}
+          onJump={(idx) => {
+            // jump to sentence and center it
+            const spans = Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
+            if (!spans.length) return;
+            const clamped = Math.max(0, Math.min(idx, spans.length - 1));
+            sentenceIndexRef.current = clamped;
+            setHighlight(clamped);
+            spans[clamped]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+          onChanged={(arr) => {
+            // rebuild underline decorations when notes change
+            try {
+              const map = {};
+              for (const n of (arr || [])) {
+                if (Number.isInteger(n?.sentenceIndex)) {
+                  map[n.sentenceIndex] = n.color || map[n.sentenceIndex] || "#FDE047";
+                }
+              }
+              noteMapRef.current = map;
+              // reuse helpers already defined above
+              clearNoteDecorations?.();
+              applyNoteDecorations?.(noteMapRef.current);
+            } catch { }
+          }}
+        />
       </div>
+
 
       <div className={styles.controlsRow}>
         <button className={styles.primaryBtn} onClick={startReading}>▶ Start</button>
