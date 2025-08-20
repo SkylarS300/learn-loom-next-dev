@@ -9,7 +9,6 @@ import books from "@/src/content/book-content.js";
 import { track } from "@/lib/rum";
 import Navbar from "../Navbar";
 import CodeLoginCard from "./CodeLoginCard";
-import MyNotesCard from "./MyNotesCard";
 import ConfirmClearModal from "./ConfirmClearModal";
 
 // Lazy-load the chart card to keep initial bundle small.
@@ -197,12 +196,6 @@ export default function DashboardPage() {
         {/* Notes panel */}
         <section className={styles.section}>
           <NotesPanel />
-        </section>
-
-
-        {/* My Notes (searchable) */}
-        <section className={styles.sectionTight}>
-          <MyNotesCard />
         </section>
 
         {/* Progress charts */}
