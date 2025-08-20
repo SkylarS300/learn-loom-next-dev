@@ -41,7 +41,7 @@ export default function ClassroomPage() {
                 <Link href="/dashboard" className={styles.btnSecondary}>← Back</Link>
                 <h1 style={{ marginTop: 8, marginBottom: 0 }}>{m?.classroom?.name || "Classroom"}</h1>
                 <p className={styles.dim}>Students: {m?.roster?.students ?? 0} • Window: {m?.from} → {m?.to}</p>
-                {m && (
+                {m && m.canExport && (
                     <div style={{ margin: "8px 0" }}>
                         <a
                             className={styles.btn}

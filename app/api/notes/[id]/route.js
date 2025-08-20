@@ -10,7 +10,7 @@ export async function PATCH(req, ctx) {
     const cookieStore = await cookies();
     const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return unauthorized();
-    const id = (await ctx.params)?.id; // quiets the Next warning
+    const id = (ctx.params)?.id; // quiets the Next warning
     if (!id) return Response.json({ ok: false, error: "Missing id" }, { status: 400 });
 
     const payload = await req.json().catch(() => ({}));
@@ -40,7 +40,7 @@ export async function DELETE(_req, ctx) {
     const cookieStore = await cookies();
     const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return unauthorized();
-    const id = (await ctx.params)?.id; // quiets the Next warning
+    const id = (ctx.params)?.id; // quiets the Next warning
     if (!id) return Response.json({ ok: false, error: "Missing id" }, { status: 400 });
 
     // enforce ownership

@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 
 // --- Simple optional in-memory rate limit (per IP) ---
 // Env toggles: ENABLE_CODE_RATELIMIT=true, CODE_RATE_MAX=20, CODE_RATE_WINDOW_MS=60000, CODE_RATE_BLOCK_MS=60000
-const ENABLE = process.env.ENABLE_CODE_RATELIMIT === "true";
+// Accept either legacy CODE_RATE_LIMIT=1 or ENABLE_CODE_RATELIMIT=true
+const ENABLE =
+    process.env.ENABLE_CODE_RATELIMIT === "true" ||
+    process.env.CODE_RATE_LIMIT === "1";
 const MAX = Number(process.env.CODE_RATE_MAX || 20);
 const WINDOW_MS = Number(process.env.CODE_RATE_WINDOW_MS || 60_000);
 const BLOCK_MS = Number(process.env.CODE_RATE_BLOCK_MS || 60_000);

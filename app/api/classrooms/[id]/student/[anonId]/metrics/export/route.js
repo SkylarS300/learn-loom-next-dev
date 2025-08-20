@@ -19,7 +19,7 @@ function toCSV(headers, rows) {
 const ymd = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10);
 
 export async function GET(req, ctx) {
-    const p = await ctx.params;
+    const p = ctx.params;
     const classId = Number(p?.id);
     const studentAnon = decodeURIComponent(p?.anonId || "");
     if (!Number.isFinite(classId) || !studentAnon) {

@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import JSZip from "jszip";
 
-function ymd(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10); }
 function toCSV(headers, rows) {
     const esc = (v) => {
         if (v == null) return "";
@@ -30,92 +29,183 @@ export async function GET(req, { params }) {
     const anonId = cs.get("learnloomId")?.value;
     if (!anonId) return new Response("Unauthorized", { status: 401 });
 
-    const cls = await prisma.classroom.findUnique({ where: { id }, select: { ownerAnon: true, id: true, name: true } });
+    const cls = await prisma.classroom.findUnique({
+        where: { id },
+        select: { ownerAnon: true, id: true, name: true },
+    });
     if (!cls) return new Response("Not found", { status: 404 });
-    const teacherRow = await prisma.studentclassroom.findFirst({ where: { classroomId: id, anonId, role: "teacher" } });
+
+    const teacherRow = await prisma.studentclassroom.findFirst({
+        where: { classroomId: id, anonId, role: "teacher" },
+    });
+    // Teacher-only export
     if (!(cls.ownerAnon === anonId || teacherRow)) return new Response("Forbidden", { status: 403 });
 
-    // Roster anonIds
+    // Roster (class-scoped; include displayName only, no global PII)
     const members = await prisma.studentclassroom.findMany({
         where: { classroomId: id },
-        select: { anonId: true, role: true },
+        select: { anonId: true, role: true, displayName: true },
+        orderBy: [{ role: "asc" }, { id: "asc" }],
     });
-    const studentAnonIds = members.filter(m => m.role !== "teacher" && m.anonId).map(m => m.anonId);
-    const rosterIds = Array.from(new Set([cls.ownerAnon, ...studentAnonIds].filter(Boolean)));
 
-    // Reading
-    const reading = rosterIds.length
-        ? await prisma.readingprogress.findMany({
-            where: { anonId: { in: rosterIds }, updatedAt: { gte: from, lte: to } },
-            select: { timeMs: true, updatedAt: true },
-        })
-        : [];
-    const readingDailyMap = new Map();
-    for (const r of reading) {
-        const d = ymd(new Date(r.updatedAt));
-        const min = Math.max(0, Math.round((r.timeMs || 0) / 60000));
-        readingDailyMap.set(d, (readingDailyMap.get(d) || 0) + min);
-    }
-    const readingDaily = Array.from(readingDailyMap.entries()).sort().map(([date, minutes]) => ({ date, minutes }));
+    const rosterCSV = toCSV(
+        ["anonId", "role", "displayName"],
+        members.map((m) => ({
+            anonId: m.anonId || "",
+            role: m.role || "student",
+            displayName: m.displayName || "",
+        }))
+    );
 
-    // Grammar + pace + weak
-    const grammar = rosterIds.length
-        ? await prisma.grammarprogress.findMany({
-            where: { anonId: { in: rosterIds }, createdAt: { gte: from, lte: to } },
-            select: { createdAt: true, score: true, durationMs: true, numQuestions: true, concept: true, subTopic: true },
-        })
-        : [];
-    const grammarDailyMap = new Map();
-    const paceDailyMap = new Map();
-    const weakMap = new Map();
-    for (const g of grammar) {
-        const d = ymd(new Date(g.createdAt));
-        grammarDailyMap.set(d, (grammarDailyMap.get(d) || []).concat([g.score]));
-        const n = Math.max(1, g.numQuestions || 0);
-        if (g.durationMs) {
-            const spq = (g.durationMs / 1000) / n;
-            paceDailyMap.set(d, (paceDailyMap.get(d) || []).concat([spq]));
-        }
-        const key = `${g.concept}:::${g.subTopic}`;
-        const rec = weakMap.get(key) || { sum: 0, n: 0, concept: g.concept, subTopic: g.subTopic };
-        rec.sum += g.score; rec.n += 1; weakMap.set(key, rec);
-    }
-    const grammarDaily = Array.from(grammarDailyMap.entries()).sort()
-        .map(([date, arr]) => ({ date, avg: arr.reduce((a, b) => a + b, 0) / arr.length }));
-    const grammarPaceDaily = Array.from(paceDailyMap.entries()).sort()
-        .map(([date, arr]) => ({ date, secPerQ: arr.reduce((a, b) => a + b, 0) / arr.length }));
-    const topWeakAreas = Array.from(weakMap.values())
-        .filter(x => x.n >= 3)
-        .map(x => ({ concept: x.concept, subTopic: x.subTopic, avg: x.sum / x.n, attempts: x.n }))
-        .sort((a, b) => a.avg - b.avg)
-        .slice(0, 20);
+    // Assignments in this class
+    const assignments = await prisma.assignment.findMany({
+        where: { classroomId: id },
+        select: {
+            id: true,
+            title: true,
+            description: true,
+            type: true,
+            startAt: true,
+            dueDate: true,
+            allowLate: true,
+            latePenaltyPct: true,
+            weightPoints: true,
+            category: true,
+            subtopic: true,
+            bookId: true,
+            chapterIndex: true,
+            uploadId: true,
+            createdAt: true,
+        },
+        orderBy: { id: "asc" },
+    });
 
-    // Notes per student
-    const notes = rosterIds.length
-        ? await prisma.note.findMany({
-            where: { anonId: { in: rosterIds }, createdAt: { gte: from, lte: to } },
-            select: { anonId: true },
-        })
-        : [];
-    const perStudent = new Map();
-    for (const n of notes) perStudent.set(n.anonId, (perStudent.get(n.anonId) || 0) + 1);
-    const notesPerStudent = Array.from(perStudent.entries()).map(([anonId, count]) => ({ anonId, count }));
+    const assignmentsCSV = toCSV(
+        [
+            "assignmentId",
+            "title",
+            "type",
+            "startAt",
+            "dueDate",
+            "allowLate",
+            "latePenaltyPct",
+            "weightPoints",
+            "category",
+            "subtopic",
+            "bookId",
+            "chapterIndex",
+            "uploadId",
+            "createdAt",
+        ],
+        assignments.map((a) => ({
+            assignmentId: a.id,
+            title: a.title,
+            type: a.type,
+            startAt: a.startAt ? a.startAt.toISOString() : "",
+            dueDate: a.dueDate ? a.dueDate.toISOString() : "",
+            allowLate: a.allowLate ? "1" : "0",
+            latePenaltyPct: a.latePenaltyPct ?? "",
+            weightPoints: a.weightPoints ?? "",
+            category: a.category ?? "",
+            subtopic: a.subtopic ?? "",
+            bookId: a.bookId ?? "",
+            chapterIndex: a.chapterIndex ?? "",
+            uploadId: a.uploadId ?? "",
+            createdAt: a.createdAt?.toISOString?.() || "",
+        }))
+    );
 
-    // CSVs
+    // Submissions for this class (assignmentcompletion) with displayName join
+    const completions = await prisma.assignmentcompletion.findMany({
+        where: { assignment: { classroomId: id }, OR: [{ anonId: { not: null } }, { userId: { not: null } }] },
+        select: {
+            assignmentId: true,
+            anonId: true,
+            status: true,
+            completedAt: true,
+            submittedAt: true,
+            gradedAt: true,
+            quizScore: true,
+            scorePct: true,
+            scorePoints: true,
+            attemptCount: true,
+            isLate: true,
+            feedback: true,
+            assignment: { select: { title: true, type: true, dueDate: true, weightPoints: true } },
+        },
+        orderBy: [{ gradedAt: "desc" }, { submittedAt: "desc" }, { completedAt: "desc" }],
+    });
+
+    const nameMap = new Map(members.map((m) => [m.anonId || "", m.displayName || ""]));
+    const submissionsCSV = toCSV(
+        [
+            "assignmentId",
+            "assignmentTitle",
+            "type",
+            "anonId",
+            "displayName",
+            "status",
+            "scorePct",
+            "scorePoints",
+            "attemptCount",
+            "isLate",
+            "submittedAt",
+            "gradedAt",
+            "completedAt",
+            "dueDate",
+            "weightPoints",
+            "feedback",
+        ],
+        completions.map((c) => ({
+            assignmentId: c.assignmentId,
+            assignmentTitle: c.assignment?.title || "",
+            type: c.assignment?.type || "",
+            anonId: c.anonId || "",
+            displayName: nameMap.get(c.anonId || "") || "",
+            status: c.status,
+            scorePct: c.scorePct ?? c.quizScore ?? "",
+            scorePoints: c.scorePoints ?? "",
+            attemptCount: c.attemptCount ?? 0,
+            isLate: c.isLate ? "1" : "0",
+            submittedAt: c.submittedAt ? c.submittedAt.toISOString() : "",
+            gradedAt: c.gradedAt ? c.gradedAt.toISOString() : "",
+            completedAt: c.completedAt ? c.completedAt.toISOString() : "",
+            dueDate: c.assignment?.dueDate ? c.assignment.dueDate.toISOString() : "",
+            weightPoints: c.assignment?.weightPoints ?? "",
+            feedback: c.feedback ?? "",
+        }))
+    );
+
+    // Overview (counts + window)
+    const overviewCSV = toCSV(
+        ["classroomId", "classroomName", "from", "to", "students", "assignments", "submissions"],
+        [
+            {
+                classroomId: cls.id,
+                classroomName: cls.name,
+                from: from.toISOString(),
+                to: to.toISOString(),
+                students: members.filter((m) => (m.role || "student") !== "teacher").length,
+                assignments: assignments.length,
+                submissions: completions.length,
+            },
+        ]
+    );
+
+    // ZIP (final)
     const zip = new JSZip();
-    zip.file("meta.txt", `classroom_id=${cls.id}\nname=${cls.name}\nfrom=${from.toISOString()}\nto=${to.toISOString()}\n`);
-    zip.file("reading_daily.csv", toCSV(["date", "minutes"], readingDaily));
-    zip.file("grammar_daily.csv", toCSV(["date", "avg"], grammarDaily));
-    zip.file("grammar_pace_daily.csv", toCSV(["date", "secPerQ"], grammarPaceDaily));
-    zip.file("top_weak_areas.csv", toCSV(["concept", "subTopic", "avg", "attempts"], topWeakAreas));
-    zip.file("notes_per_student.csv", toCSV(["anonId", "count"], notesPerStudent));
+    zip.file("class_overview.csv", overviewCSV);
+    zip.file("roster.csv", rosterCSV);
+    zip.file("assignments.csv", assignmentsCSV);
+    zip.file("submissions.csv", submissionsCSV);
+
     const buf = await zip.generateAsync({ type: "nodebuffer" });
 
     return new Response(buf, {
         status: 200,
         headers: {
             "Content-Type": "application/zip",
-            "Content-Disposition": `attachment; filename="classroom_${cls.id}_metrics.zip"`,
+            "Content-Disposition": `attachment; filename="class-${cls.id}-admin.zip"`,
         },
     });
 }
