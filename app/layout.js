@@ -1,7 +1,6 @@
 // app/layout.js
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import InitAnonId from "./InitAnonId"; // 👈 ensures anonId cookie
 // import Provider from "./SessionProvider"; ❌ Not needed anymore
 import Navbar from "/app/Navbar.js";
 
@@ -26,7 +25,6 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <InitAnonId />
         {children}
       </body>
     </html>

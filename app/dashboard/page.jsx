@@ -7,7 +7,8 @@ import NotesPanel from "./NotesPanel";
 import { useEffect, useState } from "react";
 import books from "@/src/content/book-content.js";
 import { track } from "@/lib/rum";
-import Navbar from "../Navbar"
+import Navbar from "../Navbar";
+import CodeLoginCard from "./CodeLoginCard";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -19,7 +20,6 @@ const LineCard = dynamic(() => import("./_charts/LineCard"), {
     </div>
   ),
 });
-
 
 const RecentGrammarCard = dynamic(() => import("./RecentGrammarCard"), {
   ssr: false,
@@ -68,7 +68,9 @@ export default function DashboardPage() {
         const r = await fetch(`/api/metrics?days=${rangeDays}`);
         const j = await r.json();
         if (j?.ok) setMetrics(j.data);
-      } catch { }
+      } catch {
+        /* no-op */
+      }
     })();
   }, [rangeDays]);
 
@@ -81,11 +83,11 @@ export default function DashboardPage() {
     return books?.[idx]?.title || `Book #${idx}`;
   }
 
-
   return (
     <>
       <Navbar />
       <main className={styles.main}>
+        {/* Header row */}
         <div className={styles.headerRow}>
           <h1 style={{ margin: 0 }}>Dashboard</h1>
           <RecommendedChips />
@@ -93,8 +95,16 @@ export default function DashboardPage() {
             <button
               className={styles.btnDanger}
               onClick={async () => {
-                try { localStorage.clear(); } catch { }
-                try { await fetch("/api/sharecode", { method: "DELETE" }); } catch { }
+                try {
+                  localStorage.clear();
+                } catch { }
+                try {
+                  await fetch("/api/sharecode", { method: "DELETE" });
+                } catch { }
+                // also hit logout to clear cookie server-side
+                try {
+                  await fetch("/api/session/logout", { method: "POST" });
+                } catch { }
                 document.cookie = "learnloomId=; Max-Age=0; path=/";
                 window.location.href = "/";
               }}
@@ -104,25 +114,31 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* Simple sign-in / show-code card */}
+        <section className={styles.sectionTight}>
+          <CodeLoginCard />
+        </section>
+
         {err && <p style={{ color: "red" }}>{err}</p>}
 
+        {/* Quick resume cards */}
         <section className={styles.gridCards}>
-          {/* Quick Resume: Reading */}
+          {/* Reading */}
           <div className={styles.card}>
             <h3 style={{ marginTop: 0 }}>📖 Reading</h3>
             {reading ? (
               <>
                 <p>
                   <strong>{titleForBookIndex(reading.bookIndex)}</strong>, Chapter{" "}
-                  {reading.chapterIndex}
+                  {Number.isInteger(reading.chapterIndex) ? reading.chapterIndex + 1 : "—"}
                   {Number.isInteger(reading.sentenceIndex)
-                    ? `, Sentence ${reading.sentenceIndex}`
+                    ? `, Sentence ${reading.sentenceIndex + 1}`
                     : ""}
                 </p>
                 <button
                   onClick={() =>
-                  (window.location.href =
-                    `/readingpal?bookIndex=${reading.bookIndex}&chapterIndex=${reading.chapterIndex}&resume=1`)
+                    (window.location.href = `/readingpal?bookIndex=${reading.bookIndex}&chapterIndex=${reading.chapterIndex}&resume=1`)
                   }
                   className={styles.btn}
                 >
@@ -134,16 +150,14 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Quick Resume: Upload */}
+          {/* Upload */}
           <div className={styles.card}>
             <h3 style={{ marginTop: 0 }}>📤 Upload</h3>
             {upload ? (
               <>
                 <p>
                   Upload #{upload.uploadId}
-                  {Number.isInteger(upload.paraIndex)
-                    ? `, Paragraph ${upload.paraIndex}`
-                    : ""}
+                  {Number.isInteger(upload.paraIndex) ? `, Paragraph ${upload.paraIndex}` : ""}
                 </p>
                 <button
                   onClick={() => (window.location.href = `/uploads/${upload.uploadId}`)}
@@ -157,7 +171,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Quick Resume: Grammar */}
+          {/* Grammar */}
           <div className={styles.card}>
             <h3 style={{ marginTop: 0 }}>🧠 Grammar</h3>
             {grammar ? (
@@ -166,10 +180,7 @@ export default function DashboardPage() {
                   Last practiced: <strong>{grammar.concept}</strong>
                   {grammar.subTopic ? ` — ${grammar.subTopic}` : ""}
                 </p>
-                <button
-                  onClick={() => (window.location.href = `/grammar`)}
-                  className={styles.btn}
-                >
+                <button onClick={() => (window.location.href = `/grammar`)} className={styles.btn}>
                   Practice More
                 </button>
               </>
@@ -197,11 +208,15 @@ export default function DashboardPage() {
               <button
                 onClick={() => setRangeDays(7)}
                 className={rangeDays === 7 ? styles.btn : styles.btnSecondary}
-              >7 days</button>
+              >
+                7 days
+              </button>
               <button
                 onClick={() => setRangeDays(30)}
                 className={rangeDays === 30 ? styles.btn : styles.btnSecondary}
-              >30 days</button>
+              >
+                30 days
+              </button>
             </div>
           </div>
 
@@ -247,8 +262,9 @@ export default function DashboardPage() {
                     {" · "}
                     <button
                       onClick={() =>
-                      (window.location.href =
-                        `/grammar?start=${encodeURIComponent(r.concept)}|${encodeURIComponent(r.subTopic)}`)}
+                      (window.location.href = `/grammar?start=${encodeURIComponent(
+                        r.concept
+                      )}|${encodeURIComponent(r.subTopic)}`)}
                       className={styles.btnSecondary}
                       style={{ marginLeft: 6 }}
                     >
@@ -269,10 +285,22 @@ export default function DashboardPage() {
               Exports include only your anonymous activity tied to your browser’s cookie.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              <a href="/api/export?kind=reading" download="reading.csv" className={styles.btn}>Reading CSV</a>
-              <a href="/api/export?kind=grammar" download="grammar.csv" className={styles.btn}>Grammar CSV</a>
-              <a href="/api/export?kind=uploads" download="uploads.csv" className={styles.btn}>Uploads CSV</a>
-              <a href="/api/export?kind=all" download="all_exports.zip" className={styles.btnSecondary}>All (ZIP)</a>
+              <a href="/api/export?kind=reading" download="reading.csv" className={styles.btn}>
+                Reading CSV
+              </a>
+              <a href="/api/export?kind=grammar" download="grammar.csv" className={styles.btn}>
+                Grammar CSV
+              </a>
+              <a href="/api/export?kind=uploads" download="uploads.csv" className={styles.btn}>
+                Uploads CSV
+              </a>
+              <a
+                href="/api/export?kind=all"
+                download="all_exports.zip"
+                className={styles.btnSecondary}
+              >
+                All (ZIP)
+              </a>
             </div>
           </section>
         </section>

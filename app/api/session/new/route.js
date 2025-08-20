@@ -1,5 +1,4 @@
 // app/api/session/new/route.js
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
 function genShort() {
@@ -17,25 +16,10 @@ async function mintUniqueShortCode() {
 }
 
 export async function POST() {
-    const cookieStore = await cookies();
-    let anonId = cookieStore.get("learnloomId")?.value;
-    if (!anonId) {
-        anonId = crypto.randomUUID().replace(/-/g, "");
-        cookieStore.set("learnloomId", anonId, {
-            path: "/",
-            httpOnly: false,
-            sameSite: "Lax",
-            maxAge: 60 * 60 * 24 * 365 * 5, // 5y
-        });
-    }
+    // Signup-only: create a new anonId + shortCode, but DO NOT set cookie here.
+    const anonId = crypto.randomUUID().replace(/-/g, "");
+    const shortCode = await mintUniqueShortCode();
+    await prisma.userCode.create({ data: { anonId, shortCode } });
 
-    let row = await prisma.userCode.findFirst({ where: { anonId }, orderBy: { createdAt: "desc" } });
-    if (!row) {
-        row = await prisma.userCode.create({
-            data: { anonId, shortCode: await mintUniqueShortCode() },
-        });
-    } else {
-        await prisma.userCode.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } });
-    }
-    return Response.json({ ok: true, data: { anonId, shortCode: row.shortCode } });
+    return Response.json({ ok: true, data: { anonId, shortCode } });
 }

@@ -1,19 +1,26 @@
+// lib/cookie.ts
 import { cookies } from "next/headers";
-import { v4 as uuidv4 } from "uuid";
 
-export async function getOrSetAnonId() {
-  const cookieStore = await cookies();
-  let anonId = cookieStore.get("learnloomId")?.value;
+export async function getAnonId(): Promise<string | null> {
+  const cs = await cookies();
+  return cs.get("learnloomId")?.value ?? null;
+}
 
-  if (!anonId) {
-    anonId = uuidv4();
-    cookieStore.set("learnloomId", anonId, {
-      path: "/",
-      httpOnly: false,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 90, // 90 days
-    });
-  }
+export async function setAnonIdCookie(anonId: string, maxAgeSec = 60 * 60 * 24 * 365 * 5) {
+  const cs = await cookies();
+  cs.set("learnloomId", anonId, {
+    path: "/",
+    httpOnly: false,
+    sameSite: "lax",   // <- lowercase
+    maxAge: maxAgeSec,
+  });
+}
 
-  return anonId;
+export async function clearAnonIdCookie() {
+  const cs = await cookies();
+  cs.set("learnloomId", "", {
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",   // <- lowercase
+  });
 }
