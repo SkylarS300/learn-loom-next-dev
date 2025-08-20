@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import styles from "./Navbar.module.css";
+import CodeModal from "./components/auth/CodeModal";
 
 export default function Navbar() {
   const [me, setMe] = useState({ anonId: null, shortCode: null, loading: true });
+  const [showQR, setShowQR] = useState(false);
 
   useEffect(() => {
     let dead = false;
@@ -105,9 +107,17 @@ export default function Navbar() {
               <button onClick={copyCode} className={styles.btnSecondary} style={btnSecondary}>
                 Copy code
               </button>
+              {me.shortCode && (
+                <button onClick={() => setShowQR(true)} className={styles.btnSecondary} style={btnSecondary}>
+                  Show QR
+                </button>
+              )}
               <button onClick={logout} className={styles.btnDanger} style={btnDanger}>
                 Logout
               </button>
+              {me.shortCode && (
+                <CodeModal open={showQR} shortCode={me.shortCode || ""} onClose={() => setShowQR(false)} />
+              )}
             </>
           ) : (
             <>
