@@ -1,33 +1,44 @@
 // app/classrooms/[id]/page.jsx
 "use client";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import Navbar from "../../Navbar";
 import styles from "../../dashboard/Dashboard.module.css";
 
 const LineCard = dynamic(() => import("../../dashboard/_charts/LineCard"), { ssr: false });
 
-export default function ClassroomPage({ params }) {
-    const id = Number(params?.id);
+export default function ClassroomPage() {
+    const { id } = useParams();        // id is a string from the URL
+    const classId = Number(id);
     const [m, setM] = useState(null);
     const [err, setErr] = useState("");
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!Number.isFinite(classId)) { setErr("Bad classroom id in URL"); setLoading(false); return; }
+        const ctl = new AbortController();
         (async () => {
             try {
-                const r = await fetch(`/api/classrooms/${id}/metrics`);
+                const r = await fetch(`/api/classrooms/${classId}/metrics`, { cache: "no-store", signal: ctl.signal });
                 const j = await r.json();
                 if (!j?.ok) throw new Error(j?.error || "Failed");
                 setM(j.data);
-            } catch (e) { setErr(e.message || "Failed to load"); }
+            } catch (e) {
+                if (e.name !== "AbortError") setErr(e.message || "Failed to load");
+            } finally {
+                setLoading(false);
+            }
         })();
-    }, [id]);
+        return () => ctl.abort();
+    }, [classId]);
 
     return (
         <>
             <Navbar />
             <main className={styles.main}>
-                <a href="/dashboard" className={styles.btnSecondary}>← Back</a>
+                <Link href="/dashboard" className={styles.btnSecondary}>← Back</Link>
                 <h1 style={{ marginTop: 8, marginBottom: 0 }}>{m?.classroom?.name || "Classroom"}</h1>
                 <p className={styles.dim}>Students: {m?.roster?.students ?? 0} • Window: {m?.from} → {m?.to}</p>
                 {m && (
@@ -40,7 +51,8 @@ export default function ClassroomPage({ params }) {
                         </a>
                     </div>
                 )}
-                {err && <p style={{ color: "#b91c1c" }}>{err}</p>}
+                {loading && <p className={styles.dim}>Loading…</p>}
+                {err && !loading && <p style={{ color: "#b91c1c" }}>{err}</p>}
 
                 <section className={styles.section}>
                     <LineCard title="Reading minutes / day" data={m?.readingDaily || []} yKey="minutes" />
@@ -71,12 +83,12 @@ export default function ClassroomPage({ params }) {
                         <ul style={{ margin: 0, paddingLeft: 18 }}>
                             {m.notesPerStudent.map((r) => (
                                 <li key={r.anonId}>
-                                    <a
+                                    <Link
                                         href={`/classrooms/${m.classroom.id}/student/${encodeURIComponent(r.anonId)}`}
                                         className={styles.btnSecondary}
                                     >
                                         <code>{r.anonId.slice(0, 8)}…</code>
-                                    </a>{" "}
+                                    </Link>{" "}
                                     — {r.count}
                                 </li>
                             ))}

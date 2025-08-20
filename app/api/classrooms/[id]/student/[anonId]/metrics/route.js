@@ -4,9 +4,10 @@ import prisma from "@/lib/prisma";
 
 function ymd(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10); }
 
-export async function GET(req, { params }) {
-    const classId = Number(params?.id);
-    const studentAnon = decodeURIComponent(params?.anonId || "");
+export async function GET(req, ctx) {
+    const p = await ctx.params;
+    const classId = Number(p?.id);
+    const studentAnon = decodeURIComponent(p?.anonId || "");
     if (!Number.isFinite(classId) || !studentAnon) return Response.json({ ok: false, error: "Bad params" }, { status: 400 });
 
     const url = new URL(req.url);
