@@ -984,13 +984,12 @@ export default function ReadingPalClient() {
               const map = {};
               for (const n of (arr || [])) {
                 if (Number.isInteger(n?.sentenceIndex) && n?.color) {
-                  nextMap[n.sentenceIndex] = n.color;
+                  map[n.sentenceIndex] = n.color;
                 }
               }
               noteMapRef.current = map;
-              // reuse helpers already defined above
-              clearNoteDecorations?.();
-              applyNoteDecorations?.(noteMapRef.current);
+              clearNoteDecorations();
+              applyNoteDecorations(noteMapRef.current);
             } catch { }
           }}
         />

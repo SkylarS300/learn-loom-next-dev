@@ -9,6 +9,8 @@ import books from "@/src/content/book-content.js";
 import { track } from "@/lib/rum";
 import Navbar from "../Navbar";
 import CodeLoginCard from "./CodeLoginCard";
+import MyNotesCard from "./MyNotesCard";
+import ConfirmClearModal from "./ConfirmClearModal";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -40,6 +42,16 @@ export default function DashboardPage() {
     grammarPaceDaily: [],
     topWeakAreas: [],
   });
+
+  const [showClearModal, setShowClearModal] = useState(false);
+
+  async function actuallyClearAll() {
+    try { localStorage.clear(); } catch { }
+    try { await fetch("/api/sharecode", { method: "DELETE" }); } catch { }
+    try { await fetch("/api/session/logout", { method: "POST" }); } catch { }
+    document.cookie = "learnloomId=; Max-Age=0; path=/";
+    window.location.href = "/";
+  }
 
   useEffect(() => {
     // mark dashboard start once per mount
@@ -94,20 +106,7 @@ export default function DashboardPage() {
           <div className={styles.growRight}>
             <button
               className={styles.btnDanger}
-              onClick={async () => {
-                try {
-                  localStorage.clear();
-                } catch { }
-                try {
-                  await fetch("/api/sharecode", { method: "DELETE" });
-                } catch { }
-                // also hit logout to clear cookie server-side
-                try {
-                  await fetch("/api/session/logout", { method: "POST" });
-                } catch { }
-                document.cookie = "learnloomId=; Max-Age=0; path=/";
-                window.location.href = "/";
-              }}
+              onClick={() => setShowClearModal(true)}
               aria-label="Clear my anonymous data"
             >
               Clear my traces
@@ -198,6 +197,12 @@ export default function DashboardPage() {
         {/* Notes panel */}
         <section className={styles.section}>
           <NotesPanel />
+        </section>
+
+
+        {/* My Notes (searchable) */}
+        <section className={styles.sectionTight}>
+          <MyNotesCard />
         </section>
 
         {/* Progress charts */}
@@ -305,6 +310,12 @@ export default function DashboardPage() {
           </section>
         </section>
       </main>
+      {/* Styled confirmation modal */}
+      <ConfirmClearModal
+        open={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onConfirm={actuallyClearAll}
+      />
     </>
   );
 }

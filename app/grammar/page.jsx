@@ -269,9 +269,11 @@ export default function Grammar() {
 
   return (
     <div id="main-content">
-      <NavbarGuard>
-        <Navbar />
-      </NavbarGuard>
+      {mode !== "running" && (
+        <NavbarGuard>
+          <Navbar />
+        </NavbarGuard>
+      )}
 
       <div className={styles.columns}>
         {/* ---- Sidebar ---- */}
