@@ -288,6 +288,11 @@
     align-items: center;
 }
 
+.editRow label {
+    color: #111827;
+    font-size: 14px;
+}
+
 .input,
 .textarea {
     width: 100%;

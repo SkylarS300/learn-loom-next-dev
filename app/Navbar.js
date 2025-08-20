@@ -150,7 +150,9 @@ function toast(msg) {
     zIndex: 9999,
   });
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1200);
+  setTimeout(() => {
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }, 1200);
 }
 
 const btnPrimary = {

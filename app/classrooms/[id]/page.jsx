@@ -45,6 +45,13 @@ export default function ClassroomPage() {
                     <div style={{ margin: "8px 0" }}>
                         <a
                             className={styles.btn}
+                            href={`/classrooms/${m.classroom.id}/assignments/new`}
+                            style={{ marginRight: 8 }}
+                        >
+                            + New assignment
+                        </a>
+                        <a
+                            className={styles.btn}
                             href={`/api/classrooms/${m.classroom.id}/metrics/export?from=${m.from}&to=${m.to}`}
                         >
                             Export CSV (ZIP)

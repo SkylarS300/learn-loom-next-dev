@@ -102,5 +102,8 @@ function toast(msg) {
         position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)",
         background: "#111827", color: "#fff", padding: "8px 12px", borderRadius: 8, zIndex: 9999
     });
-    document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+    document.body.appendChild(el);
+    setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, 1100);
 }
