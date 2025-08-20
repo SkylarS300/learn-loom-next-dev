@@ -137,12 +137,11 @@ export default function DashboardPage() {
           <CodeLoginCard />
           {me.ok && me.shortCode && (
             <div style={{ marginTop: 8 }}>
-              <button
-                className={styles.btnSecondary}
-                onClick={() => setShowCodeModal(true)}
-              >
-                Show QR
-              </button>
+              <CodeModal
+                open={showCodeModal}
+                shortCode={me.shortCode || ""}
+                onClose={() => setShowCodeModal(false)}
+              />
             </div>
           )}
         </section>
@@ -340,12 +339,11 @@ export default function DashboardPage() {
       />
       {me.ok && me.shortCode && (
         <div style={{ marginTop: 8 }}>
-          <button
-            className={styles.btnSecondary}
-            onClick={() => setShowCodeModal(true)}
-          >
-            Show QR
-          </button>
+          <CodeModal
+            open={showCodeModal}
+            shortCode={me.shortCode || ""}
+            onClose={() => setShowCodeModal(false)}
+          />
         </div>
       )}
     </>
