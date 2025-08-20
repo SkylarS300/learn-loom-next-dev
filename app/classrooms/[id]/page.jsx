@@ -30,6 +30,16 @@ export default function ClassroomPage({ params }) {
                 <a href="/dashboard" className={styles.btnSecondary}>← Back</a>
                 <h1 style={{ marginTop: 8, marginBottom: 0 }}>{m?.classroom?.name || "Classroom"}</h1>
                 <p className={styles.dim}>Students: {m?.roster?.students ?? 0} • Window: {m?.from} → {m?.to}</p>
+                {m && (
+                    <div style={{ margin: "8px 0" }}>
+                        <a
+                            className={styles.btn}
+                            href={`/api/classrooms/${m.classroom.id}/metrics/export?from=${m.from}&to=${m.to}`}
+                        >
+                            Export CSV (ZIP)
+                        </a>
+                    </div>
+                )}
                 {err && <p style={{ color: "#b91c1c" }}>{err}</p>}
 
                 <section className={styles.section}>
@@ -60,8 +70,17 @@ export default function ClassroomPage({ params }) {
                     {m?.notesPerStudent?.length ? (
                         <ul style={{ margin: 0, paddingLeft: 18 }}>
                             {m.notesPerStudent.map((r) => (
-                                <li key={r.anonId}><code>{r.anonId.slice(0, 8)}…</code> — {r.count}</li>
+                                <li key={r.anonId}>
+                                    <a
+                                        href={`/classrooms/${m.classroom.id}/student/${encodeURIComponent(r.anonId)}`}
+                                        className={styles.btnSecondary}
+                                    >
+                                        <code>{r.anonId.slice(0, 8)}…</code>
+                                    </a>{" "}
+                                    — {r.count}
+                                </li>
                             ))}
+
                         </ul>
                     ) : <p className={styles.dim}>No notes recorded in the range.</p>}
                 </section>
