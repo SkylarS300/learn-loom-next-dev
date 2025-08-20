@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../Navbar";
 
 export default function LoginPage() {
@@ -9,6 +9,14 @@ export default function LoginPage() {
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Prefill from QR deep-link (?code=AB12-XY34-9K)
+    useEffect(() => {
+        const pre = searchParams.get("code");
+        if (pre) setCode(pre);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // run once on mount
 
     async function submit(e) {
         e.preventDefault();
@@ -34,11 +42,13 @@ export default function LoginPage() {
             <Navbar />
             <main style={{ maxWidth: 520, margin: "24px auto", padding: 16 }}>
                 <h1>Log in with your code</h1>
-                <p style={{ color: "#6b7280" }}>Paste your short code (e.g., <code>AB12-XY34-9K</code>).</p>
+                <p style={{ color: "#6b7280" }}>
+                    Paste your short code (e.g., <code>AB12-XY34-9K</code>), or scan a QR from another device.
+                </p>
                 <form onSubmit={submit} style={{ display: "grid", gap: 12, marginTop: 12 }}>
                     <input
                         value={code}
-                        onChange={e => setCode(e.target.value)}
+                        onChange={(e) => setCode(e.target.value)}
                         placeholder="Your code"
                         aria-label="Your code"
                         style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 8 }}
@@ -46,7 +56,14 @@ export default function LoginPage() {
                     {err && <div style={{ color: "#b91c1c" }}>{err}</div>}
                     <button
                         disabled={!code.trim() || loading}
-                        style={{ padding: "10px 14px", borderRadius: 8, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer" }}
+                        style={{
+                            padding: "10px 14px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: "#3b82f6",
+                            color: "#fff",
+                            cursor: "pointer"
+                        }}
                     >
                         {loading ? "Logging in…" : "Log in"}
                     </button>

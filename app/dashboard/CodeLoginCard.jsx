@@ -12,6 +12,12 @@ export default function CodeLoginCard() {
     useEffect(() => {
         let dead = false;
         (async () => {
+            // prefill from ?code=... so QR deep-link works
+            try {
+                const q = new URLSearchParams(window.location.search);
+                const pre = q.get("code");
+                if (pre) setCode(pre);
+            } catch { }
             try {
                 const r = await fetch("/api/session/me", { cache: "no-store" });
                 const j = await r.json();
