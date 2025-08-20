@@ -148,7 +148,9 @@ export default function NewAssignmentPage() {
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to create");
             toast("Assignment created");
-            // navigate: class page for now (detail table coming next)
+            // Navigate straight to the new assignment's detail table
+            const newId = j?.data?.assignmentId;
+            router.push(newId ? `/assignments/${newId}` : `/classrooms/${classId}`);
             router.push(`/classrooms/${classId}`);
         } catch (e) {
             setErr(e.message || "Failed to create");
