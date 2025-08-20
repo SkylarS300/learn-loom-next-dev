@@ -2,10 +2,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import Navbar from "../../../Navbar";
-import styles from "../../../dashboard/Dashboard.module.css";
-
-const LineCard = dynamic(() => import("../../../dashboard/_charts/LineCard"), { ssr: false });
+import Navbar from "../../../../Navbar";
+import styles from "../../../../dashboard/Dashboard.module.css";
+const LineCard = dynamic(() => import("../../../../dashboard/_charts/LineCard"), { ssr: false });
 
 export default function StudentDrill({ params }) {
     const id = Number(params?.id);
