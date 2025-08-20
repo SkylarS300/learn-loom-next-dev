@@ -13,7 +13,7 @@ import ConfirmClearModal from "./ConfirmClearModal";
 import CodeModal from "../components/auth/CodeModal";
 import SavedCodesCard from "./SavedCodesCard";
 import SettingsCard from "./SettingsCard";
-
+import MyAssignmentsCard from "./MyAssignmentsCard";
 
 
 // Lazy-load the chart card to keep initial bundle small.
@@ -156,6 +156,10 @@ export default function DashboardPage() {
           <SettingsCard />
         </section>
 
+        {/* Student assignments */}
+        <section className={styles.sectionTight}>
+          <MyAssignmentsCard />
+        </section>
 
         {err && <p style={{ color: "red" }}>{err}</p>}
 
