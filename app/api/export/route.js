@@ -31,12 +31,19 @@ export async function GET(req) {
         );
     }
 
-    // Fetch all three datasets (cheap and simple)
-    const [reading, grammar, uploads] = await Promise.all([
+    // Fetch all datasets (notes added)
+    const [reading, grammar, uploads, notes] = await Promise.all([
         prisma.readingprogress.findMany({
             where: { anonId },
             orderBy: [{ updatedAt: "desc" }, { completedAt: "desc" }],
-            select: { bookIndex: true, chapterIndex: true, sentenceIndex: true, timeMs: true, updatedAt: true, completedAt: true },
+            select: {
+                bookIndex: true,
+                chapterIndex: true,
+                sentenceIndex: true,
+                timeMs: true,
+                updatedAt: true,
+                completedAt: true,
+            },
         }),
         prisma.grammarprogress.findMany({
             where: { anonId },
@@ -48,10 +55,41 @@ export async function GET(req) {
             orderBy: { updatedAt: "desc" },
             select: { uploadId: true, paraIndex: true, charOffset: true, updatedAt: true },
         }),
+        prisma.note.findMany({
+            where: { anonId },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+                id: true,
+                targetType: true,
+                bookIndex: true,
+                uploadId: true,
+                chapterIndex: true,
+                sentenceIndex: true,
+                wordIndex: true,
+                concept: true,
+                subTopic: true,
+                promptHash: true,
+                anchorText: true,
+                body: true,
+                tagsJson: true,
+                color: true,
+                isBookmark: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        }),
     ]);
 
     // Build CSVs
-    const readingHeaders = ["bookIndex", "bookTitle", "chapterIndex", "sentenceIndex", "timeMs", "updatedAt", "completedAt"];
+    const readingHeaders = [
+        "bookIndex",
+        "bookTitle",
+        "chapterIndex",
+        "sentenceIndex",
+        "timeMs",
+        "updatedAt",
+        "completedAt",
+    ];
     const readingRows = reading.map((r) => ({
         bookIndex: r.bookIndex,
         bookTitle: books?.[r.bookIndex]?.title || `Book #${r.bookIndex}`,
@@ -81,7 +119,57 @@ export async function GET(req) {
     }));
     const uploadsCSV = toCSV(uploadsHeaders, uploadsRows);
 
-    // Serve
+    // Notes CSV + JSON
+    const notesHeaders = [
+        "id",
+        "targetType",
+        "bookIndex",
+        "uploadId",
+        "chapterIndex",
+        "sentenceIndex",
+        "wordIndex",
+        "concept",
+        "subTopic",
+        "promptHash",
+        "anchorText",
+        "body",
+        "tags",
+        "color",
+        "isBookmark",
+        "createdAt",
+        "updatedAt",
+    ];
+    const notesRows = notes.map((n) => ({
+        id: n.id,
+        targetType: n.targetType,
+        bookIndex: n.bookIndex ?? "",
+        uploadId: n.uploadId ?? "",
+        chapterIndex: n.chapterIndex ?? "",
+        sentenceIndex: n.sentenceIndex ?? "",
+        wordIndex: n.wordIndex ?? "",
+        concept: n.concept ?? "",
+        subTopic: n.subTopic ?? "",
+        promptHash: n.promptHash ?? "",
+        anchorText: n.anchorText ?? "",
+        body: n.body ?? "",
+        tags: Array.isArray(n.tagsJson) ? n.tagsJson.join(" | ") : "",
+        color: n.color ?? "",
+        isBookmark: n.isBookmark ? "true" : "false",
+        createdAt: n.createdAt?.toISOString?.() || n.createdAt,
+        updatedAt: n.updatedAt?.toISOString?.() || n.updatedAt,
+    }));
+    const notesCSV = toCSV(notesHeaders, notesRows);
+    const notesJSON = JSON.stringify(
+        notes.map((n) => ({
+            ...n,
+            tags: Array.isArray(n.tagsJson) ? n.tagsJson : [],
+            tagsJson: undefined,
+        })),
+        null,
+        2
+    );
+
+    // Single-file responses
     if (kind === "reading") {
         return new NextResponse(readingCSV, {
             status: 200,
@@ -109,12 +197,23 @@ export async function GET(req) {
             },
         });
     }
+    if (kind === "notes") {
+        return new NextResponse(notesCSV, {
+            status: 200,
+            headers: {
+                "Content-Type": "text/csv; charset=utf-8",
+                "Content-Disposition": 'attachment; filename="notes.csv"',
+            },
+        });
+    }
 
-    // kind === "all" → ZIP of all three
+    // kind === "all" → ZIP everything
     const zip = new JSZip();
     zip.file("reading.csv", readingCSV);
     zip.file("grammar.csv", grammarCSV);
     zip.file("uploads.csv", uploadsCSV);
+    zip.file("notes.csv", notesCSV);
+    zip.file("notes.json", notesJSON);
     const blob = await zip.generateAsync({ type: "nodebuffer" });
 
     return new NextResponse(blob, {

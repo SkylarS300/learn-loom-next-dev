@@ -322,6 +322,9 @@ export default function DashboardPage() {
               <a href="/api/export?kind=uploads" download="uploads.csv" className={styles.btn}>
                 Uploads CSV
               </a>
+              <a href="/api/export?kind=notes" download="notes.csv" className={styles.btn}>
+                Notes CSV
+              </a>
               <a
                 href="/api/export?kind=all"
                 download="all_exports.zip"
