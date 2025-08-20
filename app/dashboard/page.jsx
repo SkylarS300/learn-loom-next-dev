@@ -10,6 +10,7 @@ import { track } from "@/lib/rum";
 import Navbar from "../Navbar";
 import CodeLoginCard from "./CodeLoginCard";
 import ConfirmClearModal from "./ConfirmClearModal";
+import CodeModal from "../components/auth/CodeModal";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -43,6 +44,8 @@ export default function DashboardPage() {
   });
 
   const [showClearModal, setShowClearModal] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [me, setMe] = useState({ ok: false, shortCode: null, loading: true });
 
   async function actuallyClearAll() {
     try { localStorage.clear(); } catch { }
@@ -72,6 +75,22 @@ export default function DashboardPage() {
       }
     })();
   }, []);
+
+  // Get shortCode for QR button (only 1 call; harmless if not logged-in)
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/session/me", { cache: "no-store" });
+        const j = await r.json();
+        if (!dead) setMe({ ok: !!j?.ok, shortCode: j?.data?.shortCode ?? null, loading: false });
+      } catch {
+        if (!dead) setMe({ ok: false, shortCode: null, loading: false });
+      }
+    })();
+    return () => { dead = true; };
+  }, []);
+
 
   useEffect(() => {
     (async () => {
@@ -116,6 +135,16 @@ export default function DashboardPage() {
         {/* Simple sign-in / show-code card */}
         <section className={styles.sectionTight}>
           <CodeLoginCard />
+          {me.ok && me.shortCode && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                className={styles.btnSecondary}
+                onClick={() => setShowCodeModal(true)}
+              >
+                Show QR
+              </button>
+            </div>
+          )}
         </section>
 
         {err && <p style={{ color: "red" }}>{err}</p>}
@@ -309,6 +338,16 @@ export default function DashboardPage() {
         onClose={() => setShowClearModal(false)}
         onConfirm={actuallyClearAll}
       />
+      {me.ok && me.shortCode && (
+        <div style={{ marginTop: 8 }}>
+          <button
+            className={styles.btnSecondary}
+            onClick={() => setShowCodeModal(true)}
+          >
+            Show QR
+          </button>
+        </div>
+      )}
     </>
   );
 }
