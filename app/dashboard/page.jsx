@@ -11,6 +11,7 @@ import Navbar from "../Navbar";
 import CodeLoginCard from "./CodeLoginCard";
 import ConfirmClearModal from "./ConfirmClearModal";
 import CodeModal from "../components/auth/CodeModal";
+import SavedCodesCard from "./SavedCodesCard";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -137,13 +138,14 @@ export default function DashboardPage() {
           <CodeLoginCard />
           {me.ok && me.shortCode && (
             <div style={{ marginTop: 8 }}>
-              <CodeModal
-                open={showCodeModal}
-                shortCode={me.shortCode || ""}
-                onClose={() => setShowCodeModal(false)}
-              />
             </div>
           )}
+        </section>
+
+
+        {/* Saved share codes manager */}
+        <section className={styles.sectionTight}>
+          <SavedCodesCard />
         </section>
 
         {err && <p style={{ color: "red" }}>{err}</p>}
@@ -338,13 +340,11 @@ export default function DashboardPage() {
         onConfirm={actuallyClearAll}
       />
       {me.ok && me.shortCode && (
-        <div style={{ marginTop: 8 }}>
-          <CodeModal
-            open={showCodeModal}
-            shortCode={me.shortCode || ""}
-            onClose={() => setShowCodeModal(false)}
-          />
-        </div>
+        <CodeModal
+          open={showCodeModal}
+          shortCode={me.shortCode || ""}
+          onClose={() => setShowCodeModal(false)}
+        />
       )}
     </>
   );

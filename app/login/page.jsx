@@ -8,15 +8,28 @@ export default function LoginPage() {
     const [code, setCode] = useState("");
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
+    const [autoTried, setAutoTried] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
 
     // Prefill from QR deep-link (?code=AB12-XY34-9K)
     useEffect(() => {
         const pre = searchParams.get("code");
-        if (pre) setCode(pre);
+        if (pre) setCode(pre.trim());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // run once on mount
+
+    // Auto-submit once if code came from URL and looks non-empty
+    useEffect(() => {
+        const pre = searchParams.get("code");
+        if (!pre) return;
+        if (autoTried) return;
+        if (!code.trim()) return; // wait until state is set
+        setAutoTried(true);
+        // fire and forget; reuse submit() so we keep one codepath
+        submit();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [code]);
 
     async function submit(e) {
         e.preventDefault();
