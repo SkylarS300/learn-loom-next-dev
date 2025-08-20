@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CodeModal from "../components/auth/CodeModal";
 
 export default function CodeLoginCard() {
     const [me, setMe] = useState({ ok: false, anonId: null, shortCode: null, loading: true });
     const [code, setCode] = useState("");
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
+    const [showQR, setShowQR] = useState(false);
 
     // load current session (if any)
     useEffect(() => {
@@ -63,8 +65,14 @@ export default function CodeLoginCard() {
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                     <button onClick={async () => { try { await navigator.clipboard.writeText(me.shortCode || ""); toast("Copied"); } catch { } }}
                         style={btnSecondary}>Copy</button>
+                    <button onClick={() => setShowQR(true)} style={btnSecondary}>Show QR</button>
                     <a href="/signup" style={btnPrimary}>Get a new code</a>
                 </div>
+                <CodeModal
+                    open={showQR}
+                    shortCode={me.shortCode || ""}
+                    onClose={() => setShowQR(false)}
+                />
             </div>
         );
     }
