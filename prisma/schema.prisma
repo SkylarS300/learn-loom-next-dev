@@ -14,16 +14,38 @@ model assignment {
   description String
   type        assignment_type
   dueDate     DateTime?
+  startAt     DateTime?
+  allowLate   Boolean         @default(true)
+  latePenaltyPct Int?
+  weightPoints  Int?
+  instructions  String?
+  attachmentsJson Json        @default("[]")
   createdAt   DateTime        @default(now())
 
   completions assignmentcompletion[]
   classroom   classroom              @relation(fields: [classroomId], references: [id])
+
+  targets     assignmenttarget[]
 
   category String? // for quizzes
   subtopic String? // for quizzes
 
   bookId       Int? // for reading assignments: refers to index in book-content
   chapterIndex Int? // for reading assignments: refers to chapter in book
+  uploadId     Int?
+}
+
+model assignmenttarget {
+  id           Int      @id @default(autoincrement())
+  assignmentId Int
+  anonId       String?  // null => ALL (whole class target)
+  overridesJson Json    @default("{}") // per-student overrides (dueAt, allowLate, etc.)
+
+  assignment assignment @relation(fields: [assignmentId], references: [id])
+
+  @@index([assignmentId])
+  @@index([anonId])
+  @@unique([assignmentId, anonId])
 }
 
 model bookcontent {
@@ -104,6 +126,7 @@ model studentclassroom {
   anonId      String?
   classroomId Int
   role        String  @default("student") // 'teacher' | 'student'
+  displayName String?
 
   student   user?     @relation(fields: [studentId], references: [id])
   classroom classroom @relation(fields: [classroomId], references: [id])
@@ -159,8 +182,17 @@ model assignmentcompletion {
   assignmentId Int
   userId       Int?
   anonId       String?
+  status       submission_status @default(ASSIGNED)
   completedAt  DateTime?
-  quizScore    Int?
+  submittedAt  DateTime?
+  gradedAt     DateTime?
+  quizScore    Int?     // legacy; keep
+  scorePct     Int?
+  scorePoints  Int?
+  attemptCount Int       @default(0)
+  attemptsJson Json      @default("[]") // array of attempt refs/metadata
+  feedback     String?
+  isLate       Boolean   @default(false)
 
   assignment assignment @relation(fields: [assignmentId], references: [id])
   user       user?      @relation(fields: [userId], references: [id])
@@ -199,6 +231,15 @@ enum user_role {
   STUDENT
   TEACHER
 }
+
+enum submission_status {
+  ASSIGNED
+  SUBMITTED
+  GRADED
+  MISSING
+  LATE
+}
+
 
 model uploadview {
   id       Int      @id @default(autoincrement())
