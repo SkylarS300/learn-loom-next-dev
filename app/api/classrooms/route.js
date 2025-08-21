@@ -2,68 +2,67 @@
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
-const ABC = "ABCDEFGHJKMNPQRSTUVWXZ23456789"; // no O/0/I/1
-function genCode(n = 6) {
-    return Array.from({ length: n }, () => ABC[Math.floor(Math.random() * ABC.length)]).join("");
+function normalizeName(s) {
+    return String(s || "").trim().slice(0, 120);
+}
+function genCode() {
+    return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-export async function GET() {
-    const cs = await cookies();
-    const anonId = cs.get("learnloomId")?.value;
-    if (!anonId) return Response.json({ ok: true, data: { teaching: [], enrolled: [] } });
-
-    // Classes I own (teacher)
-    const teaching = await prisma.classroom.findMany({
-        where: { ownerAnon: anonId },
-        orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, code: true, createdAt: true },
-    });
-
-    // Classes I’m enrolled in (student)
-    const memberships = await prisma.studentclassroom.findMany({
-        where: { anonId },
-        select: { classroomId: true },
-    });
-    const enrolledIds = memberships.map((m) => m.classroomId);
-    const enrolled = enrolledIds.length
-        ? await prisma.classroom.findMany({
-            where: { id: { in: enrolledIds } },
-            orderBy: { createdAt: "desc" },
-            select: { id: true, name: true, code: true, createdAt: true },
-        })
-        : [];
-
-    return Response.json({ ok: true, data: { teaching, enrolled } });
+async function makeUniqueCode() {
+    for (let i = 0; i < 6; i++) {
+        const code = genCode();
+        const exists = await prisma.classroom.findUnique({ where: { code } });
+        if (!exists) return code;
+    }
+    throw new Error("Could not mint unique class code");
 }
 
+// POST /api/classrooms  { name }
+// Creates a classroom; owner = current anonId; also joins owner as role='teacher'
 export async function POST(req) {
     const cs = await cookies();
-    const anonId = cs.get("learnloomId")?.value;
+    const anonId = cs.get("learnloomId")?.value || null;
     if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const { name } = await req.json().catch(() => ({}));
-    if (!name || String(name).trim().length < 2) {
-        return Response.json({ ok: false, error: "Name required" }, { status: 422 });
+    const body = await req.json().catch(() => ({}));
+    const name = normalizeName(body?.name);
+    if (!name) return Response.json({ ok: false, error: "Missing name" }, { status: 400 });
+
+    try {
+        const code = await makeUniqueCode();
+
+        const cls = await prisma.classroom.create({
+            data: {
+                name,
+                code,
+                ownerAnon: anonId,
+                // teacherId is legacy; leave null
+            },
+            select: { id: true, code: true, name: true },
+        });
+
+        // Ensure owner is in roster as a teacher (idempotent)
+        await prisma.studentclassroom.upsert({
+            where: {
+                // no composite unique on (anonId, classroomId), so emulate via find+create
+                // Use anonId+classroomId uniqueness by guarding with findFirst
+                // We'll simply try create and ignore duplicate
+                // (MySQL will allow; but to be safe do findFirst)
+                // This upsert uses a fake unique; Prisma needs a unique field; fall back to createMany skipDuplicates:
+                // Use createMany for idempotency:
+            },
+            update: {},
+            create: {}, // This upsert trick won't work without a unique — use createMany instead below
+        }).catch(() => { });
+
+        await prisma.studentclassroom.createMany({
+            data: [{ classroomId: cls.id, anonId, role: "teacher" }],
+            skipDuplicates: true,
+        });
+
+        return Response.json({ ok: true, data: cls }, { status: 201 });
+    } catch (e) {
+        return Response.json({ ok: false, error: e.message || "Failed to create" }, { status: 500 });
     }
-
-    // Generate unique code
-    let code = "";
-    for (let i = 0; i < 8; i++) {
-        const tryCode = genCode(6);
-        const clash = await prisma.classroom.findUnique({ where: { code: tryCode } });
-        if (!clash) { code = tryCode; break; }
-    }
-    if (!code) return Response.json({ ok: false, error: "Could not generate code" }, { status: 500 });
-
-    const cls = await prisma.classroom.create({
-        data: { name: String(name).trim(), code, teacherId: 0, ownerAnon: anonId },
-        select: { id: true, name: true, code: true, createdAt: true },
-    });
-
-    // (Optional) also record a teacher membership row for easier queries
-    await prisma.studentclassroom.create({
-        data: { classroomId: cls.id, anonId, role: "teacher" },
-    }).catch(() => { });
-
-    return Response.json({ ok: true, data: cls });
 }
