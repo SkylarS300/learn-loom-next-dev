@@ -13,12 +13,18 @@ export async function GET(req) {
     const horizonDays = Number(url.searchParams.get("days") || 30);
     const to = new Date(now.getTime() + horizonDays * 86400000);
 
-    // classes I'm in
+    // classes I'm in (with role + classroom name) — we only keep non-teacher classes here
     const classes = await prisma.studentclassroom.findMany({
         where: { anonId: me },
-        select: { classroomId: true },
+        select: {
+            classroomId: true,
+            role: true,
+            classroom: { select: { name: true } },
+        },
     });
-    const classIds = classes.map(c => c.classroomId);
+    const studentClasses = classes.filter(c => (c.role || "student") !== "teacher");
+    const classNameById = new Map(classes.map(c => [c.classroomId, c.classroom?.name || "Class"]));
+    const classIds = studentClasses.map(c => c.classroomId);
     if (!classIds.length) return Response.json({ ok: true, data: [] });
 
     // all assignments targeting me across my classes
@@ -66,6 +72,8 @@ export async function GET(req) {
             isLate: s?.isLate ?? false,
             bucket,
             href,
+            classroomId: a.classroomId,
+            classroomName: classNameById.get(a.classroomId) || "Class",
         };
     });
 

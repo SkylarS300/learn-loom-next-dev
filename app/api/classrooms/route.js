@@ -37,25 +37,13 @@ export async function POST(req) {
                 name,
                 code,
                 ownerAnon: anonId,
-                // teacherId is legacy; leave null
+                // Required by Prisma schema; no FK, so store sentinel 0.
+                teacherId: 0,
             },
             select: { id: true, code: true, name: true },
         });
 
         // Ensure owner is in roster as a teacher (idempotent)
-        await prisma.studentclassroom.upsert({
-            where: {
-                // no composite unique on (anonId, classroomId), so emulate via find+create
-                // Use anonId+classroomId uniqueness by guarding with findFirst
-                // We'll simply try create and ignore duplicate
-                // (MySQL will allow; but to be safe do findFirst)
-                // This upsert uses a fake unique; Prisma needs a unique field; fall back to createMany skipDuplicates:
-                // Use createMany for idempotency:
-            },
-            update: {},
-            create: {}, // This upsert trick won't work without a unique — use createMany instead below
-        }).catch(() => { });
-
         await prisma.studentclassroom.createMany({
             data: [{ classroomId: cls.id, anonId, role: "teacher" }],
             skipDuplicates: true,

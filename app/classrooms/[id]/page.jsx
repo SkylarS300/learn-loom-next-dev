@@ -297,14 +297,6 @@ export default function ClassroomPage() {
                 <section className={styles.section}>
                     <div className={styles.headerRow}>
                         <h3 style={{ margin: 0 }}>🗂 Assignments</h3>
-                        <div className={styles.growRight}>
-                            <a
-                                className={styles.btn}
-                                href={`/classrooms/${classId}/assignments/new`}
-                            >
-                                + New assignment
-                            </a>
-                        </div>
                     </div>
                     {aLoading ? (
                         <p className={styles.dim}>Loading…</p>
