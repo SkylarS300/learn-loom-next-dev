@@ -12,9 +12,12 @@ const LineCard = dynamic(() => import("../../dashboard/_charts/LineCard"), { ssr
 export default function ClassroomPage() {
     const { id } = useParams();        // id is a string from the URL
     const classId = Number(id);
+
+    // metrics
     const [m, setM] = useState(null);
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(true);
+
     // assignments
     const [alist, setAlist] = useState([]);
     const [aErr, setAErr] = useState("");
@@ -22,6 +25,16 @@ export default function ClassroomPage() {
     const demoAssignments =
         typeof window !== "undefined" &&
         new URLSearchParams(window.location.search).get("demoAssignments") === "1";
+
+    // roster
+    const [roster, setRoster] = useState([]);
+    const [rErr, setRErr] = useState("");
+    const [rLoading, setRLoading] = useState(true);
+    const [editMap, setEditMap] = useState({}); // anonId -> draft displayName
+
+    // kick modal
+    const [kick, setKick] = useState(null); // { anonId, displayName, token, input }
+
     useEffect(() => {
         if (!Number.isFinite(classId)) { setErr("Bad classroom id in URL"); setLoading(false); return; }
         const ctl = new AbortController();
@@ -35,6 +48,26 @@ export default function ClassroomPage() {
                 if (e.name !== "AbortError") setErr(e.message || "Failed to load");
             } finally {
                 setLoading(false);
+            }
+        })();
+        return () => ctl.abort();
+    }, [classId]);
+
+    // load roster
+    useEffect(() => {
+        if (!Number.isFinite(classId)) return;
+        const ctl = new AbortController();
+        (async () => {
+            try {
+                const r = await fetch(`/api/classrooms/${classId}/roster`, { cache: "no-store", signal: ctl.signal });
+                const j = await r.json();
+                if (!j?.ok) throw new Error(j?.error || "Failed to load roster");
+                setRoster(j.data || []);
+                setEditMap(Object.fromEntries((j.data || []).map(r => [r.anonId, r.displayName || ""])));
+            } catch (e) {
+                setRErr(e.message || "Failed to load roster");
+            } finally {
+                setRLoading(false);
             }
         })();
         return () => ctl.abort();
@@ -68,6 +101,45 @@ export default function ClassroomPage() {
         return () => { dead = true; ctl.abort(); };
     }, [classId, demoAssignments]);
 
+    async function saveName(anonId) {
+        const displayName = (editMap[anonId] ?? "").trim();
+        try {
+            const r = await fetch(`/api/classrooms/${classId}/roster/${encodeURIComponent(anonId)}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ displayName }),
+            });
+            const j = await r.json();
+            if (!j?.ok) throw new Error(j?.error || "Failed to save");
+            setRoster(prev => prev.map(p => p.anonId === anonId ? { ...p, displayName: displayName || "" } : p));
+            toast("Saved");
+        } catch (e) {
+            toast(e.message || "Failed to save", true);
+        }
+    }
+
+    function openKick(anonId, displayName, role) {
+        if (role === "teacher") { toast("Teachers can't be removed", true); return; }
+        const token = `REMOVE-${anonId.slice(0, 8).toUpperCase()}`;
+        setKick({ anonId, displayName: displayName || "", token, input: "" });
+    }
+
+    async function doKick() {
+        if (!kick) return;
+        if (kick.input !== kick.token) { toast("Token does not match", true); return; }
+        try {
+            const r = await fetch(`/api/classrooms/${classId}/roster/${encodeURIComponent(kick.anonId)}`, {
+                method: "DELETE",
+            });
+            const j = await r.json();
+            if (!j?.ok) throw new Error(j?.error || "Failed to remove");
+            setRoster(prev => prev.filter(p => p.anonId !== kick.anonId));
+            setKick(null);
+            toast("Removed");
+        } catch (e) {
+            toast(e.message || "Failed to remove", true);
+        }
+    }
 
     return (
         <>
@@ -95,6 +167,88 @@ export default function ClassroomPage() {
                 )}
                 {loading && <p className={styles.dim}>Loading…</p>}
                 {err && !loading && <p style={{ color: "#b91c1c" }}>{err}</p>}
+
+                {/* Roster */}
+                <section className={styles.section}>
+                    <div className={styles.headerRow}>
+                        <h3 style={{ margin: 0 }}>👥 Roster</h3>
+                        <div className={styles.growRight}>
+                            <span className={styles.dim}>Edit names or remove students</span>
+                        </div>
+                    </div>
+
+                    {rLoading ? (
+                        <p className={styles.dim}>Loading…</p>
+                    ) : rErr ? (
+                        <p className={styles.dim}>{rErr}</p>
+                    ) : (
+                        <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
+                            <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                                    <thead>
+                                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                                            <th style={th}>Display name</th>
+                                            <th style={th}>Anon ID</th>
+                                            <th style={th}>Role</th>
+                                            <th style={th}>Reading (7d)</th>
+                                            <th style={th}>Quiz avg (7d)</th>
+                                            <th style={th}>Last seen</th>
+                                            <th style={th}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(roster || []).map(r => {
+                                            const isTeacher = (r.role || "student") === "teacher";
+                                            return (
+                                                <tr key={r.anonId} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                                    <td style={td}>
+                                                        <div style={{ display: "flex", gap: 6 }}>
+                                                            <input
+                                                                className={styles.input}
+                                                                style={{ maxWidth: 220 }}
+                                                                value={editMap[r.anonId] ?? ""}
+                                                                onChange={(e) => setEditMap(prev => ({ ...prev, [r.anonId]: e.target.value }))}
+                                                                placeholder="e.g., Alex R."
+                                                            />
+                                                            <button
+                                                                className={styles.btnSecondary}
+                                                                onClick={() => saveName(r.anonId)}
+                                                                disabled={isTeacher}
+                                                                title={isTeacher ? "Teachers' names are managed elsewhere" : "Save name"}
+                                                            >
+                                                                Save
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td style={td}><code>{r.anonId}</code></td>
+                                                    <td style={td}>
+                                                        <RoleBadge role={r.role} />
+                                                    </td>
+                                                    <td style={td}>{(r.stats?.readingMin7d ?? 0)} min</td>
+                                                    <td style={td}>{r.stats?.quizAvgPct7d != null ? `${r.stats.quizAvgPct7d}%` : "—"}</td>
+                                                    <td style={td}>{fmtMaybeDT(r.stats?.lastSeen)}</td>
+                                                    <td style={td}>
+                                                        <button
+                                                            className={styles.btnDanger}
+                                                            onClick={() => openKick(r.anonId, editMap[r.anonId] ?? r.displayName ?? "", r.role)}
+                                                            disabled={isTeacher}
+                                                            title={isTeacher ? "Cannot remove teachers" : "Remove from class"}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {(!roster || roster.length === 0) && (
+                                            <tr><td style={td} colSpan={7} className={styles.dim}>No members yet.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </section>
 
                 <section className={styles.section}>
                     <LineCard title="Reading minutes / day" data={m?.readingDaily || []} yKey="minutes" />
@@ -210,11 +364,65 @@ export default function ClassroomPage() {
                         </div>
                     )}
                 </section>
+
+                {kick && (
+                    <ConfirmKickModal
+                        token={kick.token}
+                        displayName={kick.displayName}
+                        anonId={kick.anonId}
+                        onCancel={() => setKick(null)}
+                        onConfirm={doKick}
+                    />
+                )}
             </main>
         </>
     );
 }
 
+function RoleBadge({ role }) {
+    const r = (role || "student").toLowerCase();
+    const label = r === "teacher" ? "Teacher" : "Student";
+    const bg = r === "teacher" ? "#ecfeff" : "#eef2ff";
+    const color = r === "teacher" ? "#155e75" : "#3730a3";
+    return (
+        <span style={{ background: bg, color, borderRadius: 999, padding: "2px 8px", fontSize: 12 }}>
+            {label}
+        </span>
+    );
+}
+
+function ConfirmKickModal({ token, displayName, anonId, onCancel, onConfirm }) {
+    return (
+        <div role="dialog" aria-modal="true" aria-label="Confirm removal"
+            style={{
+                position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
+                display: "grid", placeItems: "center", zIndex: 50
+            }}>
+            <div style={{ background: "#fff", borderRadius: 12, padding: 16, width: 460, maxWidth: "95vw", border: "1px solid #e5e7eb" }}>
+                <h3 style={{ margin: "0 0 6px" }}>Remove from class?</h3>
+                <p style={{ margin: "0 0 10px", color: "#374151" }}>
+                    You’re removing <strong>{displayName || anonId.slice(0, 8) + "…"}</strong> (<code>{anonId}</code>) from this classroom.
+                </p>
+                <p className="dim" style={{ margin: "0 0 12px", color: "#6b7280" }}>
+                    Raw attempt logs are kept for <strong>21 days</strong> by default (configurable in class settings).
+                </p>
+                <p style={{ margin: "0 0 8px" }}>
+                    Type <code>{token}</code> to confirm.
+                </p>
+                <input className={styles.input} id="kick_token" placeholder={token} onChange={(e) => (ConfirmKickModal.input = e.target.value)} />
+                <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+                    <button className={styles.btnSecondary} onClick={onCancel}>Cancel</button>
+                    <button className={styles.btnDanger} onClick={() => {
+                        // little hack to pass current input back
+                        const v = document.getElementById("kick_token")?.value || "";
+                        ConfirmKickModal.input = v;
+                        onConfirm();
+                    }}>Remove</button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 const th = { textAlign: "left", padding: "10px 12px", fontWeight: 600 };
 const thMini = { textAlign: "center", padding: "6px 12px", fontWeight: 600, fontSize: 12 };
@@ -232,6 +440,16 @@ function fmtMaybe(iso) {
     try {
         const d = new Date(iso);
         return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "2-digit" }).format(d);
+    } catch { return iso; }
+}
+function fmtMaybeDT(iso) {
+    if (!iso) return "—";
+    try {
+        const d = new Date(iso);
+        return new Intl.DateTimeFormat(undefined, {
+            year: "numeric", month: "short", day: "2-digit",
+            hour: "2-digit", minute: "2-digit"
+        }).format(d);
     } catch { return iso; }
 }
 
@@ -259,4 +477,16 @@ function demoRows() {
             counts: { ASSIGNED: 2, SUBMITTED: 0, GRADED: 0, LATE: 0, MISSING: 0 },
         },
     ];
+}
+
+function toast(msg, danger = false) {
+    const el = document.createElement("div");
+    el.textContent = msg;
+    Object.assign(el.style, {
+        position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)",
+        background: danger ? "#991b1b" : "#111827", color: "#fff",
+        padding: "8px 12px", borderRadius: 8, zIndex: 9999
+    });
+    document.body.appendChild(el);
+    setTimeout(() => { if (el && el.parentNode) el.parentNode.removeChild(el); }, 1200);
 }
