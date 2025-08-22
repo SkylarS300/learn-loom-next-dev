@@ -57,7 +57,7 @@ export async function GET(req, { params }) {
     const needGrammar = mode === "any" || mode === "grammar";
     const needUpload = mode === "any" || mode === "upload";
 
-    const [reads, grams, uploads, beats] = await Promise.all([
+    const [reads, beats, grams, uploads] = await Promise.all([
         needReading
             ? prisma.readingprogress.findMany({
                 where: { anonId: { in: anonIds }, updatedAt: { gte: from } },
