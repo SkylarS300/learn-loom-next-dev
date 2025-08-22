@@ -14,24 +14,24 @@ enum live_mode {
 }
 
 model assignment {
-  id          Int             @id @default(autoincrement())
-  classroomId Int
-  title       String
-  description String
-  type        assignment_type
-  dueDate     DateTime?
-  startAt     DateTime?
-  allowLate   Boolean         @default(true)
-  latePenaltyPct Int?
-  weightPoints  Int?
-  instructions  String?
-  attachmentsJson Json        @default("[]")
-  createdAt   DateTime        @default(now())
+  id              Int             @id @default(autoincrement())
+  classroomId     Int
+  title           String
+  description     String
+  type            assignment_type
+  dueDate         DateTime?
+  startAt         DateTime?
+  allowLate       Boolean         @default(true)
+  latePenaltyPct  Int?
+  weightPoints    Int?
+  instructions    String?
+  attachmentsJson Json            @default("[]")
+  createdAt       DateTime        @default(now())
 
   completions assignmentcompletion[]
   classroom   classroom              @relation(fields: [classroomId], references: [id])
 
-  targets     assignmenttarget[]
+  targets assignmenttarget[]
 
   category String? // for quizzes
   subtopic String? // for quizzes
@@ -42,16 +42,16 @@ model assignment {
 }
 
 model assignmenttarget {
-  id           Int      @id @default(autoincrement())
-  assignmentId Int
-  anonId       String?  // null => ALL (whole class target)
+  id            Int     @id @default(autoincrement())
+  assignmentId  Int
+  anonId        String? // null => ALL (whole class target)
   overridesJson Json    @default("{}") // per-student overrides (dueAt, allowLate, etc.)
 
   assignment assignment @relation(fields: [assignmentId], references: [id])
 
+  @@unique([assignmentId, anonId])
   @@index([assignmentId])
   @@index([anonId])
-  @@unique([assignmentId, anonId])
 }
 
 model bookcontent {
@@ -76,8 +76,9 @@ model classroom {
   ownerAnon String? // optional anon owner (teacher-by-code)
   createdAt DateTime @default(now())
 
-  assignments assignment[]
-  students    studentclassroom[]
+  assignments    assignment[]
+  students       studentclassroom[]
+  liveheartbeats liveheartbeat[]    @relation("ClassroomLiveHeartbeats")
 
   @@index([teacherId], map: "Classroom_teacherId_fkey")
   @@index([ownerAnon])
@@ -184,7 +185,7 @@ model user {
 }
 
 model assignmentcompletion {
-  id           Int       @id @default(autoincrement())
+  id           Int               @id @default(autoincrement())
   assignmentId Int
   userId       Int?
   anonId       String?
@@ -192,13 +193,13 @@ model assignmentcompletion {
   completedAt  DateTime?
   submittedAt  DateTime?
   gradedAt     DateTime?
-  quizScore    Int?     // legacy; keep
+  quizScore    Int? // legacy; keep
   scorePct     Int?
   scorePoints  Int?
-  attemptCount Int       @default(0)
-  attemptsJson Json      @default("[]") // array of attempt refs/metadata
+  attemptCount Int               @default(0)
+  attemptsJson Json              @default("[]") // array of attempt refs/metadata
   feedback     String?
-  isLate       Boolean   @default(false)
+  isLate       Boolean           @default(false)
 
   assignment assignment @relation(fields: [assignmentId], references: [id])
   user       user?      @relation(fields: [userId], references: [id])
@@ -245,7 +246,6 @@ enum submission_status {
   MISSING
   LATE
 }
-
 
 model uploadview {
   id       Int      @id @default(autoincrement())
@@ -323,7 +323,7 @@ model liveheartbeat {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  classroom classroom @relation(fields: [classroomId], references: [id])
+  classroom classroom @relation("ClassroomLiveHeartbeats", fields: [classroomId], references: [id])
 
   @@unique([classroomId, anonId])
   @@index([classroomId, updatedAt])
