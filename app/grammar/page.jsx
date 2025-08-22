@@ -111,6 +111,27 @@ export default function Grammar() {
     } catch { }
   }, []);
 
+  // live ping helper
+  const livePing = (mode = "grammar") => {
+    try {
+      const blob = new Blob([JSON.stringify({ mode })], { type: "application/json" });
+      if (navigator.sendBeacon) { navigator.sendBeacon("/api/live/ping", blob); return; }
+    } catch { }
+    fetch("/api/live/ping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    }).catch(() => { });
+  };
+
+  // ping while quiz is running
+  useEffect(() => {
+    if (mode !== "running") return;
+    livePing("grammar"); // immediate
+    const iv = setInterval(() => livePing("grammar"), 10000);
+    return () => clearInterval(iv);
+  }, [mode]);
+
   // Deep-link handler:
   //   /grammar?concept=...&subTopic=...&start=1
   // Back-compat:

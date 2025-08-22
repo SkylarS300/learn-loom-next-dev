@@ -41,8 +41,8 @@ export async function GET(req, { params }) {
         where: { classroomId },
         select: { anonId: true, displayName: true, role: true },
     });
-    const anonIds = roster.map(r => r.anonId).filter(Boolean);
 
+    const anonIds = roster.map(r => r.anonId).filter(Boolean);
     const now = new Date();
     const from = new Date(now.getTime() - minutes * 60000);
 
@@ -58,13 +58,7 @@ export async function GET(req, { params }) {
     const needGrammar = mode === "any" || mode === "grammar";
     const needUpload = mode === "any" || mode === "upload";
 
-    // Map UI modes to enum for heartbeat filter
-    const modeEnum =
-        mode === "reading" ? "READING" :
-            mode === "grammar" ? "GRAMMAR" :
-                mode === "upload" ? "UPLOAD" : null;
-
-    const [reads, grams, uploads, beats] = await Promise.all([
+    const [reads, grams, uploads] = await Promise.all([
         needReading
             ? prisma.readingprogress.findMany({
                 where: { anonId: { in: anonIds }, updatedAt: { gte: from } },
@@ -83,15 +77,6 @@ export async function GET(req, { params }) {
                 select: { anonId: true, updatedAt: true },
             })
             : Promise.resolve([]),
-        // Heartbeats (always fetched; filtered by mode if provided)
-        prisma.liveheartbeat.findMany({
-            where: {
-                classroomId,
-                updatedAt: { gte: from },
-                ...(modeEnum ? { mode: modeEnum } : {}),
-            },
-            select: { anonId: true, updatedAt: true },
-        }),
     ]);
 
     const lastSeen = new Map(); // anonId -> Date
@@ -100,11 +85,9 @@ export async function GET(req, { params }) {
         const prev = lastSeen.get(a);
         if (!prev || t > prev) lastSeen.set(a, t);
     };
-
     for (const r of reads) bump(r.anonId, r.updatedAt);
     for (const g of grams) bump(g.anonId, g.createdAt);
     for (const u of uploads) bump(u.anonId, u.updatedAt);
-    for (const b of beats) bump(b.anonId, b.updatedAt);
 
     const rosterMap = new Map(roster.map(r => [r.anonId, r]));
     const activeNow = Array.from(lastSeen.entries())
@@ -116,6 +99,7 @@ export async function GET(req, { params }) {
         }))
         .sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1));
 
+    // privacy-safe telemetry
     try {
         // eslint-disable-next-line no-console
         console.log("[live_query]", { classroomId, minutes, mode, active: activeNow.length });

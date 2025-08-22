@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
 // Upsert a bookmark for (anonId, bookIndex, chapterIndex)
@@ -7,25 +7,31 @@ export async function POST(req) {
     const anonId = cookieStore.get("learnloomId")?.value;
     if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const { bookIndex, chapterIndex, sentenceIndex, timeMs } = await req.json();
+    let body = {};
+    try { body = await req.json(); } catch { }
 
-    if (!Number.isFinite(bookIndex) || !Number.isFinite(chapterIndex)) {
+    const bIdx = Number(body.bookIndex);
+    const cIdx = Number(body.chapterIndex);
+    const sIdx = Number.isFinite(Number(body.sentenceIndex)) ? Number(body.sentenceIndex) : null;
+    const tMs = Number.isFinite(Number(body.timeMs)) ? Math.max(0, Number(body.timeMs)) : undefined;
+
+    if (!Number.isFinite(bIdx) || !Number.isFinite(cIdx)) {
         return Response.json({ ok: false, error: "Invalid indices" }, { status: 400 });
     }
 
     try {
         const row = await prisma.readingprogress.upsert({
-            where: { anonId_bookIndex_chapterIndex: { anonId, bookIndex, chapterIndex } },
+            where: { anonId_bookIndex_chapterIndex: { anonId, bookIndex: bIdx, chapterIndex: cIdx } },
             update: {
-                sentenceIndex: Number.isFinite(sentenceIndex) ? sentenceIndex : null,
-                timeMs: Number.isFinite(timeMs) ? timeMs : undefined,
+                sentenceIndex: sIdx,
+                timeMs: tMs, // if undefined, Prisma ignores (no change)
             },
             create: {
                 anonId,
-                bookIndex,
-                chapterIndex,
-                sentenceIndex: Number.isFinite(sentenceIndex) ? sentenceIndex : null,
-                timeMs: Number.isFinite(timeMs) ? timeMs : 0,
+                bookIndex: bIdx,
+                chapterIndex: cIdx,
+                sentenceIndex: sIdx,
+                timeMs: tMs ?? 0,
             },
         });
         return Response.json({ ok: true, data: row });
@@ -42,16 +48,15 @@ export async function GET(req) {
     if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const bookIndex = Number(searchParams.get("bookIndex"));
-    const chapterIndex = Number(searchParams.get("chapterIndex"));
-
-    if (!Number.isFinite(bookIndex) || !Number.isFinite(chapterIndex)) {
+    const bIdx = Number(searchParams.get("bookIndex"));
+    const cIdx = Number(searchParams.get("chapterIndex"));
+    if (!Number.isFinite(bIdx) || !Number.isFinite(cIdx)) {
         return Response.json({ ok: false, error: "Invalid indices" }, { status: 400 });
     }
 
     try {
         const row = await prisma.readingprogress.findUnique({
-            where: { anonId_bookIndex_chapterIndex: { anonId, bookIndex, chapterIndex } },
+            where: { anonId_bookIndex_chapterIndex: { anonId, bookIndex: bIdx, chapterIndex: cIdx } },
             select: { sentenceIndex: true, timeMs: true, updatedAt: true },
         });
         return Response.json({ ok: true, data: row ?? null });

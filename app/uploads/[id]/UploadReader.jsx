@@ -108,6 +108,15 @@ export default function UploadReader({ upload, isOwner = false }) {
         if (!unlocked || !uploadContent || !upload?.id) return;
         lastTickRef.current = performance.now();
 
+        const ping = () => {
+            try {
+                const blob = new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" });
+                if (navigator.sendBeacon) { navigator.sendBeacon("/api/live/ping", blob); return; }
+            } catch { }
+            fetch("/api/live/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "upload" }) }).catch(() => { });
+        };
+
+
         const postDelta = (ms) => {
             const delta = Math.max(0, Math.round(ms || 0));
             if (!delta) return;
@@ -116,6 +125,7 @@ export default function UploadReader({ upload, isOwner = false }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ uploadId: upload.id, deltaTimeMs: delta }),
             }).catch(() => { });
+            ping();
         };
 
         hbRef.current = setInterval(() => {
@@ -136,6 +146,11 @@ export default function UploadReader({ upload, isOwner = false }) {
                         new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })],
                             { type: "application/json" })
                     );
+                    navigator.sendBeacon?.(
+                        "/api/live/ping",
+                        new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" })
+                    );
+
                 } catch { }
             }
         };
@@ -148,6 +163,10 @@ export default function UploadReader({ upload, isOwner = false }) {
                     "/api/uploadprogress",
                     new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })],
                         { type: "application/json" })
+                );
+                navigator.sendBeacon?.(
+                    "/api/live/ping",
+                    new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" })
                 );
             } catch { }
         };

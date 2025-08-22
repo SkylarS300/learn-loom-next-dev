@@ -129,6 +129,19 @@ export default function ReadingPalClient() {
 
   const highlightedColorRef = useRef("yellow");
 
+  // fire-and-forget ping (uses sendBeacon when available)
+  function livePing(mode = "reading") {
+    try {
+      const blob = new Blob([JSON.stringify({ mode })], { type: "application/json" });
+      if (navigator.sendBeacon && navigator.sendBeacon("/api/live/ping", blob)) return;
+    } catch { }
+    fetch("/api/live/ping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    }).catch(() => { });
+  }
+
   // ------- tiny toast helper (non-blocking) -------
   function toast(msg) {
     const el = document.createElement("div");
@@ -258,6 +271,8 @@ export default function ReadingPalClient() {
               deltaTimeMs: Math.max(0, Math.round(dt)),
             }),
           }).catch(() => { });
+          // also ping live
+          livePing("reading");
         }
       }
     };
@@ -281,6 +296,13 @@ export default function ReadingPalClient() {
             { type: "application/json" }
           )
         );
+        // final ping
+        try {
+          navigator.sendBeacon?.(
+            "/api/live/ping",
+            new Blob([JSON.stringify({ mode: "reading" })], { type: "application/json" })
+          );
+        } catch { }
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
@@ -778,6 +800,8 @@ export default function ReadingPalClient() {
         const dt = now - lastTickRef.current;
         lastTickRef.current = now;
         flushDelta(dt);
+        // ping presence every slice
+        livePing("reading");
         scheduleHeartbeat();
       }, 5000);
     };
@@ -851,6 +875,7 @@ export default function ReadingPalClient() {
           }).catch(() => { });
         }
         scheduleHeartbeat();
+        livePing("reading");
       };
 
       u.onend = () => {
