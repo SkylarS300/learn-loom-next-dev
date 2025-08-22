@@ -57,13 +57,24 @@ export async function GET(req, { params }) {
     const needGrammar = mode === "any" || mode === "grammar";
     const needUpload = mode === "any" || mode === "upload";
 
-    const [reads, grams, uploads] = await Promise.all([
+    const [reads, grams, uploads, beats] = await Promise.all([
         needReading
             ? prisma.readingprogress.findMany({
                 where: { anonId: { in: anonIds }, updatedAt: { gte: from } },
                 select: { anonId: true, updatedAt: true },
             })
             : Promise.resolve([]),
+        // DB heartbeats
+        prisma.liveheartbeat.findMany({
+            where: {
+                classroomId,
+                updatedAt: { gte: from },
+                ...(mode !== "any"
+                    ? { mode: mode === "reading" ? "READING" : mode === "grammar" ? "GRAMMAR" : "UPLOAD" }
+                    : {}),
+            },
+            select: { anonId: true, updatedAt: true },
+        }),
         needGrammar
             ? prisma.grammarprogress.findMany({
                 where: { anonId: { in: anonIds }, createdAt: { gte: from } },
@@ -87,6 +98,7 @@ export async function GET(req, { params }) {
     for (const r of reads) bump(r.anonId, r.updatedAt);
     for (const g of grams) bump(g.anonId, g.createdAt);
     for (const u of uploads) bump(u.anonId, u.updatedAt);
+    for (const b of beats) bump(b.anonId, b.updatedAt);
 
     const rosterMap = new Map(roster.map((r) => [r.anonId, r]));
     const activeNow = Array.from(lastSeen.entries())

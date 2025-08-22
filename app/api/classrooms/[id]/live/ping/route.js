@@ -1,15 +1,39 @@
-// app/api/live/ping/route.js
+// app/api/classrooms/[id]/live/ping/route.js
 import { cookies } from "next/headers";
+import prisma from "@/lib/prisma";
 
-// POST /api/live/ping  { classroomId?, mode? }
-// Skeleton: acknowledges pings (no persistence yet). Useful for wiring client polling.
-export async function POST(req) {
+const MODE_MAP = {
+    reading: "READING",
+    grammar: "GRAMMAR",
+    upload: "UPLOAD",
+};
+
+export async function POST(req, { params }) {
+    const classroomId = Number(params?.id);
+    if (!Number.isFinite(classroomId)) {
+        return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
+    }
+
     const cs = await cookies();
-    const me = cs.get("learnloomId")?.value;
-    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const anonId = cs.get("learnloomId")?.value;
+    if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    // Accept body for future use (classroomId/mode/etc.)
-    await req.json().catch(() => ({}));
-    // No-op for MVP; GET /classrooms/:id/live derives presence from recent activity.
+    // Must be in this classroom (student or teacher)
+    const membership = await prisma.studentclassroom.findFirst({
+        where: { classroomId, anonId },
+        select: { id: true },
+    });
+    if (!membership) return Response.json({ ok: false, error: "Forbidden" }, { status: 403 });
+
+    const body = await req.json().catch(() => ({}));
+    const rawMode = String(body?.mode || "").toLowerCase();
+    const mode = MODE_MAP[rawMode] ?? null;
+
+    await prisma.liveheartbeat.upsert({
+        where: { classroomId_anonId: { classroomId, anonId } },
+        update: { mode: mode ?? undefined }, // updatedAt auto-bumps
+        create: { classroomId, anonId, mode },
+    });
+
     return Response.json({ ok: true });
 }

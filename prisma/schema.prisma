@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum live_mode {
+  READING
+  GRAMMAR
+  UPLOAD
+}
+
 model assignment {
   id          Int             @id @default(autoincrement())
   classroomId Int
@@ -307,6 +313,21 @@ model uploadunlockattempt {
   @@unique([anonId, uploadId])
   @@index([anonId])
   @@index([uploadId])
+}
+
+model liveheartbeat {
+  id          Int        @id @default(autoincrement())
+  classroomId Int
+  anonId      String
+  mode        live_mode?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  classroom classroom @relation(fields: [classroomId], references: [id])
+
+  @@unique([classroomId, anonId])
+  @@index([classroomId, updatedAt])
+  @@index([anonId])
 }
 
 model Note {
