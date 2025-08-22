@@ -32,6 +32,14 @@ export default function ClassroomPage() {
     const [rLoading, setRLoading] = useState(true);
     const [editMap, setEditMap] = useState({}); // anonId -> draft displayName
 
+    // live view
+    const [live, setLive] = useState({ data: [], window: null });
+    const [lErr, setLErr] = useState("");
+    const [lLoading, setLLoading] = useState(true);
+    const [liveMode, setLiveMode] = useState("any");       // 'any' | 'reading' | 'grammar' | 'upload'
+    const [liveMinutes, setLiveMinutes] = useState(5);     // 1..60
+
+
     // kick modal
     const [kick, setKick] = useState(null); // { anonId, displayName, token, input }
 
@@ -101,6 +109,34 @@ export default function ClassroomPage() {
         return () => { dead = true; ctl.abort(); };
     }, [classId, demoAssignments]);
 
+    // poll live activity
+    useEffect(() => {
+        if (!Number.isFinite(classId)) return;
+        let dead = false;
+        let timer = null;
+        async function load() {
+            try {
+                const r = await fetch(
+                    `/api/classrooms/${classId}/live?minutes=${encodeURIComponent(liveMinutes)}&mode=${encodeURIComponent(liveMode)}`,
+                    { cache: "no-store" }
+                );
+                const j = await r.json();
+                if (!j?.ok) throw new Error(j?.error || "Failed to load live view");
+                if (!dead) { setLive({ data: j.data || [], window: j.window || null }); setLErr(""); }
+            } catch (e) {
+                if (!dead) setLErr(e.message || "Failed to load live view");
+            } finally {
+                if (!dead) setLLoading(false);
+            }
+        }
+        load();
+        timer = setInterval(load, 10000); // 10s
+        return () => {
+            dead = true;
+            if (timer) clearInterval(timer);
+        };
+    }, [classId, liveMode, liveMinutes]);
+
     async function saveName(anonId) {
         const displayName = (editMap[anonId] ?? "").trim();
         try {
@@ -167,6 +203,82 @@ export default function ClassroomPage() {
                 )}
                 {loading && <p className={styles.dim}>Loading…</p>}
                 {err && !loading && <p style={{ color: "#b91c1c" }}>{err}</p>}
+
+                {/* Live view */}
+                <section className={styles.section}>
+                    <div className={styles.headerRow}>
+                        <h3 style={{ margin: 0 }}>🟢 Active now</h3>
+                        <div className={styles.growRight} style={{ gap: 8 }}>
+                            <label className={styles.dim} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                Mode:
+                                <select
+                                    className={styles.input}
+                                    value={liveMode}
+                                    onChange={(e) => setLiveMode(e.target.value)}
+                                    style={{ maxWidth: 160 }}
+                                >
+                                    <option value="any">Any</option>
+                                    <option value="reading">Reading</option>
+                                    <option value="grammar">Grammar</option>
+                                    <option value="upload">Upload</option>
+                                </select>
+                            </label>
+                            <label className={styles.dim} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                Window:
+                                <select
+                                    className={styles.input}
+                                    value={String(liveMinutes)}
+                                    onChange={(e) => setLiveMinutes(Number(e.target.value))}
+                                    style={{ maxWidth: 120 }}
+                                >
+                                    <option value="3">3 min</option>
+                                    <option value="5">5 min</option>
+                                    <option value="10">10 min</option>
+                                    <option value="15">15 min</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    {lLoading ? (
+                        <p className={styles.dim}>Loading…</p>
+                    ) : lErr ? (
+                        <p className={styles.dim}>{lErr}</p>
+                    ) : (
+                        <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
+                            <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                                    <thead>
+                                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                                            <th style={th}>Display name</th>
+                                            <th style={th}>Anon ID</th>
+                                            <th style={th}>Role</th>
+                                            <th style={th}>Last seen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(live.data || []).map((u) => (
+                                            <tr key={u.anonId} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                                <td style={td}>{u.displayName || "—"}</td>
+                                                <td style={td}><code>{u.anonId}</code></td>
+                                                <td style={td}><RoleBadge role={u.role} /></td>
+                                                <td style={td}>{timeAgo(u.lastSeen)}</td>
+                                            </tr>
+                                        ))}
+                                        {(!live.data || live.data.length === 0) && (
+                                            <tr><td style={td} colSpan={4} className={styles.dim}>No one active in this window.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                    {live.window && (
+                        <p className={styles.dim} style={{ marginTop: 6 }}>
+                            Window: {fmtMaybeDT(live.window.from)} → {fmtMaybeDT(live.window.to)}
+                        </p>
+                    )}
+                </section>
+
 
                 {/* Roster */}
                 <section className={styles.section}>
@@ -362,6 +474,8 @@ export default function ClassroomPage() {
                         token={kick.token}
                         displayName={kick.displayName}
                         anonId={kick.anonId}
+                        value={kick.input}
+                        onChange={(v) => setKick(prev => ({ ...prev, input: v }))}
                         onCancel={() => setKick(null)}
                         onConfirm={doKick}
                     />
@@ -369,6 +483,21 @@ export default function ClassroomPage() {
             </main>
         </>
     );
+}
+
+
+function timeAgo(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso).getTime();
+    const now = Date.now();
+    const diff = Math.max(0, Math.floor((now - d) / 1000));
+    if (diff < 60) return `${diff}s ago`;
+    const m = Math.floor(diff / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    return `${days}d ago`;
 }
 
 function RoleBadge({ role }) {
@@ -383,7 +512,7 @@ function RoleBadge({ role }) {
     );
 }
 
-function ConfirmKickModal({ token, displayName, anonId, onCancel, onConfirm }) {
+function ConfirmKickModal({ token, displayName, anonId, value, onChange, onCancel, onConfirm }) {
     return (
         <div role="dialog" aria-modal="true" aria-label="Confirm removal"
             style={{
@@ -401,15 +530,10 @@ function ConfirmKickModal({ token, displayName, anonId, onCancel, onConfirm }) {
                 <p style={{ margin: "0 0 8px" }}>
                     Type <code>{token}</code> to confirm.
                 </p>
-                <input className={styles.input} id="kick_token" placeholder={token} onChange={(e) => (ConfirmKickModal.input = e.target.value)} />
+                <input className={styles.input} placeholder={token} value={value} onChange={(e) => onChange?.(e.target.value)} />
                 <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
                     <button className={styles.btnSecondary} onClick={onCancel}>Cancel</button>
-                    <button className={styles.btnDanger} onClick={() => {
-                        // little hack to pass current input back
-                        const v = document.getElementById("kick_token")?.value || "";
-                        ConfirmKickModal.input = v;
-                        onConfirm();
-                    }}>Remove</button>
+                    <button className={styles.btnDanger} onClick={onConfirm}>Remove</button>
                 </div>
             </div>
         </div>
