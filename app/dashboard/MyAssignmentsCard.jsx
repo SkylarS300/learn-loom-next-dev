@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./Dashboard.module.css";
+import { track } from "@/lib/rum";
 
 const BUCKETS = ["DUE_SOON", "MISSING", "COMPLETED"];
 
@@ -72,6 +73,14 @@ export default function MyAssignmentsCard() {
         return () => { dead = true; ctl.abort(); };
     }, [demoMode]);
 
+    // Telemetry: fire once when classes have finished loading
+    useEffect(() => {
+        if (clsLoading || hasTrackedClasses.current) return;
+        const teacher = classes.filter(c => (c.role || "student") === "teacher").length;
+        const student = classes.length - teacher;
+        track("dash_classes_loaded", { total: classes.length, teacher, student });
+        hasTrackedClasses.current = true;
+    }, [clsLoading, classes]);
 
 
     useEffect(() => {
@@ -158,6 +167,17 @@ export default function MyAssignmentsCard() {
         return classes.filter(c => classFilter === "ALL" || c.classroomId === Number(classFilter));
     }, [classes, classFilter]);
 
+
+    // Telemetry: filter changes (status tab or class dropdown)
+    useEffect(() => {
+        const changed = prevBucketRef.current !== bucket || prevClassRef.current !== classFilter;
+        if (changed) {
+            track("dash_assignments_filtered", { bucket, classFilter });
+            prevBucketRef.current = bucket;
+            prevClassRef.current = classFilter;
+        }
+    }, [bucket, classFilter]);
+
     return (
         <div className={styles.card}>
             <div className={styles.cardHead}>
@@ -222,8 +242,20 @@ export default function MyAssignmentsCard() {
                                 </div>
                                 {isTeacher ? (
                                     <div className={styles.assignmentActions} style={{ marginTop: 6 }}>
-                                        <a href={`/classrooms/${c.classroomId}`} className={styles.btnSecondary}>View class</a>
-                                        <a href={`/classrooms/${c.classroomId}/assignments/new`} className={styles.btnSecondary}>+ New assignment</a>
+                                        <a
+                                            href={`/classrooms/${c.classroomId}`}
+                                            className={styles.btnSecondary}
+                                            onClick={() => track("dash_class_click", { kind: "view_class", classroomId: c.classroomId })}
+                                        >
+                                            View class
+                                        </a>
+                                        <a
+                                            href={`/classrooms/${c.classroomId}/assignments/new`}
+                                            className={styles.btnSecondary}
+                                            onClick={() => track("dash_class_click", { kind: "new_assignment", classroomId: c.classroomId })}
+                                        >
+                                            + New assignment
+                                        </a>
                                     </div>
                                 ) : rows.length === 0 ? (
                                     <p className={styles.dim} style={{ marginTop: 4 }}>No assignments in this filter.</p>
@@ -248,7 +280,18 @@ export default function MyAssignmentsCard() {
                                                     </div>
                                                 </div>
                                                 <div className={styles.assignmentActions}>
-                                                    <a href={it.href} className={styles.btn}>
+                                                    <a
+                                                        href={it.href}
+                                                        className={styles.btn}
+                                                        onClick={() =>
+                                                            track("dash_class_click", {
+                                                                kind: "open_assignment",
+                                                                classroomId: c.classroomId,
+                                                                assignmentId: it.assignmentId,
+                                                                bucket
+                                                            })
+                                                        }
+                                                    >
                                                         {ctaFor(it)}
                                                     </a>
                                                 </div>
