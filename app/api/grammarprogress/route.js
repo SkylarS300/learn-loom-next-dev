@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
 // GET: list your grammar attempts (most recent first)
@@ -25,6 +25,64 @@ export async function GET() {
         createdAt: true,
       },
     });
+
+    // Completion hook (QUIZ)
+    try {
+      // classes where this user is a student
+      const memberships = await prisma.studentclassroom.findMany({
+        where: { anonId, role: { not: "teacher" } },
+        select: { classroomId: true },
+      });
+      const classIds = memberships.map((m) => m.classroomId);
+      if (classIds.length) {
+        const now = new Date();
+        const asns = await prisma.assignment.findMany({
+          where: {
+            classroomId: { in: classIds },
+            type: "QUIZ",
+            targets: { some: { OR: [{ anonId }, { anonId: null }] } },
+            category: String(concept),
+            OR: [{ subtopic: null }, { subtopic: String(subTopic) }],
+          },
+          select: { id: true, dueDate: true },
+        });
+        await Promise.all(
+          asns.map(async (a) => {
+            const prev = await prisma.assignmentcompletion.findUnique({
+              where: { anonId_assignmentId: { anonId, assignmentId: a.id } },
+              select: { scorePct: true, attemptCount: true },
+            });
+            const late = !!(a.dueDate && now > a.dueDate);
+            const status = late ? "LATE" : "SUBMITTED";
+            const best = Math.max(prev?.scorePct ?? 0, s);
+            await prisma.assignmentcompletion.upsert({
+              where: { anonId_assignmentId: { anonId, assignmentId: a.id } },
+              create: {
+                anonId,
+                assignmentId: a.id,
+                status,
+                submittedAt: now,
+                isLate: late,
+                scorePct: best,
+                attemptCount: 1,
+              },
+              update: {
+                status,
+                submittedAt: now,
+                isLate: late,
+                scorePct: best,
+                attemptCount: (prev?.attemptCount ?? 0) + 1,
+              },
+            });
+          })
+        );
+      }
+    } catch (hookErr) {
+      // eslint-disable-next-line no-console
+      console.warn("[grammarprogress] completion hook failed:", hookErr);
+    }
+
+
     return Response.json({ ok: true, data: results });
   } catch (e) {
     console.error("grammarprogress GET failed:", e);

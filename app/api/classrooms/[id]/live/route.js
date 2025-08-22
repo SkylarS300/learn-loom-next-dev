@@ -98,6 +98,13 @@ export async function GET(req, { params }) {
         }))
         .sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1));
 
+    // telemetry (privacy-safe)
+    try {
+        // eslint-disable-next-line no-console
+        console.log("[live_query]", { classroomId, minutes, mode, active: activeNow.length });
+    } catch { }
+
+
     return Response.json({
         ok: true,
         data: activeNow,

@@ -35,6 +35,57 @@ export async function POST(req) {
             });
         }
 
+        // Completion hook (UPLOAD)
+        try {
+            const memberships = await prisma.studentclassroom.findMany({
+                where: { anonId, role: { not: "teacher" } },
+                select: { classroomId: true },
+            });
+            const classIds = memberships.map((m) => m.classroomId);
+            if (classIds.length) {
+                const now = new Date();
+                const asns = await prisma.assignment.findMany({
+                    where: {
+                        classroomId: { in: classIds },
+                        type: "UPLOAD",
+                        targets: { some: { OR: [{ anonId }, { anonId: null }] } },
+                        uploadId: Number(uploadId),
+                    },
+                    select: { id: true, dueDate: true },
+                });
+                await Promise.all(
+                    asns.map(async (a) => {
+                        const prev = await prisma.assignmentcompletion.findUnique({
+                            where: { anonId_assignmentId: { anonId, assignmentId: a.id } },
+                            select: { attemptCount: true },
+                        });
+                        const late = !!(a.dueDate && now > a.dueDate);
+                        const status = late ? "LATE" : "SUBMITTED";
+                        await prisma.assignmentcompletion.upsert({
+                            where: { anonId_assignmentId: { anonId, assignmentId: a.id } },
+                            create: {
+                                anonId,
+                                assignmentId: a.id,
+                                status,
+                                submittedAt: now,
+                                isLate: late,
+                                attemptCount: 1,
+                            },
+                            update: {
+                                status,
+                                submittedAt: now,
+                                isLate: late,
+                                attemptCount: (prev?.attemptCount ?? 0) + 1,
+                            },
+                        });
+                    })
+                );
+            }
+        } catch (hookErr) {
+            // eslint-disable-next-line no-console
+            console.warn("[uploadprogress] completion hook failed:", hookErr);
+        }
+
         return new Response(null, { status: 200 });
     } catch (e) {
         console.error("uploadprogress POST failed:", e);
