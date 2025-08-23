@@ -16,7 +16,8 @@ export async function POST(req) {
     sentenceIndex = null,
     deltaTimeMs = 0,
     chapterCompleted = false,
-  } = body ?? {}; if (!Number.isInteger(bookIndex) || !Number.isInteger(chapterIndex)) {
+  } = body ?? {};
+  if (!Number.isInteger(bookIndex) || !Number.isInteger(chapterIndex)) {
     return NextResponse.json(
       { ok: false, error: "bookIndex and chapterIndex must be integers" },
       { status: 422 }
@@ -44,6 +45,9 @@ export async function POST(req) {
     );
   }
 
+  // Cap single-slice time to 60s to avoid background/sleep runaway
+  const dt = Math.min(60_000, Math.max(0, Number(deltaTimeMs) || 0));
+
   // First attempt: with sentenceIndex/timeMs (new schema)
   try {
     const row = await prisma.readingprogress.upsert({
@@ -53,11 +57,11 @@ export async function POST(req) {
         bookIndex,
         chapterIndex,
         sentenceIndex,
-        timeMs: deltaTimeMs || 0,
+        timeMs: dt, // start the counter
       },
       update: {
         sentenceIndex: sentenceIndex === null ? undefined : sentenceIndex,
-        timeMs: deltaTimeMs ? { increment: deltaTimeMs } : undefined,
+        timeMs: dt ? { increment: dt } : undefined,
         // if chapterCompleted, bump completedAt to "now" (lets you see latest completion)
         ...(chapterCompleted ? { completedAt: new Date() } : {}),
       },

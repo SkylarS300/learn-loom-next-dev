@@ -14,9 +14,8 @@ export async function GET(_req, context) {
 
     const cookieStore = await cookies(); //  Next 15 requires await
     const anonId = cookieStore.get("learnloomId")?.value;
-
     if (!anonId || !uploadId) {
-      return new Response("Unauthorized", { status: 401 });
+      return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     // Check if this anonId has unlocked this upload
@@ -24,7 +23,7 @@ export async function GET(_req, context) {
       where: { anonId_uploadId: { anonId, uploadId } },
     });
     if (!unlocked) {
-      return new Response("Locked", { status: 403 });
+      return Response.json({ ok: false, error: "Locked" }, { status: 403 });
     }
 
     const upload = await prisma.uploadedtext.findUnique({
@@ -32,10 +31,10 @@ export async function GET(_req, context) {
       select: { id: true, title: true, content: true },
     });
 
-    if (!upload) return new Response("Not found", { status: 404 });
+    if (!upload) return Response.json({ ok: false, error: "Not found" }, { status: 404 });
     return Response.json(upload);
   } catch (e) {
     console.error("/api/uploads/[id] GET failed:", e);
-    return new Response("Server error", { status: 500 });
+    return Response.json({ ok: false, error: "Server error" }, { status: 500 });
   }
 }

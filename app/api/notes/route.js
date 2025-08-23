@@ -13,7 +13,8 @@ export async function GET(req) {
 
     const url = new URL(req.url);
     const scope = url.searchParams.get("scope");
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50), 1), 200);
+    const rawLimit = Number(url.searchParams.get("limit"));
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 200) : 50;
     const cursorParam = url.searchParams.get("cursor"); // id (no q) OR numeric offset (with q)
     const typeParam = (url.searchParams.get("type") || "").trim(); // 'book' | 'upload' | 'grammar' | 'all'
     const q = (url.searchParams.get("q") || "").trim();             // keep raw (MySQL FTS)
@@ -229,6 +230,7 @@ export async function POST(req) {
             color: color || null,
             isBookmark: !!isBookmark,
         },
+
     });
-    return Response.json({ ok: true, data: row });
+    return Response.json({ ok: true, data: row }, { status: 201 });
 }
