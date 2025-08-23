@@ -117,6 +117,9 @@ export default function ReadingPalClient() {
   const fontSizeRef = useRef(null);
   const prevChapterRef = useRef(null);
   const nextChapterRef = useRef(null);
+  const spansRef = useRef([]); // cache current chapter sentence spans
+  const scrollHandlerRef = useRef(null);
+
 
   const readingRef = useRef(false);
   const sentenceIndexRef = useRef(0);
@@ -230,7 +233,11 @@ export default function ReadingPalClient() {
   /* ---------- voices + prefs ---------- */
   useEffect(() => {
     function loadVoices() {
-      const v = speechSynthesis.getVoices();
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+        toast("⚠️ Text‑to‑speech is not available in this browser.");
+        return;
+      }
+      const v = window.speechSynthesis.getVoices();
       if (v.length) {
         setVoices(v);
         setSelectedVoice(
@@ -239,7 +246,9 @@ export default function ReadingPalClient() {
       }
     }
     loadVoices();
-    speechSynthesis.onvoiceschanged = loadVoices;
+    const ss = window.speechSynthesis;
+    const prev = ss.onvoiceschanged;
+    ss.onvoiceschanged = loadVoices;
 
     const p = loadPrefs(anonId);
     if (p) {
@@ -248,6 +257,9 @@ export default function ReadingPalClient() {
       if (typeof p.volume === "number") setVolume(p.volume);
       if (typeof p.autoAdvance === "boolean") setAutoAdvance(p.autoAdvance);
     }
+    return () => {
+      if (ss) ss.onvoiceschanged = prev || null;
+    };
   }, []); // eslint-disable-line
 
   // Flush time when tab hides or page unloads (prevents time loss)
@@ -353,8 +365,13 @@ export default function ReadingPalClient() {
         if (textRef.current) {
           textRef.current.innerText = data.content || "";
           wrapSentences(textRef.current);
-          const key = `scroll_upload_${uploadId}`;
+          const key = `scroll_book_${bookIndex}_${chapterIndex}`;
+          // remove old handler (if any) before adding a new one
+          if (scrollHandlerRef.current && textRef.current) {
+            textRef.current.removeEventListener("scroll", scrollHandlerRef.current);
+          }
           const h = () => throttledScrollSave(key, textRef.current);
+          scrollHandlerRef.current = h;
           textRef.current.addEventListener("scroll", h);
           setTimeout(() => applySavedScroll(key, textRef.current), 80);
           if (fontSizeRef.current) {
@@ -568,15 +585,25 @@ export default function ReadingPalClient() {
 
   /* ---------- sentence wrapping & highlight ---------- */
   function wrapSentences(container) {
-    const sentences = (container.innerText || "")
-      .match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [];
-    container.innerHTML = sentences
-      .map((s, i) => `<span class="${styles.sentence}" data-index="${i}">${s.trim()} </span>`)
-      .join("");
+    const text = container.innerText || "";
+    const sentences = text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [];
+    // Clear and rebuild safely without innerHTML
+    container.textContent = "";
+    const frag = document.createDocumentFragment();
+    spansRef.current = [];
+    for (let i = 0; i < sentences.length; i++) {
+      const span = document.createElement("span");
+      span.className = styles.sentence;
+      span.setAttribute("data-index", String(i));
+      span.textContent = sentences[i].trim() + " ";
+      spansRef.current.push(span);
+      frag.appendChild(span);
+    }
+    container.appendChild(frag);
   }
 
   function currentSpans() {
-    return Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
+    return spansRef.current || [];
   }
 
   function setHighlight(idx) {
@@ -590,7 +617,7 @@ export default function ReadingPalClient() {
     if (t) {
       t.classList.add(styles.highlightedSentence);
       t.style.backgroundColor = highlightedColorRef.current;
-      t.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Scrolling is handled by jump/click callers to avoid duplicate calls
     }
   }
 
@@ -697,12 +724,15 @@ export default function ReadingPalClient() {
       container.removeEventListener("click", clickHandler);
       container.removeEventListener("dblclick", dblHandler);
     };
-  }, [selectedVoice, rate, pitch, volume]);
+  }, []); // handlers read from refs; no need to re-bind
 
   /* ---------- jump helper ---------- */
   function jumpToSentence(idx, start = false) {
     const spans = currentSpans();
-    if (!spans.length) return;
+    if (!spans.length) {
+      toast("No sentences to read in this section.");
+      return;
+    }
     const clamped = Math.max(0, Math.min(idx, spans.length - 1));
     sentenceIndexRef.current = clamped;
     setHighlight(clamped);
