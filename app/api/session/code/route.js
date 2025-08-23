@@ -1,6 +1,7 @@
 // app/api/session/code/route.js
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
+import { jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // --- Simple optional in-memory rate limit (per IP) ---
 // Env toggles: ENABLE_CODE_RATELIMIT=true, CODE_RATE_MAX=20, CODE_RATE_WINDOW_MS=60000, CODE_RATE_BLOCK_MS=60000
@@ -40,7 +41,7 @@ export async function POST(req) {
     const code = normalizeCode(rawCode);
 
     if (!code) {
-        return Response.json({ ok: false, error: "Missing code" }, { status: 400 });
+        return jsonErr("Missing code", 400);
     }
 
     // Rate limit (per IP)
@@ -49,7 +50,7 @@ export async function POST(req) {
         const now = Date.now();
         const bucket = g.__codeRate.get(ip) || { tokens: MAX, resetAt: now + WINDOW_MS, blockedUntil: 0 };
         if (bucket.blockedUntil > now) {
-            return Response.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
+            return jsonErr("Too many attempts. Try again later.", 429);
         }
         if (bucket.resetAt <= now) {
             bucket.tokens = MAX;
@@ -77,7 +78,7 @@ export async function POST(req) {
             }
         }
         await jitter(); // slow down enumeration
-        return Response.json({ ok: false, error: "Invalid code" }, { status: 404 });
+        return jsonErr("Invalid code", 404);
     }
 
     await prisma.userCode.update({
@@ -94,5 +95,5 @@ export async function POST(req) {
         maxAge: 60 * 60 * 24 * 365 * 5,
     });
 
-    return Response.json({ ok: true, data: { anonId: row.anonId } });
+    return jsonOk({ anonId: row.anonId });
 }

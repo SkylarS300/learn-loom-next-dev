@@ -1,14 +1,13 @@
 // app/api/session/me/route.js
-import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 export async function GET() {
-    const cs = await cookies();
-    const anonId = cs.get("learnloomId")?.value;
+    const anonId = await getAnonId();
 
     if (!anonId) {
         // No session — do NOT mint anything here.
-        return Response.json({ ok: false, error: "no_session" }, { status: 401 });
+        return jsonErr("no_session", 401);
     }
 
     // Fetch latest short code for display, but don't create if missing.
@@ -18,8 +17,5 @@ export async function GET() {
         select: { shortCode: true, createdAt: true, lastUsedAt: true },
     });
 
-    return Response.json({
-        ok: true,
-        data: { anonId, shortCode: uc?.shortCode || null },
-    });
+    return jsonOk({ anonId, shortCode: uc?.shortCode || null });
 }

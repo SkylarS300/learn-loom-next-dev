@@ -32,6 +32,7 @@ export default function Navbar() {
   }, []);
 
   const loggedIn = !!me.anonId;
+  const loading = !!me.loading;
 
   async function copyCode() {
     try {
@@ -102,7 +103,11 @@ export default function Navbar() {
           className={styles.actions}
           style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}
         >
-          {loggedIn ? (
+          {loading ? (
+            <div aria-busy="true" aria-live="polite" style={{ color: "#6b7280", fontSize: 12 }}>
+              Loading…
+            </div>
+          ) : loggedIn ? (
             <>
               <button onClick={copyCode} className={styles.btnSecondary} style={btnSecondary}>
                 Copy code

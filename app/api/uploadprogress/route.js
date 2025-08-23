@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
+import { z } from "zod";
+import { jsonErr } from "@/app/api/_util/auth";
 
 export async function POST(req) {
     try {
@@ -7,7 +9,17 @@ export async function POST(req) {
         const anonId = cookieStore.get("learnloomId")?.value;
         if (!anonId) return new Response("Unauthorized", { status: 401 });
 
-        const { uploadId, paraIndex = 0, charOffset = 0, deltaTimeMs = 0 } = await req.json(); if (!uploadId) return new Response("Missing uploadId", { status: 400 });
+        const Body = z.object({
+            uploadId: z.coerce.number().int().positive(),
+            paraIndex: z.coerce.number().int().min(0).optional(),
+            charOffset: z.coerce.number().int().min(0).optional(),
+            deltaTimeMs: z.coerce.number().int().min(0).optional(),
+        });
+        const parsed = Body.safeParse(await req.json());
+        if (!parsed.success) {
+            return jsonErr("Invalid request", 422, { issues: parsed.error.issues });
+        }
+        const { uploadId, paraIndex = 0, charOffset = 0, deltaTimeMs = 0 } = parsed.data;
 
         try {
             await prisma.uploadprogress.upsert({

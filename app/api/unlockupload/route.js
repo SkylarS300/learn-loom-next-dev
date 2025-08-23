@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // simple backoff: lock 5 minutes after 5 bad tries; double each extra 5
 function nextLock(count) {
@@ -11,22 +13,29 @@ function nextLock(count) {
   return until;
 }
 
+const Body = z.object({
+  uploadId: z.coerce.number().int().positive(),
+  password: z.string().min(1).max(128),
+});
+
+
 export async function POST(req) {
   try {
-    const { uploadId, password } = await req.json();
-    const cookieStore = await cookies();
-    const anonId = cookieStore.get("learnloomId")?.value;
-
-    if (!anonId || !uploadId || !password) {
-      return Response.json({ ok: false, error: "Invalid request" }, { status: 422 });
+    const parsed = Body.safeParse(await req.json());
+    if (!parsed.success) {
+      return jsonErr("Invalid request", 422, { issues: parsed.error.issues });
     }
+    const { uploadId, password } = parsed.data;
+    const anonId = await getAnonId();
+
+    if (!anonId) return jsonErr("Unauthorized", 401);
 
     const upload = await prisma.uploadedtext.findUnique({
       where: { id: Number(uploadId) },
       select: { id: true, password: true },
     });
     if (!upload || !upload.password) {
-      return Response.json({ ok: false, error: "Not found or not protected" }, { status: 404 });
+      return jsonErr("Not found or not protected", 404);
     }
 
     // get or create attempt row
@@ -36,10 +45,7 @@ export async function POST(req) {
 
     if (attempt?.lockedUntil && attempt.lockedUntil > new Date()) {
       const ms = attempt.lockedUntil.getTime() - Date.now();
-      return Response.json(
-        { ok: false, error: `Too many attempts. Try again in ${Math.ceil(ms / 60000)} min.` },
-        { status: 429 }
-      );
+      return jsonErr(`Too many attempts. Try again in ${Math.ceil(ms / 60000)} min.`, 429);
     }
 
     const ok = await bcrypt.compare(password, upload.password);
@@ -58,7 +64,7 @@ export async function POST(req) {
           create: { anonId, uploadId: Number(uploadId), count: 0 },
         }),
       ]);
-      return Response.json({ ok: true });
+      return jsonOk();
     }
 
     // wrong password: increment + maybe lock
@@ -76,9 +82,9 @@ export async function POST(req) {
       });
     }
 
-    return Response.json({ ok: false, error: "Incorrect password" }, { status: 401 });
+    return jsonErr("Incorrect password", 401);
   } catch (e) {
     console.error("unlockupload POST failed:", e);
-    return Response.json({ ok: false, error: "Server error" }, { status: 500 });
+    return jsonErr("Server error", 500);
   }
 }

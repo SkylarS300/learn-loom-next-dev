@@ -1,5 +1,6 @@
 // app/api/session/new/route.js
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
+import { jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 function genShort() {
     const A = "ABCDEFGHJKMNPQRSTUVWXZ23456789"; // no O/0/I/1
@@ -21,5 +22,5 @@ export async function POST() {
     const shortCode = await mintUniqueShortCode();
     await prisma.userCode.create({ data: { anonId, shortCode } });
 
-    return Response.json({ ok: true, data: { anonId, shortCode } });
+    return jsonOk({ anonId, shortCode });
 }
