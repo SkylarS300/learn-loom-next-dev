@@ -38,8 +38,12 @@ export default function MyAssignmentsCard() {
     const [clsLoading, setClsLoading] = useState(true);
     const [clsErr, setClsErr] = useState("");
 
+    // 🔧 FIX: missing refs
+    const hasTrackedClasses = useRef(false);
+    const prevBucketRef = useRef(null);
+    const prevClassRef = useRef("ALL");
+
     // ⚡ ultra-simple demo mode:
-    // Visit /dashboard?demoMyAssignments=1 to populate the card without API/DB.
     const demoMode =
         typeof window !== "undefined" &&
         new URLSearchParams(window.location.search).get("demoMyAssignments") === "1";
@@ -82,7 +86,6 @@ export default function MyAssignmentsCard() {
         hasTrackedClasses.current = true;
     }, [clsLoading, classes]);
 
-
     useEffect(() => {
         let dead = false;
         const ctl = new AbortController();
@@ -92,7 +95,6 @@ export default function MyAssignmentsCard() {
             setErr("");
             try {
                 if (demoMode) {
-                    // Demo fixtures — safe, local-only (not persisted)
                     const demo = [
                         {
                             assignmentId: 1001,
@@ -167,10 +169,10 @@ export default function MyAssignmentsCard() {
         return classes.filter(c => classFilter === "ALL" || c.classroomId === Number(classFilter));
     }, [classes, classFilter]);
 
-
     // Telemetry: filter changes (status tab or class dropdown)
     useEffect(() => {
-        const changed = prevBucketRef.current !== bucket || prevClassRef.current !== classFilter;
+        const changed =
+            prevBucketRef.current !== bucket || prevClassRef.current !== classFilter;
         if (changed) {
             track("dash_assignments_filtered", { bucket, classFilter });
             prevBucketRef.current = bucket;
