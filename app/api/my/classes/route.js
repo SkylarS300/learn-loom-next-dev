@@ -20,7 +20,7 @@ export async function GET() {
     // Build quick counts for student-role classes
     const now = new Date();
     const studentClassIds = memberships.filter(m => (m.role || "student") !== "teacher").map(m => m.classroomId);
-    let countsByClass = new Map();
+    const countsByClass = new Map();
     if (studentClassIds.length) {
         const assignments = await prisma.assignment.findMany({
             where: {

@@ -1,5 +1,5 @@
 // app/api/users/route.js
-import prisma from "../../../lib/prisma";
+import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 
@@ -8,42 +8,49 @@ export async function POST(request) {
     const { email, password, firstName, lastName, grade, role } = await request.json();
 
     if (!email || !password || !firstName || !lastName || !role) {
-      return new Response("Missing required fields", { status: 400 });
+      return Response.json({ ok: false, error: "Missing required fields" }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const emailNorm = String(email).trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: emailNorm } });
     if (existing) {
-      return new Response("Email already in use", { status: 409 });
+      return Response.json({ ok: false, error: "Email already in use" }, { status: 409 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const gradeNum = Number.isFinite(parseInt(grade, 10)) ? parseInt(grade, 10) : null;
+
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: emailNorm,
         password: hashedPassword,
         firstName,
         lastName,
-        grade: parseInt(grade),
+        grade: gradeNum,
         role: role.toUpperCase() === "TEACHER" ? "TEACHER" : "STUDENT",
       },
     });
 
-    const { password: _, ...safeUser } = user;
-    return Response.json(safeUser);
+    const { password: _pw, ...safeUser } = user;
+    return Response.json({ ok: true, data: safeUser });
   } catch (error) {
-      console.error("Signup error:", error.message, error.stack); // <== Add this
-      return new Response("Internal server error", { status: 500 });
+    console.error("Signup error:", error.message, error.stack);
+    return Response.json({ ok: false, error: "Internal server error" }, { status: 500 });
   }
 
 }
 
 export async function GET() {
   try {
-    const users = await prisma.user.findMany();
-    return Response.json(users);
+    // Expose only non-sensitive fields
+    const users = await prisma.user.findMany({
+      select: { id: true, email: true, firstName: true, lastName: true, grade: true, role: true, createdAt: true, updatedAt: true },
+      orderBy: { id: "asc" },
+    });
+    return Response.json({ ok: true, data: users });
   } catch (error) {
-      console.error("Error fetching users:", error);
-      return new Response("Failed to fetch users", { status: 500 });
+    console.error("Error fetching users:", error);
+    return Response.json({ ok: false, error: "Failed to fetch users" }, { status: 500 });
   }
 }

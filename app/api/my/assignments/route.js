@@ -10,7 +10,7 @@ export async function GET(req) {
 
     const url = new URL(req.url);
     const now = new Date();
-    const horizonDays = Number(url.searchParams.get("days") || 30);
+    const horizonDays = Math.max(1, Number(url.searchParams.get("days") || 30));
     const to = new Date(now.getTime() + horizonDays * 86400000);
 
     // classes I'm in (with role + classroom name) — we only keep non-teacher classes here
@@ -35,6 +35,11 @@ export async function GET(req) {
                 { targets: { some: { anonId: me } } },
                 { targets: { some: { anonId: null } } }, // ALL
             ],
+            // Show overdue OR due within horizon OR no due date
+            OR: [
+                { dueDate: null },
+                { dueDate: { lte: to } },
+            ],
         },
         orderBy: { dueDate: "asc" },
         select: {
@@ -57,9 +62,13 @@ export async function GET(req) {
         const bucket = isMissing ? "MISSING" : (["SUBMITTED", "GRADED", "LATE"].includes(status) ? "COMPLETED" : "DUE_SOON");
         // deep link
         let href = "#";
-        if (a.type === "BOOK") href = `/readingpal?bookIndex=${a.bookId ?? ""}&chapterIndex=${a.chapterIndex ?? ""}&from=assign:${a.id}`;
-        if (a.type === "QUIZ") href = `/grammar?concept=${encodeURIComponent(a.category || "")}&subTopic=${encodeURIComponent(a.subtopic || "")}&start=1&from=assign:${a.id}`;
-        if (a.type === "UPLOAD") href = `/uploads/${a.uploadId ?? ""}?from=assign:${a.id}`;
+        if (a.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex)) {
+            href = `/readingpal?bookIndex=${a.bookId}&chapterIndex=${a.chapterIndex}&from=assign:${a.id}`;
+        } else if (a.type === "QUIZ" && a.category) {
+            href = `/grammar?concept=${encodeURIComponent(a.category)}&subTopic=${encodeURIComponent(a.subtopic || "")}&start=1&from=assign:${a.id}`;
+        } else if (a.type === "UPLOAD" && Number.isInteger(a.uploadId)) {
+            href = `/uploads/${a.uploadId}?from=assign:${a.id}`;
+        }
 
         return {
             assignmentId: a.id,
@@ -77,5 +86,5 @@ export async function GET(req) {
         };
     });
 
-    return Response.json({ ok: true, data: items });
+    return Response.json({ ok: true, data: items, window: { to: to.toISOString(), horizonDays } });
 }

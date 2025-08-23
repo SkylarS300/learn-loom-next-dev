@@ -35,7 +35,7 @@ export async function GET() {
         upload: upload ?? null,
         grammar: grammar ?? null,
       },
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ ok: false, error: "Failed to fetch quick resume" }, { status: 500 });
   }

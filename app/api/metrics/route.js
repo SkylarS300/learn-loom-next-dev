@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 // ----- helpers -----
 function dayKeyUTC(d) {
     // YYYY-MM-DD (UTC)
-    return new Date(d).toISOString().slice(0, 10);
+    const dt = d instanceof Date ? d : new Date(d);
+    return dt.toISOString().slice(0, 10);
 }
 function rangeDaysUTC(days) {
     const out = [];
@@ -172,7 +173,7 @@ export async function GET(req) {
         return Response.json({
             ok: true,
             data: { readingDaily, grammarDaily, grammarPaceDaily, topWeakAreas },
-        });
+        }, { headers: { "Cache-Control": "no-store" } });
     } catch (e) {
         console.error("metrics GET failed:", e);
         return Response.json({ ok: false, error: "Server error" }, { status: 500 });

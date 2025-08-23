@@ -20,7 +20,7 @@ function toCSV(headers, rows) {
 
 export async function GET(req) {
     const url = new URL(req.url);
-    const kind = (url.searchParams.get("kind") || "all").toLowerCase();
+    const kind = String(url.searchParams.get("kind") || "all").toLowerCase();
 
     const c = await cookies();
     const anonId = c.get("learnloomId")?.value;
@@ -209,11 +209,14 @@ export async function GET(req) {
 
     // kind === "all" → ZIP everything
     const zip = new JSZip();
+    // data
     zip.file("reading.csv", readingCSV);
     zip.file("grammar.csv", grammarCSV);
     zip.file("uploads.csv", uploadsCSV);
     zip.file("notes.csv", notesCSV);
     zip.file("notes.json", notesJSON);
+    // meta
+    zip.file("meta.json", JSON.stringify({ exportedAt: new Date().toISOString() }, null, 2));
     const blob = await zip.generateAsync({ type: "nodebuffer" });
 
     return new NextResponse(blob, {
