@@ -107,9 +107,12 @@ export async function GET(_req, { params }) {
             ["assignmentId", "type", "title", "startAt", "dueAt", "allowLate", "latePenaltyPct", "weightPoints", "targets", "completed", "missing", "late"],
             assignments.map(a => {
                 const subs = completions.filter(c => c.assignmentId === a.id);
-                // Target logic: if there are explicit targets with anonId != null we count those; else whole class (excluding teachers)
-                const expTargets = []; // optional enhancement later
-                const totalTargets = expTargets.length || roster.filter(r => r.role !== "teacher").length;
+                // if any target row has anonId != null → targeted set = those anonIds; otherwise all students
+                const targets = (a.targets || []);
+                const targetedIds = targets.some(t => t.anonId != null)
+                    ? new Set(targets.map(t => t.anonId).filter(Boolean))
+                    : new Set(roster.filter(r => r.role !== "teacher").map(r => r.anonId).filter(Boolean));
+                const totalTargets = targetedIds.size;
                 const stCompleted = subs.filter(s => s.status === "SUBMITTED" || s.status === "GRADED").length;
                 const stLate = subs.filter(s => s.isLate).length;
                 const stMissing = Math.max(0, totalTargets - stCompleted);
@@ -122,7 +125,7 @@ export async function GET(_req, { params }) {
                     allowLate: String(a.allowLate ?? true),
                     latePenaltyPct: a.latePenaltyPct ?? "",
                     weightPoints: a.weightPoints ?? "",
-                    targets: expTargets.length ? "SELECTED" : "ALL",
+                    targets: targets.some(t => t.anonId != null) ? "SELECTED" : "ALL",
                     completed: stCompleted,
                     missing: stMissing,
                     late: stLate,
