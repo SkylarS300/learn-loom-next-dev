@@ -170,10 +170,10 @@ export async function GET(req) {
             .sort((a, b) => b.weakness - a.weakness)
             .slice(0, 3);
 
-        return Response.json({
-            ok: true,
-            data: { readingDaily, grammarDaily, grammarPaceDaily, topWeakAreas },
-        }, { headers: { "Cache-Control": "no-store" } });
+        return Response.json(
+            { ok: true, data: { readingDaily, grammarDaily, grammarPaceDaily, topWeakAreas } },
+            { headers: { "Cache-Control": "no-store" } }
+        );
     } catch (e) {
         console.error("metrics GET failed:", e);
         return Response.json({ ok: false, error: "Server error" }, { status: 500 });

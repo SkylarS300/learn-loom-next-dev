@@ -86,5 +86,5 @@ export async function GET(req) {
         };
     });
 
-    return Response.json({ ok: true, data: items, window: { to: to.toISOString(), horizonDays } });
+    return Response.json({ ok: true, data: items }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -61,5 +61,5 @@ export async function GET() {
         };
     });
 
-    return Response.json({ ok: true, data });
+    return Response.json({ ok: true, data }, { headers: { "Cache-Control": "no-store" } });
 }
