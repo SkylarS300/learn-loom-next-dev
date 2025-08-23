@@ -5,13 +5,20 @@ import bcrypt from "bcryptjs";
 
 export async function POST(request) {
   try {
-    const { email, password, firstName, lastName, grade, role } = await request.json();
+    const { email, password, firstName, lastName, grade, role } = await request.json().catch(() => ({}));
 
     if (!email || !password || !firstName || !lastName || !role) {
       return Response.json({ ok: false, error: "Missing required fields" }, { status: 400 });
     }
 
     const emailNorm = String(email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+      return new Response("Invalid email", { status: 422 });
+    }
+    if (String(password).length < 8) {
+      return new Response("Password too short", { status: 422 });
+    }
+
     const existing = await prisma.user.findUnique({ where: { email: emailNorm } });
     if (existing) {
       return Response.json({ ok: false, error: "Email already in use" }, { status: 409 });

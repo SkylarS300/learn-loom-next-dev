@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
-// POST /api/classrooms/:id/live/ping  { mode?("reading"|"grammar"|"upload") }
+// POST /api/classrooms/:id/live/ping  { mode?("reading"|"grammar"|"upload"), classroomId? } (classroomId optional; params.id preferred)
 export async function POST(req, { params }) {
     const cs = await cookies();
     const anonId = cs.get("learnloomId")?.value;
@@ -11,7 +11,7 @@ export async function POST(req, { params }) {
     let body = {};
     try { body = await req.json(); } catch { body = {}; }
 
-    const classroomId = Number(params?.id);
+    const classroomId = Number(params?.id ?? body.classroomId);
     if (!Number.isFinite(classroomId)) {
         return Response.json({ ok: false, error: "Bad classroomId" }, { status: 400 });
     }

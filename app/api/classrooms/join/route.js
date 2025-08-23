@@ -25,7 +25,9 @@ export async function POST(req) {
     const cls = await prisma.classroom.findUnique({ where: { code }, select: { id: true, ownerAnon: true } });
     if (!cls) return jsonErr("Class not found", 404);
 
-    const role = joinAsTeacher ? "teacher" : "student";
+    // Only the class owner can join as a teacher (no public escalation)
+    const role =
+        (joinAsTeacher && anonId === cls.ownerAnon) ? "teacher" : "student";
 
     // If already in roster, just update display name if provided
     const existing = await prisma.studentclassroom.findFirst({
