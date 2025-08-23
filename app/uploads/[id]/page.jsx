@@ -38,8 +38,7 @@ export default async function UploadViewPage(props) {
     const cookieOK = upload.shareCode && codeCookieSet.has(upload.shareCode);
     const urlOK = upload.shareCode && shareCodeParam === upload.shareCode;
     if (!(cookieOK || urlOK)) {
-      // allow page, but do not send content
-      upload.content = null;
+      // allow page, but do not send content (handled below in safeUpload)
     }
   }
   // PUBLIC: allowed (content may still be password-locked)
@@ -57,7 +56,11 @@ export default async function UploadViewPage(props) {
   const safeUpload = {
     id: upload.id,
     title: upload.title,
-    content: upload.password && !unlocked ? null : upload.content,
+    content: upload.password && !unlocked
+      ? null
+      : (upload.visibility === "CODED" && !isOwner && !(upload.shareCode && (codeCookieSet.has(upload.shareCode) || shareCodeParam === upload.shareCode)))
+        ? null
+        : upload.content,
     password: !!upload.password,
     createdAt: upload.createdAt,
     visibility: upload.visibility,

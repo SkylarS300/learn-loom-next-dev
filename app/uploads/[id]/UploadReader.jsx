@@ -53,15 +53,19 @@ export default function UploadReader({ upload, isOwner = false }) {
         })();
     }, [unlocked, upload]);
 
-    // Autosave current paragraph on scroll (throttled via rAF)
+    // Autosave current paragraph on scroll (only when paragraph changes; debounced)
     useEffect(() => {
         if (!unlocked || !uploadContent) return;
         const cont = containerRef.current;
         if (!cont) return;
 
         let pending = null;
+        let debounce = null;
+        let lastSavedIdx = -1;
 
         const saveProgress = async (pi) => {
+            if (pi === lastSavedIdx) return; // nothing new to save
+            lastSavedIdx = pi;
             try {
                 await fetch("/api/uploadprogress", {
                     method: "POST",
@@ -91,7 +95,9 @@ export default function UploadReader({ upload, isOwner = false }) {
                     }
                 });
 
-                saveProgress(bestIdx);
+                // debounce server write ~800ms after scroll settles
+                if (debounce) clearTimeout(debounce);
+                debounce = setTimeout(() => saveProgress(bestIdx), 800);
             });
         };
 
@@ -99,6 +105,7 @@ export default function UploadReader({ upload, isOwner = false }) {
         return () => {
             cont.removeEventListener("scroll", onScroll);
             if (pending) cancelAnimationFrame(pending);
+            if (debounce) clearTimeout(debounce);
         };
     }, [unlocked, uploadContent, upload?.id]);
 
@@ -189,6 +196,12 @@ export default function UploadReader({ upload, isOwner = false }) {
                 behavior: "smooth",
             });
         }
+        // persist the resumed position immediately
+        fetch("/api/uploadprogress", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uploadId: upload.id, paraIndex: Number(resume.paraIndex) || 0, charOffset: 0 }),
+        }).catch(() => { });
         setResume(null);
     }
 
@@ -213,8 +226,15 @@ export default function UploadReader({ upload, isOwner = false }) {
                     setUploadContent(data.content ?? "");
                 }
             } else {
-                const text = await res.text();
-                setError(text || "Incorrect password");
+                let msg = "Incorrect password";
+                try {
+                    const j = await res.json();
+                    msg = j?.error || msg;
+                } catch {
+                    const text = await res.text();
+                    if (text) msg = text;
+                }
+                setError(msg);
             }
         } catch {
             setError("Server error");
@@ -274,7 +294,7 @@ export default function UploadReader({ upload, isOwner = false }) {
                             >
                                 Copy
                             </button>
-                            +                <button
+                            <button
                                 className="cta-button small"
                                 onClick={async () => {
                                     const link = `${window.location.origin}/uploads/${upload.id}?code=${encodeURIComponent(code)}`;
