@@ -68,15 +68,12 @@ export async function GET(req, ctx) {
         orderBy: [{ updatedAt: "desc" }, { completedAt: "desc" }],
     });
 
-    const rMap = new Map(); // date -> minutes
+    const rMs = new Map(); // date -> total ms
     readingRows.forEach((r) => {
         const d = ymd(new Date(r.updatedAt));
-        const add = Math.max(0, Math.round((r.timeMs || 0) / 60000));
-        rMap.set(d, (rMap.get(d) || 0) + add);
+        rMs.set(d, (rMs.get(d) || 0) + Math.max(0, r.timeMs || 0));
     });
-    const readingDaily = Array.from(rMap.entries())
-        .sort(([a], [b]) => (a < b ? -1 : 1))
-        .map(([date, minutes]) => ({ date, minutes }));
+    const readingDaily = Array.from(rMs.entries())
 
     // ---- Grammar attempts (raw + daily avgs + pace) ----
     const grammarRows = await prisma.grammarprogress.findMany({

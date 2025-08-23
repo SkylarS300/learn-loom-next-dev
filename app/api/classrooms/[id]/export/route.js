@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import JSZip from "jszip";
 import { requireAnon, assertTeacher } from "@/app/api/_util/auth";
 
+
 function toCSV(headers, rows) {
     const esc = (v) => {
         if (v == null) return "";
@@ -16,7 +17,7 @@ export async function GET(_req, { params }) {
     try {
         const anonId = await requireAnon();
         const id = Number(params.id);
-        await assertTeacher(id, anonId);
+        const cls = await assertTeacher(id, anonId);
 
         // Roster
         const roster = await prisma.studentclassroom.findMany({
@@ -40,8 +41,18 @@ export async function GET(_req, { params }) {
                 where: { anonId: { in: ids }, updatedAt: { gte: since } },
                 _sum: { timeMs: true },
             });
+            // also track latest activity timestamp from reading
+            const latestReads = await prisma.readingprogress.findMany({
+                where: { anonId: { in: ids }, updatedAt: { gte: since } },
+                select: { anonId: true, updatedAt: true },
+            });
             for (const r of reading) {
-                const m = map.get(r.anonId); if (m) m.readingMin7d = Math.round((r._sum.timeMs || 0) / 60000);
+                const m = map.get(r.anonId);
+                if (m) m.readingMin7d = Math.round((r._sum.timeMs || 0) / 60000);
+            }
+            for (const rr of latestReads) {
+                const m = map.get(rr.anonId);
+                if (m) m.lastSeen = Math.max(+new Date(m.lastSeen || 0), +rr.updatedAt) ? new Date(Math.max(+new Date(m.lastSeen || 0), +rr.updatedAt)).toISOString() : m.lastSeen;
             }
             const gp = await prisma.grammarprogress.findMany({
                 where: { anonId: { in: ids }, createdAt: { gte: since } },
@@ -54,7 +65,13 @@ export async function GET(_req, { params }) {
                 acc.set(g.anonId, a);
             }
             for (const [aid, a] of acc) {
-                const m = map.get(aid); if (m) { m.quizAvg7d = Math.round(a.sum / Math.max(1, a.n)); m.attempts7d = a.n; m.lastSeen = new Date(a.last).toISOString(); }
+                const m = map.get(aid);
+                if (m) {
+                    m.quizAvg7d = Math.round(a.sum / Math.max(1, a.n));
+                    m.attempts7d = a.n;
+                    const prev = m.lastSeen ? +new Date(m.lastSeen) : 0;
+                    m.lastSeen = new Date(Math.max(prev, a.last || 0)).toISOString();
+                }
             }
         }
 
@@ -69,7 +86,7 @@ export async function GET(_req, { params }) {
             ["classroomId", "classroomName", "createdAt", "totalStudents", "totalAssignments", "readingMinutes7d", "quizAvgPct7d"],
             [{
                 classroomId: id,
-                classroomName: `Class #${id}`,
+                classroomName: cls?.name || `Class #${id}`,
                 createdAt: "", // could add if you want
                 totalStudents: roster.filter(r => r.role !== "teacher").length,
                 totalAssignments: assignments.length,

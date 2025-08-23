@@ -1,9 +1,9 @@
-// app/api/live/ping/route.js
+// app/api/classrooms/[id]/live/ping/route.js
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
-// POST /api/live/ping  { classroomId, mode?("reading"|"grammar"|"upload") }
-export async function POST(req) {
+// POST /api/classrooms/:id/live/ping  { mode?("reading"|"grammar"|"upload") }
+export async function POST(req, { params }) {
     const cs = await cookies();
     const anonId = cs.get("learnloomId")?.value;
     if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -11,7 +11,7 @@ export async function POST(req) {
     let body = {};
     try { body = await req.json(); } catch { body = {}; }
 
-    const classroomId = Number(body.classroomId);
+    const classroomId = Number(params?.id);
     if (!Number.isFinite(classroomId)) {
         return Response.json({ ok: false, error: "Bad classroomId" }, { status: 400 });
     }
@@ -44,5 +44,5 @@ export async function POST(req) {
         update: { mode, updatedAt: new Date() },
     });
 
-    return Response.json({ ok: true });
+    return new Response(null, { status: 204 });
 }

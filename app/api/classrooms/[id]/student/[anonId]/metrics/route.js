@@ -37,12 +37,14 @@ export async function GET(req, ctx) {
         where: { anonId: studentAnon, updatedAt: { gte: from, lte: to } },
         select: { timeMs: true, updatedAt: true },
     });
-    const rMap = new Map();
+    const rMsByDay = new Map(); // date -> total ms
     for (const r of rRows) {
         const d = ymd(new Date(r.updatedAt));
-        rMap.set(d, (rMap.get(d) || 0) + Math.max(0, Math.round((r.timeMs || 0) / 60000)));
+        rMsByDay.set(d, (rMsByDay.get(d) || 0) + Math.max(0, r.timeMs || 0));
     }
-    const readingDaily = Array.from(rMap.entries()).sort().map(([date, minutes]) => ({ date, minutes }));
+    const readingDaily = Array.from(rMsByDay.entries())
+        .sort()
+        .map(([date, ms]) => ({ date, minutes: Math.round(ms / 60000) }));
 
     // Grammar
     const gRows = await prisma.grammarprogress.findMany({

@@ -33,7 +33,7 @@ export async function GET(req, { params }) {
     if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const url = new URL(req.url);
-    const minutes = Math.max(1, Math.min(60, Number(url.searchParams.get("minutes") || 5)));
+    const minutes = Math.max(1, Math.min(60, Number(url.searchParams.get("minutes") || 5) || 5));
     const modeRaw = String(url.searchParams.get("mode") || "any").toLowerCase();
     const mode = ["any", "reading", "grammar", "upload"].includes(modeRaw) ? modeRaw : "any";
 

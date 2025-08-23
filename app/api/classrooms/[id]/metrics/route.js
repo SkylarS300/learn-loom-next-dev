@@ -50,13 +50,14 @@ export async function GET(_req, { params }) {
             select: { timeMs: true, updatedAt: true },
         })
         : [];
-    const readingDailyMap = new Map();
+    const readingMsDaily = new Map(); // date -> total ms
     for (const r of reading) {
         const d = ymd(new Date(r.updatedAt));
-        const min = Math.max(0, Math.round((r.timeMs || 0) / 60000));
-        readingDailyMap.set(d, (readingDailyMap.get(d) || 0) + min);
+        readingMsDaily.set(d, (readingMsDaily.get(d) || 0) + Math.max(0, r.timeMs || 0));
     }
-    const readingDaily = Array.from(readingDailyMap.entries()).sort().map(([date, minutes]) => ({ date, minutes }));
+    const readingDaily = Array.from(readingMsDaily.entries())
+        .sort()
+        .map(([date, ms]) => ({ date, minutes: Math.round(ms / 60000) }));
 
     // grammar avg score by day
     const grammar = rosterIds.length
