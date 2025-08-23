@@ -1,40 +1,33 @@
 // app/api/classrooms/[id]/assignments/route.js
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-
-// helper: auth as teacher/owner
-async function requireTeacher(anonId, classroomId) {
-    const cls = await prisma.classroom.findUnique({
-        where: { id: classroomId },
-        select: { id: true, ownerAnon: true },
-    });
-    if (!cls) return { ok: false, status: 404, error: "Not found" };
-    if (cls.ownerAnon === anonId) return { ok: true, cls, isTeacher: true };
-    const teacherRow = await prisma.studentclassroom.findFirst({
-        where: { classroomId, anonId, role: "teacher" },
-        select: { id: true },
-    });
-    if (!teacherRow) return { ok: false, status: 403, error: "Forbidden" };
-    return { ok: true, cls, isTeacher: true };
-}
+import { z } from "zod";
+import { assertTeacher, getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // GET: list assignments for class with basic computed counts
 export async function GET(req, { params }) {
     const classId = Number(params?.id);
-    if (!Number.isFinite(classId)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
+    if (!Number.isFinite(classId)) return jsonErr("Bad id", 400);
 
-    const cs = await cookies();
-    const me = cs.get("learnloomId")?.value;
-    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-
-    const auth = await requireTeacher(me, classId);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+    const me = await getAnonId();
+    if (!me) return jsonErr("Unauthorized", 401);
+    try {
+        await assertTeacher(classId, me);
+    } catch (e) {
+        return jsonErr(e.message || "Forbidden", e.status || 403);
+    }
 
     const url = new URL(req.url);
-    const to = url.searchParams.get("to") ? new Date(url.searchParams.get("to")) : new Date();
-    const from = url.searchParams.get("from")
-        ? new Date(url.searchParams.get("from"))
-        : new Date(to.getTime() - 30 * 86400000);
+    const Query = z.object({
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+    });
+    const parsed = Query.safeParse({
+        from: url.searchParams.get("from") || undefined,
+        to: url.searchParams.get("to") || undefined,
+    });
+    if (!parsed.success) return jsonErr("Invalid query", 400, { issues: parsed.error.issues });
+    const to = parsed.data.to ? new Date(parsed.data.to) : new Date();
+    const from = parsed.data.from ? new Date(parsed.data.from) : new Date(to.getTime() - 30 * 86400000);
 
     const [assignments, members] = await Promise.all([
         prisma.assignment.findMany({
@@ -101,36 +94,51 @@ export async function GET(req, { params }) {
         };
     });
 
-    return Response.json({ ok: true, data });
+    return jsonOk(data);
 }
 
 // POST: create assignment + targets
 export async function POST(req, { params }) {
     const classId = Number(params?.id);
-    if (!Number.isFinite(classId)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
+    if (!Number.isFinite(classId)) return jsonErr("Bad id", 400);
 
-    const cs = await cookies();
-    const me = cs.get("learnloomId")?.value;
-    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-
-    const auth = await requireTeacher(me, classId);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
-
-    const body = await req.json().catch(() => ({}));
-    const {
-        title, description = "", type,
-        startAt = null, dueDate = null,
-        allowLate = true, latePenaltyPct = null, weightPoints = null,
-        instructions = "", attachments = [],
-        category = null, subtopic = null,
-        bookId = null, chapterIndex = null,
-        uploadId = null,
-        targets = "ALL", // "ALL" or array of anonIds
-    } = body || {};
-
-    if (!title || !type) {
-        return Response.json({ ok: false, error: "Missing title or type" }, { status: 400 });
+    const me = await getAnonId();
+    if (!me) return jsonErr("Unauthorized", 401);
+    try {
+        await assertTeacher(classId, me);
+    } catch (e) {
+        return jsonErr(e.message || "Forbidden", e.status || 403);
     }
+
+    const Body = z.object({
+        title: z.string().trim().min(1).max(200),
+        description: z.string().max(2000).optional().default(""),
+        type: z.enum(["QUIZ", "BOOK", "UPLOAD"]),
+        startAt: z.string().datetime().nullable().optional(),
+        dueDate: z.string().datetime().nullable().optional(),
+        allowLate: z.boolean().optional().default(true),
+        latePenaltyPct: z.number().min(0).max(100).nullable().optional(),
+        weightPoints: z.number().min(0).nullable().optional(),
+        instructions: z.string().max(4000).optional().default(""),
+        attachments: z.array(z.string().max(400)).optional().default([]),
+        category: z.string().max(120).nullable().optional(),
+        subtopic: z.string().max(120).nullable().optional(),
+        bookId: z.number().int().nullable().optional(),
+        chapterIndex: z.number().int().nullable().optional(),
+        uploadId: z.number().int().nullable().optional(),
+        targets: z.union([z.literal("ALL"), z.array(z.string().min(1)).min(1)]).optional().default("ALL"),
+    });
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return jsonErr("Missing or invalid fields", 400, { issues: parsed.error.issues });
+    const {
+        title, description, type,
+        startAt, dueDate,
+        allowLate, latePenaltyPct, weightPoints,
+        instructions, attachments,
+        category, subtopic,
+        bookId, chapterIndex,
+        uploadId, targets,
+    } = parsed.data;
 
     const created = await prisma.assignment.create({
         data: {
@@ -165,5 +173,5 @@ export async function POST(req, { params }) {
         });
     }
 
-    return Response.json({ ok: true, data: { assignmentId: created.id } }, { status: 201 });
+    return jsonOk({ assignmentId: created.id }, 201);
 }

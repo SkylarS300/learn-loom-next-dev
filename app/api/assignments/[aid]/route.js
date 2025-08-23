@@ -1,6 +1,7 @@
 // app/api/assignments/[aid]/route.js
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 async function requireTeacherByAid(anonId, aid) {
     const a = await prisma.assignment.findUnique({
@@ -20,14 +21,13 @@ async function requireTeacherByAid(anonId, aid) {
 // GET: detail + per-student table
 export async function GET(_req, { params }) {
     const aid = Number(params?.aid);
-    if (!Number.isFinite(aid)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
+    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
 
-    const cs = await cookies();
-    const me = cs.get("learnloomId")?.value;
-    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const me = await getAnonId();
+    if (!me) return jsonErr("Unauthorized", 401);
 
     const auth = await requireTeacherByAid(me, aid);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+    if (!auth.ok) return jsonErr(auth.error, auth.status);
 
     const [a, roster, subs] = await Promise.all([
         prisma.assignment.findUnique({
@@ -53,7 +53,7 @@ export async function GET(_req, { params }) {
         }),
     ]);
 
-    if (!a) return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+    if (!a) return jsonErr("Not found", 404);
 
     const nameMap = new Map(roster.map(r => [r.anonId || "", r.displayName || ""]));
     const subMap = new Map((subs || []).map(s => [s.anonId || "", s]));
@@ -77,23 +77,31 @@ export async function GET(_req, { params }) {
             };
         });
 
-    return Response.json({ ok: true, data: { assignment: a, students: table } });
+    return jsonOk({ assignment: a, students: table });
 }
 
 // PATCH: grade override / feedback (simple form here)
 export async function PATCH(req, { params }) {
     const aid = Number(params?.aid);
-    if (!Number.isFinite(aid)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
+    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
 
-    const cs = await cookies();
-    const me = cs.get("learnloomId")?.value;
-    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const me = await getAnonId();
+    if (!me) return jsonErr("Unauthorized", 401);
 
     const auth = await requireTeacherByAid(me, aid);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+    if (!auth.ok) return jsonErr(auth.error, auth.status);
 
-    const { anonId, status, scorePct, scorePoints, feedback, isLate } = await req.json().catch(() => ({}));
-    if (!anonId) return Response.json({ ok: false, error: "Missing anonId" }, { status: 400 });
+    const Body = z.object({
+        anonId: z.string().min(1),
+        status: z.enum(["ASSIGNED", "SUBMITTED", "GRADED", "LATE"]).optional(),
+        scorePct: z.number().min(0).max(100).nullable().optional(),
+        scorePoints: z.number().nullable().optional(),
+        feedback: z.string().max(4000).nullable().optional(),
+        isLate: z.boolean().optional(),
+    });
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return jsonErr("Invalid request", 400, { issues: parsed.error.issues });
+    const { anonId, status, scorePct, scorePoints, feedback, isLate } = parsed.data;
 
     const now = new Date();
     const updated = await prisma.assignmentcompletion.upsert({
@@ -121,5 +129,5 @@ export async function PATCH(req, { params }) {
         select: { anonId: true, status: true, scorePct: true, scorePoints: true, gradedAt: true, feedback: true, isLate: true },
     });
 
-    return Response.json({ ok: true, data: updated });
+    return jsonOk(updated);
 }

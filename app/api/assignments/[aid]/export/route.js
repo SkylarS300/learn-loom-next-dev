@@ -38,7 +38,7 @@ export async function GET(_req, { params }) {
     if (!me) return new Response("Unauthorized", { status: 401 });
 
     const auth = await requireTeacherByAid(me, aid);
-    if (!auth.ok) return new Response(auth.error, { status: auth.status });
+    if (!auth.ok) return new Response(auth.error || "Forbidden", { status: auth.status || 403 });
 
     const [a, roster, subs] = await Promise.all([
         prisma.assignment.findUnique({

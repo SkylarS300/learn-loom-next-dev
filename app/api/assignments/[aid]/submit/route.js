@@ -1,16 +1,13 @@
 // app/api/assignments/[aid]/submit/route.js
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 export async function POST(req, { params }) {
     const aid = Number(params?.aid);
-    if (!Number.isFinite(aid)) {
-        return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
-    }
+    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
 
-    const cs = await cookies();
-    const anonId = cs.get("learnloomId")?.value;
-    if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const anonId = await getAnonId();
+    if (!anonId) return jsonErr("Unauthorized", 401);
 
     const assignment = await prisma.assignment.findUnique({
         where: { id: aid },
@@ -31,20 +28,17 @@ export async function POST(req, { params }) {
         },
     });
 
-    if (!assignment) return Response.json({ ok: false, error: "Not found" }, { status: 404 });
-
+    if (!assignment) return jsonErr("Not found", 404);
     // Must be in the classroom
     const member = await prisma.studentclassroom.findFirst({
         where: { classroomId: assignment.classroomId, anonId },
         select: { id: true },
     });
-    if (!member) return Response.json({ ok: false, error: "Not in classroom" }, { status: 403 });
-
+    if (!member) return jsonErr("Not in classroom", 403);
     // Must be targeted
     const targetsAll = assignment.targets.some(t => t.anonId == null);
     const targeted = targetsAll || assignment.targets.some(t => t.anonId === anonId);
-    if (!targeted) return Response.json({ ok: false, error: "Not targeted" }, { status: 403 });
-
+    if (!targeted) return jsonErr("Not targeted", 403);
     const now = new Date();
     const due = assignment.dueDate ? new Date(assignment.dueDate) : null;
     const pastDue = due ? now > due : false;
@@ -64,7 +58,7 @@ export async function POST(req, { params }) {
     // Type-specific validation / scoring source
     if (assignment.type === "QUIZ") {
         if (!assignment.category) {
-            return Response.json({ ok: false, error: "Quiz meta missing" }, { status: 400 });
+            return jsonErr("Quiz meta missing", 400);
         }
         const latest = await prisma.grammarprogress.findFirst({
             where: {
@@ -76,7 +70,7 @@ export async function POST(req, { params }) {
             select: { id: true, score: true, numQuestions: true, createdAt: true },
         });
         if (!latest) {
-            return Response.json({ ok: false, error: "No recent quiz attempt found" }, { status: 400 });
+            return jsonErr("No recent quiz attempt found", 400);
         }
         nextScorePct = Math.max(nextScorePct ?? 0, latest.score ?? 0);
         attemptEntry = {
@@ -88,14 +82,14 @@ export async function POST(req, { params }) {
         };
     } else if (assignment.type === "BOOK") {
         if (assignment.bookId == null || assignment.chapterIndex == null) {
-            return Response.json({ ok: false, error: "Reading meta missing" }, { status: 400 });
+            return jsonErr("Reading meta missing", 400);
         }
         const rp = await prisma.readingprogress.findFirst({
             where: { anonId, bookIndex: assignment.bookId, chapterIndex: assignment.chapterIndex },
             orderBy: { updatedAt: "desc" },
             select: { id: true, timeMs: true, updatedAt: true },
         });
-        if (!rp) return Response.json({ ok: false, error: "No reading progress found" }, { status: 400 });
+        if (!rp) return jsonErr("No reading progress found", 400);
         attemptEntry = {
             ...attemptEntry,
             ref: { table: "readingprogress", id: rp.id },
@@ -104,14 +98,14 @@ export async function POST(req, { params }) {
         };
     } else if (assignment.type === "UPLOAD") {
         if (assignment.uploadId == null) {
-            return Response.json({ ok: false, error: "Upload meta missing" }, { status: 400 });
+            return jsonErr("Upload meta missing", 400);
         }
         const up = await prisma.uploadprogress.findFirst({
             where: { anonId, uploadId: assignment.uploadId },
             orderBy: { updatedAt: "desc" },
             select: { id: true, paraIndex: true, charOffset: true, timeMs: true, updatedAt: true },
         });
-        if (!up) return Response.json({ ok: false, error: "No upload progress found" }, { status: 400 });
+        if (!up) return jsonErr("No upload progress found", 400);
         attemptEntry = {
             ...attemptEntry,
             ref: { table: "uploadprogress", id: up.id },
@@ -158,5 +152,5 @@ export async function POST(req, { params }) {
         },
     });
 
-    return Response.json({ ok: true, data: updated });
+    return jsonOk(updated);
 }

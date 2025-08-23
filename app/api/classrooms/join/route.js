@@ -1,23 +1,29 @@
 // app/api/classrooms/join/route.js
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // POST /api/classrooms/join  { code, displayName?, joinAsTeacher? }
 export async function POST(req) {
-    const cs = await cookies();
-    const anonId = cs.get("learnloomId")?.value || null;
-    if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const anonId = await getAnonId();
+    if (!anonId) return jsonErr("Unauthorized", 401);
 
-    const body = await req.json().catch(() => ({}));
-    const rawCode = String(body?.code || "");
+    const Body = z.object({
+        code: z.string().trim().min(1).max(16),
+        displayName: z.string().trim().max(80).optional(),
+        joinAsTeacher: z.boolean().optional(),
+    });
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return jsonErr("Invalid request", 400, { issues: parsed.error.issues });
+    const rawCode = parsed.data.code || "";
     const code = rawCode.trim().toUpperCase().replace(/\s+/g, "");
-    const displayName = (body?.displayName || "").toString().trim().slice(0, 80) || null;
-    const joinAsTeacher = !!body?.joinAsTeacher;
+    const displayName = parsed.data.displayName?.trim() || null;
+    const joinAsTeacher = !!parsed.data.joinAsTeacher;
 
-    if (!code) return Response.json({ ok: false, error: "Missing code" }, { status: 400 });
+    if (!code) return jsonErr("Missing code", 400);
 
     const cls = await prisma.classroom.findUnique({ where: { code }, select: { id: true, ownerAnon: true } });
-    if (!cls) return Response.json({ ok: false, error: "Class not found" }, { status: 404 });
+    if (!cls) return jsonErr("Class not found", 404);
 
     const role = joinAsTeacher ? "teacher" : "student";
 
@@ -38,5 +44,5 @@ export async function POST(req) {
         });
     }
 
-    return Response.json({ ok: true, data: { classroomId: cls.id, role } }, { status: 200 });
+    return jsonOk({ classroomId: cls.id, role });
 }

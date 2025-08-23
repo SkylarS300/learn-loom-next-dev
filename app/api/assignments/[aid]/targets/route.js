@@ -1,6 +1,7 @@
 // app/api/assignments/[aid]/targets/route.js
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 async function requireTeacherByAid(anonId, aid) {
     const a = await prisma.assignment.findUnique({
@@ -19,17 +20,21 @@ async function requireTeacherByAid(anonId, aid) {
 
 export async function POST(req, { params }) {
     const aid = Number(params?.aid);
-    if (!Number.isFinite(aid)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
+    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
 
-    const cs = await cookies();
-    const me = cs.get("learnloomId")?.value;
-    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const me = await getAnonId();
+    if (!me) return jsonErr("Unauthorized", 401);
 
     const auth = await requireTeacherByAid(me, aid);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+    if (!auth.ok) return jsonErr(auth.error, auth.status);
 
-    const body = await req.json().catch(() => ({}));
-    const { targets = "ALL", overrides = {} } = body || {};
+    const Body = z.object({
+        targets: z.union([z.literal("ALL"), z.array(z.string().min(1)).min(1)]).optional().default("ALL"),
+        overrides: z.record(z.unknown()).optional().default({}),
+    });
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return jsonErr("Invalid request", 400, { issues: parsed.error.issues });
+    const { targets = "ALL", overrides = {} } = parsed.data;
     // wipe old
     await prisma.assignmenttarget.deleteMany({ where: { assignmentId: aid } });
 
@@ -44,5 +49,5 @@ export async function POST(req, { params }) {
         });
     }
 
-    return Response.json({ ok: true });
+    return jsonOk();
 }

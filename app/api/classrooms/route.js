@@ -1,6 +1,7 @@
 // app/api/classrooms/route.js
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 function normalizeName(s) {
     return String(s || "").trim().slice(0, 120);
@@ -21,13 +22,13 @@ async function makeUniqueCode() {
 // POST /api/classrooms  { name }
 // Creates a classroom; owner = current anonId; also joins owner as role='teacher'
 export async function POST(req) {
-    const cs = await cookies();
-    const anonId = cs.get("learnloomId")?.value || null;
-    if (!anonId) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const anonId = await getAnonId();
+    if (!anonId) return jsonErr("Unauthorized", 401);
 
-    const body = await req.json().catch(() => ({}));
-    const name = normalizeName(body?.name);
-    if (!name) return Response.json({ ok: false, error: "Missing name" }, { status: 400 });
+    const Body = z.object({ name: z.string().trim().min(1).max(120) });
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return jsonErr("Missing or invalid name", 400, { issues: parsed.error.issues });
+    const name = normalizeName(parsed.data.name);
 
     try {
         const code = await makeUniqueCode();
@@ -49,8 +50,8 @@ export async function POST(req) {
             skipDuplicates: true,
         });
 
-        return Response.json({ ok: true, data: cls }, { status: 201 });
+        return jsonOk(cls, 201);
     } catch (e) {
-        return Response.json({ ok: false, error: e.message || "Failed to create" }, { status: 500 });
+        return jsonErr(e.message || "Failed to create", 500);
     }
 }
