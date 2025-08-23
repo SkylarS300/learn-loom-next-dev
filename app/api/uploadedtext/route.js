@@ -1,6 +1,8 @@
 import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
+import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // Short, URL-safe share code (e.g., 6 chars)
 function genShareCode(len = 6) {
@@ -12,19 +14,21 @@ function genShareCode(len = 6) {
 
 
 export async function POST(req) {
-  const cookieStore = await cookies();
-  const anonId = cookieStore.get("learnloomId")?.value;
-  if (!anonId) return new Response("Unauthorized", { status: 401 });
+  const anonId = await getAnonId();
+  if (!anonId) return jsonErr("Unauthorized", 401);
 
-  const { title, content, password, visibility = "PRIVATE" } = await req.json();
-  if (!title || !content) {
-    return new Response("Missing title or content", { status: 400 });
-  }
+  const Body = z.object({
+    title: z.string().min(1).max(200),
+    content: z.string().min(1),
+    password: z.string().max(128).optional(),
+    visibility: z.enum(["PRIVATE", "CODED", "PUBLIC"]).optional().default("PRIVATE"),
+  });
+  const parsed = Body.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) return jsonErr("Missing or invalid fields", 400, { issues: parsed.error.issues });
+  const { title, content, password, visibility } = parsed.data;
 
   const hashed = password ? await bcrypt.hash(password, 10) : null;
-  const vis = ["PRIVATE", "CODED", "PUBLIC"].includes(String(visibility).toUpperCase())
-    ? String(visibility).toUpperCase()
-    : "PRIVATE";
+  const vis = String(visibility).toUpperCase();
   const code = vis === "CODED" ? genShareCode() : null;
 
 
@@ -40,17 +44,27 @@ export async function POST(req) {
   });
 
   // Return shareCode if generated, so user can share immediately
-  return Response.json({ id: newText.id, shareCode: newText.shareCode, visibility: newText.visibility });
+  return jsonOk({ id: newText.id, shareCode: newText.shareCode, visibility: newText.visibility });
 }
 
 // Unified GET (supports your uploads; or community via ?scope=public[&code=XXXX] plus saved cookie codes)
 export async function GET(req) {
   const cookieStore = await cookies(); // Next 15: await cookies()
   const { searchParams } = new URL(req.url);
-  const scope = (searchParams.get("scope") || "mine").toLowerCase(); // mine | public  const codeParamRaw = searchParams.get("code")?.trim() || null;
-  const codeParamRaw = searchParams.get("code")?.trim() || null;
-  const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") || 24)));
-  const cursor = searchParams.get("cursor"); // ISO date string
+  const Query = z.object({
+    scope: z.enum(["mine", "public"]).optional().default("mine"),
+    code: z.string().trim().max(32).optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional().default(24),
+    cursor: z.string().trim().optional(),
+  });
+  const parsed = Query.safeParse({
+    scope: searchParams.get("scope") || undefined,
+    code: searchParams.get("code") || undefined,
+    limit: searchParams.get("limit") || undefined,
+    cursor: searchParams.get("cursor") || undefined,
+  });
+  if (!parsed.success) return jsonErr("Invalid query", 400, { issues: parsed.error.issues });
+  const { scope, code: codeParamRaw, limit, cursor } = parsed.data;
   const anonId = cookieStore.get("learnloomId")?.value;
 
   // gather saved codes from cookie (JSON array), plus optional ?code param
@@ -68,7 +82,7 @@ export async function GET(req) {
   try {
     // Default = "mine" (requires anon)
     if (scope !== "public" && !anonId) {
-      return Response.json({ ok: false, error: "Missing anonymous ID" }, { status: 401 });
+      return jsonErr("Missing anonymous ID", 401);
     }
 
     const baseSelect = {
@@ -130,28 +144,28 @@ export async function GET(req) {
           : undefined,
     }));
 
-    return Response.json({ ok: true, data, nextCursor });
+    return jsonOk({ data, nextCursor });
   } catch (e) {
     console.error("uploadedtext GET failed:", e);
-    return Response.json({ ok: false, error: "Server error" }, { status: 500 });
+    return jsonErr("Server error", 500);
   }
 }
 
 export async function DELETE(req) {
-  const cookieStore = await cookies();
-  const anonId = cookieStore.get("learnloomId")?.value;
-  if (!anonId) return new Response("Unauthorized", { status: 401 });
+  const anonId = await getAnonId();
+  if (!anonId) return jsonErr("Unauthorized", 401);
 
-  const { id } = await req.json();
-
-  if (!id) return new Response("Missing ID", { status: 400 });
+  const Body = z.object({ id: z.coerce.number().int().positive() });
+  const parsed = Body.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) return jsonErr("Missing ID", 400, { issues: parsed.error.issues });
+  const { id } = parsed.data;
 
   const text = await prisma.uploadedtext.findUnique({
     where: { id },
   });
 
   if (!text || text.anonId !== anonId) {
-    return new Response("Not found or not authorized", { status: 403 });
+    return jsonErr("Not found or not authorized", 403);
   }
 
   await prisma.$transaction([
@@ -160,5 +174,5 @@ export async function DELETE(req) {
     prisma.uploadedtext.delete({ where: { id } }),
   ]);
 
-  return new Response("Deleted", { status: 200 });
+  return jsonOk();
 }

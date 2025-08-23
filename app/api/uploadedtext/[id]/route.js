@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+import { jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // Simple URL-safe code
 function genShareCode(len = 6) {
@@ -15,32 +17,36 @@ export async function PATCH(req, ctx) {
     const { id } = await params; // Next 15 idiom
     const uploadId = Number(id);
     if (!Number.isInteger(uploadId)) {
-        return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
+        return jsonErr("Invalid id", 400);
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { visibility, action } = body || {};
+    const Body = z.object({
+        visibility: z.enum(["PRIVATE", "CODED", "PUBLIC"]).optional(),
+        action: z.enum(["regenCode"]).optional(),
+    }).refine((v) => !!v.visibility || !!v.action, { message: "Provide visibility or action" });
+    const parsed = Body.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+        return jsonErr("Invalid request", 422, { issues: parsed.error.issues });
+    }
+    const { visibility, action } = parsed.data;
 
     const c = await cookies();
     const anonId = c.get("learnloomId")?.value;
     if (!anonId) {
-        return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        return jsonErr("Unauthorized", 401);
     }
 
     // AuthZ: only owner can mutate
     const row = await prisma.uploadedtext.findUnique({ where: { id: uploadId } });
     if (!row || row.anonId !== anonId) {
         // Hide existence if not owner
-        return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+        return jsonErr("Not found", 404);
     }
 
     const updates = {};
     // change visibility (PRIVATE | CODED | PUBLIC)
     if (visibility) {
         const vis = String(visibility).toUpperCase();
-        if (!["PRIVATE", "CODED", "PUBLIC"].includes(vis)) {
-            return NextResponse.json({ ok: false, error: "Invalid visibility" }, { status: 422 });
-        }
         updates.visibility = vis;
         // If switching away from CODED, drop code; if switching to CODED, ensure a code exists
         if (vis !== "CODED") {
@@ -54,12 +60,12 @@ export async function PATCH(req, ctx) {
     if (action) {
         const act = String(action);
         if (row.visibility !== "CODED" && updates.visibility !== "CODED") {
-            return NextResponse.json({ ok: false, error: "Code actions require CODED visibility" }, { status: 422 });
+            return jsonErr("Code actions require CODED visibility", 422);
         }
         if (act === "regenCode") {
             updates.shareCode = genShareCode();
         } else {
-            return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 422 });
+            return jsonErr("Unknown action", 422);
         }
     }
 
@@ -68,5 +74,5 @@ export async function PATCH(req, ctx) {
         data: updates,
         select: { id: true, visibility: true, shareCode: true },
     });
-    return NextResponse.json({ ok: true, data: updated });
+    return jsonOk(updated);
 }
