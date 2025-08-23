@@ -94,7 +94,7 @@ export async function POST(req) {
             return Response.json({ ok: false, error: "No items produced" }, { status: 502 });
         }
         // Do not persist user text or items here; privacy-first
-        return Response.json({ ok: true, items });
+        return Response.json({ ok: true, items }, { headers: { "Cache-Control": "no-store" } });
     } catch (e) {
         console.error("ai/quiz POST failed:", e);
         return Response.json({ ok: false, error: "Server error" }, { status: 500 });

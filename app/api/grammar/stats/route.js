@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
 export async function GET(req) {
@@ -10,8 +10,10 @@ export async function GET(req) {
     try {
         const url = new URL(req.url);
         if (url.searchParams.get("recent") === "1") {
-            const limit = Math.min(Number(url.searchParams.get("limit") ?? 60), 200);
-            const sinceDays = Number(url.searchParams.get("days") ?? 45);
+            const rawLimit = Number(url.searchParams.get("limit"));
+            const limit = Math.min(200, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 60));
+            const rawDays = Number(url.searchParams.get("days"));
+            const sinceDays = Math.min(365, Math.max(1, Number.isFinite(rawDays) ? rawDays : 45));
             const since = new Date();
             since.setDate(since.getDate() - sinceDays);
 
@@ -62,10 +64,10 @@ export async function GET(req) {
                         const latestScore = last3.length ? last3[last3.length - 1] : null;
                         return { concept, subTopic, latestScore, last3, series: entry.series };
                     });
-                return Response.json({ ok: true, data: { topThree: all.slice(0, 3), all } });
+                return Response.json({ ok: true, data: { topThree: all.slice(0, 3), all } }, { headers: { "Cache-Control": "no-store" } });
             }
 
-            return Response.json({ ok: true, data: { topThree } });
+            return Response.json({ ok: true, data: { topThree } }, { headers: { "Cache-Control": "no-store" } });
         }
     } catch {
         // If URL parsing fails, fall through to default aggregation
@@ -90,7 +92,7 @@ export async function GET(req) {
             lastAt: r._max?.createdAt || null,
         }));
 
-        return Response.json({ ok: true, data });
+        return Response.json({ ok: true, data }, { headers: { "Cache-Control": "no-store" } });
     } catch (e) {
         console.error("grammar/stats GET failed:", e);
         // Fallback aggregation in JS if needed
@@ -115,7 +117,8 @@ export async function GET(req) {
                 avgScore: v.attempts ? Math.round((v.sum / v.attempts) * 10) / 10 : 0,
                 lastAt: v.lastAt,
             }));
-            return Response.json({ ok: true, data });
+            return Response.json({ ok: true, data }, { headers: { "Cache-Control": "no-store" } });
+
         } catch (err) {
             console.error("grammar/stats fallback failed:", err);
             return Response.json({ ok: false, error: "Server error" }, { status: 500 });

@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import bank from "@/src/grammar/buildQuiz"; // default export is the question bank object
 
 // -------- utils --------
@@ -228,16 +228,15 @@ export async function GET(req) {
                 avgSecPerQ: spq || null,
                 efficiency: eff,
                 weakness: Math.min(1, 1 - (s * eff)),
-                rank: Math.min(1, 1 - (s * eff)), // fallback rank aligns with weakness
                 avgHintsPerQ: 0,
                 streakDays: 1,
                 rank: Math.min(1, 1 - (s * eff)), // fallback rank aligns with weakness
             }];
 
-            return Response.json({ ok: true, data: top });
+            return Response.json({ ok: true, data: top }, { headers: { "Cache-Control": "no-store" } });
         }
 
-        return Response.json({ ok: true, data: top });
+        return Response.json({ ok: true, data: top }, { headers: { "Cache-Control": "no-store" } });
     } catch (e) {
         console.error("recommendations GET failed:", e);
         return Response.json({ ok: false, error: "Server error" }, { status: 500 });
