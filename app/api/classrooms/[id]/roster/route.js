@@ -19,8 +19,8 @@ async function requireTeacher(anonId, classroomId) {
 
 // GET /api/classrooms/:id/roster
 // returns [{ anonId, displayName, role, stats: { readingMin7d, quizAvgPct7d, lastSeen } }]
-export async function GET(req, { params }) {
-    const classId = Number(params?.id);
+export async function GET(req, ctx) {
+    const classId = Number((await ctx.params)?.id);
     if (!Number.isFinite(classId)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
 
     const cs = await cookies();

@@ -19,8 +19,8 @@ async function requireTeacher(anonId, classroomId) {
 
 // GET /api/classrooms/:id/live?minutes=5&mode=any
 // mode: 'any' | 'reading' | 'grammar' | 'upload'
-export async function GET(req, { params }) {
-    const classroomId = Number(params?.id);
+export async function GET(req, ctx) {
+    const classroomId = Number((await ctx.params)?.id);
     if (!Number.isFinite(classroomId)) {
         return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
     }

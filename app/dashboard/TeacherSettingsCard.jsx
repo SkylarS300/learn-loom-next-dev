@@ -26,7 +26,7 @@ export default function TeacherSettingsCard() {
             const r = await fetch("/api/classrooms", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, teaderId: 0 }),
+                body: JSON.stringify({ name }),
             });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to create");

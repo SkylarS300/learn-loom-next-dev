@@ -19,9 +19,11 @@ async function requireTeacher(anonId, classroomId) {
 }
 
 // PATCH /api/classrooms/:id/roster/:anonId { displayName }
-export async function PATCH(req, { params }) {
+export async function PATCH(req, ctx) {
+    const { id, anonId } = await ctx.params;
+    const classId = Number(id);
+    const targetAnon = String(anonId || "");
     const classroomId = Number(params?.id);
-    const anonId = params?.anonId;
     if (!Number.isFinite(classroomId) || !anonId) {
         return Response.json({ ok: false, error: "Bad params" }, { status: 400 });
     }
@@ -30,8 +32,23 @@ export async function PATCH(req, { params }) {
     const me = cs.get("learnloomId")?.value;
     if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const auth = await requireTeacher(me, classroomId);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+    // Allow: teachers OR the student updating their own displayName
+    let isTeacher = false;
+    const teacherCheck = await requireTeacher(me, classroomId);
+    if (teacherCheck.ok) isTeacher = true;
+    if (!isTeacher) {
+        // if not a teacher, must be the same student and a member of this class
+        if (me !== anonId) return Response.json({ ok: false, error: "Forbidden" }, { status: 403 });
+        const member = await prisma.studentclassroom.findFirst({
+            where: { classroomId, anonId: me },
+            select: { id: true, role: true },
+        });
+        if (!member) return Response.json({ ok: false, error: "Not in class" }, { status: 404 });
+        if (member.role === "teacher") {
+            // teachers' names are not managed here
+            return Response.json({ ok: false, error: "Cannot edit teacher here" }, { status: 400 });
+        }
+    }
 
     const { displayName } = await req.json().catch(() => ({}));
     const cleaned = typeof displayName === "string" ? displayName.trim() : "";
@@ -56,9 +73,10 @@ export async function PATCH(req, { params }) {
 }
 
 // DELETE /api/classrooms/:id/roster/:anonId
-export async function DELETE(_req, { params }) {
-    const classroomId = Number(params?.id);
-    const anonId = params?.anonId;
+export async function DELETE(_req, ctx) {
+    const { id, anonId } = await ctx.params;
+    const classId = Number(id);
+    const targetAnon = String(anonId || "");
     if (!Number.isFinite(classroomId) || !anonId) {
         return Response.json({ ok: false, error: "Bad params" }, { status: 400 });
     }

@@ -14,6 +14,7 @@ import CodeModal from "../components/auth/CodeModal";
 import SavedCodesCard from "./SavedCodesCard";
 import MyAssignmentsCard from "./MyAssignmentsCard";
 import TeacherSettingsCard from "./TeacherSettingsCard";
+import MyClassesCard from "./MyClassesCard";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -153,6 +154,11 @@ export default function DashboardPage() {
         {/* Teacher Settings Card */}
         <section className={styles.sectionTight}>
           <TeacherSettingsCard />
+        </section>
+
+        {/* My classes list with codes */}
+        <section className={styles.sectionTight}>
+          <MyClassesCard />
         </section>
 
         {/* Student assignments */}

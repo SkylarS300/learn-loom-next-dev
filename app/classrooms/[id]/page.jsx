@@ -10,8 +10,13 @@ import styles from "../../dashboard/Dashboard.module.css";
 const LineCard = dynamic(() => import("../../dashboard/_charts/LineCard"), { ssr: false });
 
 export default function ClassroomPage() {
-    const { id } = useParams();        // id is a string from the URL
+    const { id } = useParams(); // id is a string from the URL
     const classId = Number(id);
+
+    // class info (name, code, my role, my display name)
+    const [info, setInfo] = useState(null);
+    const [iErr, setIErr] = useState("");
+    const isTeacher = info?.role === "teacher";
 
     // metrics
     const [m, setM] = useState(null);
@@ -36,19 +41,52 @@ export default function ClassroomPage() {
     const [live, setLive] = useState({ data: [], window: null });
     const [lErr, setLErr] = useState("");
     const [lLoading, setLLoading] = useState(true);
-    const [liveMode, setLiveMode] = useState("any");       // 'any' | 'reading' | 'grammar' | 'upload'
-    const [liveMinutes, setLiveMinutes] = useState(5);     // 1..60
-
+    const [liveMode, setLiveMode] = useState("any"); // 'any' | 'reading' | 'grammar' | 'upload'
+    const [liveMinutes, setLiveMinutes] = useState(5); // 1..60
 
     // kick modal
     const [kick, setKick] = useState(null); // { anonId, displayName, token, input }
 
+    // my display name editing (student-self)
+    const [myName, setMyName] = useState("");
+    const [mySaving, setMySaving] = useState(false);
+
+    // load class info (role + code + my displayName)
     useEffect(() => {
-        if (!Number.isFinite(classId)) { setErr("Bad classroom id in URL"); setLoading(false); return; }
+        if (!Number.isFinite(classId)) return;
+        let dead = false;
+        (async () => {
+            try {
+                const r = await fetch(`/api/classrooms/${classId}/info`, { cache: "no-store" });
+                const j = await r.json();
+                if (!j?.ok) throw new Error(j?.error || "Failed to load class info");
+                if (!dead) {
+                    setInfo(j.data);
+                    setMyName(j.data.myDisplayName || "");
+                }
+            } catch (e) {
+                if (!dead) setIErr(e.message || "Failed to load class info");
+            }
+        })();
+        return () => {
+            dead = true;
+        };
+    }, [classId]);
+
+    // metrics
+    useEffect(() => {
+        if (!Number.isFinite(classId)) {
+            setErr("Bad classroom id in URL");
+            setLoading(false);
+            return;
+        }
         const ctl = new AbortController();
         (async () => {
             try {
-                const r = await fetch(`/api/classrooms/${classId}/metrics`, { cache: "no-store", signal: ctl.signal });
+                const r = await fetch(`/api/classrooms/${classId}/metrics`, {
+                    cache: "no-store",
+                    signal: ctl.signal,
+                });
                 const j = await r.json();
                 if (!j?.ok) throw new Error(j?.error || "Failed");
                 setM(j.data);
@@ -61,17 +99,23 @@ export default function ClassroomPage() {
         return () => ctl.abort();
     }, [classId]);
 
-    // load roster
+    // load roster (teacher only)
     useEffect(() => {
-        if (!Number.isFinite(classId)) return;
+        if (!Number.isFinite(classId) || !isTeacher) {
+            setRLoading(false);
+            return;
+        }
         const ctl = new AbortController();
         (async () => {
             try {
-                const r = await fetch(`/api/classrooms/${classId}/roster`, { cache: "no-store", signal: ctl.signal });
+                const r = await fetch(`/api/classrooms/${classId}/roster`, {
+                    cache: "no-store",
+                    signal: ctl.signal,
+                });
                 const j = await r.json();
                 if (!j?.ok) throw new Error(j?.error || "Failed to load roster");
                 setRoster(j.data || []);
-                setEditMap(Object.fromEntries((j.data || []).map(r => [r.anonId, r.displayName || ""])));
+                setEditMap(Object.fromEntries((j.data || []).map((r) => [r.anonId, r.displayName || ""])));
             } catch (e) {
                 setRErr(e.message || "Failed to load roster");
             } finally {
@@ -79,18 +123,26 @@ export default function ClassroomPage() {
             }
         })();
         return () => ctl.abort();
-    }, [classId]);
+    }, [classId, isTeacher]);
 
     // load assignments (teacher only; falls back to demo if ?demoAssignments=1)
     useEffect(() => {
-        if (!Number.isFinite(classId)) return;
+        if (!Number.isFinite(classId) || !isTeacher) {
+            setALoading(false);
+            return;
+        }
         const ctl = new AbortController();
         let dead = false;
         (async () => {
             try {
-                const r = await fetch(`/api/classrooms/${classId}/assignments`, { cache: "no-store", signal: ctl.signal });
+                const r = await fetch(`/api/classrooms/${classId}/assignments`, {
+                    cache: "no-store",
+                    signal: ctl.signal,
+                });
                 if (r.status === 403 && demoAssignments) {
-                    if (!dead) { setAlist(demoRows()); }
+                    if (!dead) {
+                        setAlist(demoRows());
+                    }
                     return;
                 }
                 const j = await r.json();
@@ -106,23 +158,34 @@ export default function ClassroomPage() {
                 if (!dead) setALoading(false);
             }
         })();
-        return () => { dead = true; ctl.abort(); };
-    }, [classId, demoAssignments]);
+        return () => {
+            dead = true;
+            ctl.abort();
+        };
+    }, [classId, demoAssignments, isTeacher]);
 
-    // poll live activity
+    // poll live activity (teacher only)
     useEffect(() => {
-        if (!Number.isFinite(classId)) return;
+        if (!Number.isFinite(classId) || !isTeacher) {
+            setLLoading(false);
+            return;
+        }
         let dead = false;
         let timer = null;
         async function load() {
             try {
                 const r = await fetch(
-                    `/api/classrooms/${classId}/live?minutes=${encodeURIComponent(liveMinutes)}&mode=${encodeURIComponent(liveMode)}`,
+                    `/api/classrooms/${classId}/live?minutes=${encodeURIComponent(
+                        liveMinutes
+                    )}&mode=${encodeURIComponent(liveMode)}`,
                     { cache: "no-store" }
                 );
                 const j = await r.json();
                 if (!j?.ok) throw new Error(j?.error || "Failed to load live view");
-                if (!dead) { setLive({ data: j.data || [], window: j.window || null }); setLErr(""); }
+                if (!dead) {
+                    setLive({ data: j.data || [], window: j.window || null });
+                    setLErr("");
+                }
             } catch (e) {
                 if (!dead) setLErr(e.message || "Failed to load live view");
             } finally {
@@ -135,41 +198,80 @@ export default function ClassroomPage() {
             dead = true;
             if (timer) clearInterval(timer);
         };
-    }, [classId, liveMode, liveMinutes]);
+    }, [classId, liveMode, liveMinutes, isTeacher]);
 
     async function saveName(anonId) {
         const displayName = (editMap[anonId] ?? "").trim();
         try {
-            const r = await fetch(`/api/classrooms/${classId}/roster/${encodeURIComponent(anonId)}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ displayName }),
-            });
+            const r = await fetch(
+                `/api/classrooms/${classId}/roster/${encodeURIComponent(anonId)}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ displayName }),
+                }
+            );
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to save");
-            setRoster(prev => prev.map(p => p.anonId === anonId ? { ...p, displayName: displayName || "" } : p));
+            setRoster((prev) =>
+                prev.map((p) => (p.anonId === anonId ? { ...p, displayName: displayName || "" } : p))
+            );
             toast("Saved");
         } catch (e) {
             toast(e.message || "Failed to save", true);
         }
     }
 
+    // student self-save
+    async function saveMyName() {
+        if (!info?.myAnonId) return;
+        const displayName = (myName ?? "").trim();
+        try {
+            setMySaving(true);
+            const r = await fetch(
+                `/api/classrooms/${classId}/roster/${encodeURIComponent(info.myAnonId)}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ displayName }),
+                }
+            );
+            const j = await r.json();
+            if (!j?.ok) throw new Error(j?.error || "Failed to save");
+            setInfo((prev) => (prev ? { ...prev, myDisplayName: displayName } : prev));
+            toast("Saved");
+        } catch (e) {
+            toast(e.message || "Failed to save", true);
+        } finally {
+            setMySaving(false);
+        }
+    }
+
     function openKick(anonId, displayName, role) {
-        if (role === "teacher") { toast("Teachers can't be removed", true); return; }
+        if (role === "teacher") {
+            toast("Teachers can't be removed", true);
+            return;
+        }
         const token = `REMOVE-${anonId.slice(0, 8).toUpperCase()}`;
         setKick({ anonId, displayName: displayName || "", token, input: "" });
     }
 
     async function doKick() {
         if (!kick) return;
-        if (kick.input !== kick.token) { toast("Token does not match", true); return; }
+        if (kick.input !== kick.token) {
+            toast("Token does not match", true);
+            return;
+        }
         try {
-            const r = await fetch(`/api/classrooms/${classId}/roster/${encodeURIComponent(kick.anonId)}`, {
-                method: "DELETE",
-            });
+            const r = await fetch(
+                `/api/classrooms/${classId}/roster/${encodeURIComponent(kick.anonId)}`,
+                {
+                    method: "DELETE",
+                }
+            );
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to remove");
-            setRoster(prev => prev.filter(p => p.anonId !== kick.anonId));
+            setRoster((prev) => prev.filter((p) => p.anonId !== kick.anonId));
             setKick(null);
             toast("Removed");
         } catch (e) {
@@ -181,9 +283,28 @@ export default function ClassroomPage() {
         <>
             <Navbar />
             <main className={styles.main}>
-                <Link href="/dashboard" className={styles.btnSecondary}>← Back</Link>
-                <h1 style={{ marginTop: 8, marginBottom: 0 }}>{m?.classroom?.name || "Classroom"}</h1>
-                <p className={styles.dim}>Students: {m?.roster?.students ?? 0} • Window: {m?.from} → {m?.to}</p>
+                <Link href="/dashboard" className={styles.btnSecondary}>
+                    ← Back
+                </Link>
+                <h1 style={{ marginTop: 8, marginBottom: 0 }}>
+                    {info?.name || m?.classroom?.name || "Classroom"}
+                </h1>
+                {info?.code && (
+                    <p className={styles.dim} style={{ marginTop: 4 }}>
+                        Class code: <CopyCode code={info.code} />{" "}
+                        <a
+                            href={`/api/qrcode?text=${encodeURIComponent(info.code)}`}
+                            target="_blank"
+                            className={styles.btnSecondary}
+                            style={{ marginLeft: 6 }}
+                        >
+                            Show QR
+                        </a>
+                    </p>
+                )}
+                <p className={styles.dim}>
+                    Students: {m?.roster?.students ?? 0} • Window: {m?.from} → {m?.to}
+                </p>
                 {m && m.canExport && (
                     <div style={{ margin: "8px 0" }}>
                         <a
@@ -202,272 +323,431 @@ export default function ClassroomPage() {
                     </div>
                 )}
                 {loading && <p className={styles.dim}>Loading…</p>}
-                {err && !loading && <p style={{ color: "#b91c1c" }}>{err}</p>}
+                {(err || iErr) && !loading && (
+                    <p style={{ color: "#b91c1c" }}>{err || iErr}</p>
+                )}
 
-                {/* Live view */}
-                <section className={styles.section}>
-                    <div className={styles.headerRow}>
-                        <h3 style={{ margin: 0 }}>🟢 Active now</h3>
-                        <div className={styles.growRight} style={{ gap: 8 }}>
-                            <label className={styles.dim} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                Mode:
-                                <select
+                {/* Student-only: edit my display name for this class */}
+                {!isTeacher && info?.myAnonId && (
+                    <section className={styles.section}>
+                        <div className={styles.card}>
+                            <h4 className={styles.h4}>My name in this class</h4>
+                            <div className={styles.editRow} style={{ marginTop: 8 }}>
+                                <input
                                     className={styles.input}
-                                    value={liveMode}
-                                    onChange={(e) => setLiveMode(e.target.value)}
-                                    style={{ maxWidth: 160 }}
+                                    style={{ maxWidth: 260 }}
+                                    value={myName}
+                                    onChange={(e) => setMyName(e.target.value)}
+                                    placeholder="Visible to classmates and teacher"
+                                />
+                                <button
+                                    className={styles.btn}
+                                    onClick={saveMyName}
+                                    disabled={mySaving}
+                                    style={{ marginLeft: 8 }}
                                 >
-                                    <option value="any">Any</option>
-                                    <option value="reading">Reading</option>
-                                    <option value="grammar">Grammar</option>
-                                    <option value="upload">Upload</option>
-                                </select>
-                            </label>
-                            <label className={styles.dim} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                Window:
-                                <select
-                                    className={styles.input}
-                                    value={String(liveMinutes)}
-                                    onChange={(e) => setLiveMinutes(Number(e.target.value))}
-                                    style={{ maxWidth: 120 }}
-                                >
-                                    <option value="3">3 min</option>
-                                    <option value="5">5 min</option>
-                                    <option value="10">10 min</option>
-                                    <option value="15">15 min</option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
-                    {lLoading ? (
-                        <p className={styles.dim}>Loading…</p>
-                    ) : lErr ? (
-                        <p className={styles.dim}>{lErr}</p>
-                    ) : (
-                        <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
-                            <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                                    <thead>
-                                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                                            <th style={th}>Display name</th>
-                                            <th style={th}>Anon ID</th>
-                                            <th style={th}>Role</th>
-                                            <th style={th}>Last seen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(live.data || []).map((u) => (
-                                            <tr key={u.anonId} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                                                <td style={td}>{u.displayName || "—"}</td>
-                                                <td style={td}><code>{u.anonId}</code></td>
-                                                <td style={td}><RoleBadge role={u.role} /></td>
-                                                <td style={td}>{timeAgo(u.lastSeen)}</td>
-                                            </tr>
-                                        ))}
-                                        {(!live.data || live.data.length === 0) && (
-                                            <tr><td style={td} colSpan={4} className={styles.dim}>No one active in this window.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                    {mySaving ? "Saving…" : "Save"}
+                                </button>
                             </div>
                         </div>
-                    )}
-                    {live.window && (
-                        <p className={styles.dim} style={{ marginTop: 6 }}>
-                            Window: {fmtMaybeDT(live.window.from)} → {fmtMaybeDT(live.window.to)}
-                        </p>
-                    )}
-                </section>
+                    </section>
+                )}
 
-
-                {/* Roster */}
-                <section className={styles.section}>
-                    <div className={styles.headerRow}>
-                        <h3 style={{ margin: 0 }}>👥 Roster</h3>
-                        <div className={styles.growRight}>
-                            <span className={styles.dim}>Edit names or remove students</span>
+                {/* Live view (teacher only) */}
+                {isTeacher && (
+                    <section className={styles.section}>
+                        <div className={styles.headerRow}>
+                            <h3 style={{ margin: 0 }}>🟢 Active now</h3>
+                            <div className={styles.growRight} style={{ gap: 8 }}>
+                                <label
+                                    className={styles.dim}
+                                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                                >
+                                    Mode:
+                                    <select
+                                        className={styles.input}
+                                        value={liveMode}
+                                        onChange={(e) => setLiveMode(e.target.value)}
+                                        style={{ maxWidth: 160 }}
+                                    >
+                                        <option value="any">Any</option>
+                                        <option value="reading">Reading</option>
+                                        <option value="grammar">Grammar</option>
+                                        <option value="upload">Upload</option>
+                                    </select>
+                                </label>
+                                <label
+                                    className={styles.dim}
+                                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                                >
+                                    Window:
+                                    <select
+                                        className={styles.input}
+                                        value={String(liveMinutes)}
+                                        onChange={(e) => setLiveMinutes(Number(e.target.value))}
+                                        style={{ maxWidth: 120 }}
+                                    >
+                                        <option value="3">3 min</option>
+                                        <option value="5">5 min</option>
+                                        <option value="10">10 min</option>
+                                        <option value="15">15 min</option>
+                                    </select>
+                                </label>
+                            </div>
                         </div>
-                    </div>
-
-                    {rLoading ? (
-                        <p className={styles.dim}>Loading…</p>
-                    ) : rErr ? (
-                        <p className={styles.dim}>{rErr}</p>
-                    ) : (
-                        <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
-                            <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                                    <thead>
-                                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                                            <th style={th}>Display name</th>
-                                            <th style={th}>Anon ID</th>
-                                            <th style={th}>Role</th>
-                                            <th style={th}>Reading (7d)</th>
-                                            <th style={th}>Quiz avg (7d)</th>
-                                            <th style={th}>Last seen</th>
-                                            <th style={th}>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(roster || []).map(r => {
-                                            const isTeacher = (r.role || "student") === "teacher";
-                                            return (
-                                                <tr key={r.anonId} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        {lLoading ? (
+                            <p className={styles.dim}>Loading…</p>
+                        ) : lErr ? (
+                            <p className={styles.dim}>{lErr}</p>
+                        ) : (
+                            <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
+                                <div style={{ overflowX: "auto" }}>
+                                    <table
+                                        style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}
+                                    >
+                                        <thead>
+                                            <tr
+                                                style={{
+                                                    background: "#f9fafb",
+                                                    borderBottom: "1px solid #e5e7eb",
+                                                }}
+                                            >
+                                                <th style={th}>Display name</th>
+                                                <th style={th}>Anon ID</th>
+                                                <th style={th}>Role</th>
+                                                <th style={th}>Last seen</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(live.data || []).map((u) => (
+                                                <tr
+                                                    key={u.anonId}
+                                                    style={{ borderBottom: "1px solid #f3f4f6" }}
+                                                >
+                                                    <td style={td}>{u.displayName || "—"}</td>
                                                     <td style={td}>
-                                                        <div style={{ display: "flex", gap: 6 }}>
-                                                            <input
-                                                                className={styles.input}
-                                                                style={{ maxWidth: 220 }}
-                                                                value={editMap[r.anonId] ?? ""}
-                                                                onChange={(e) => setEditMap(prev => ({ ...prev, [r.anonId]: e.target.value }))}
-                                                                placeholder="e.g., Alex R."
-                                                            />
-                                                            <button
-                                                                className={styles.btnSecondary}
-                                                                onClick={() => saveName(r.anonId)}
-                                                                disabled={isTeacher}
-                                                                title={isTeacher ? "Teachers' names are managed elsewhere" : "Save name"}
-                                                            >
-                                                                Save
-                                                            </button>
-                                                        </div>
+                                                        <code>{u.anonId}</code>
                                                     </td>
-                                                    <td style={td}><code>{r.anonId}</code></td>
                                                     <td style={td}>
-                                                        <RoleBadge role={r.role} />
+                                                        <RoleBadge role={u.role} />
                                                     </td>
-                                                    <td style={td}>{(r.stats?.readingMin7d ?? 0)} min</td>
-                                                    <td style={td}>{r.stats?.quizAvgPct7d != null ? `${r.stats.quizAvgPct7d}%` : "—"}</td>
-                                                    <td style={td}>{fmtMaybeDT(r.stats?.lastSeen)}</td>
-                                                    <td style={td}>
-                                                        <button
-                                                            className={styles.btnDanger}
-                                                            onClick={() => openKick(r.anonId, editMap[r.anonId] ?? r.displayName ?? "", r.role)}
-                                                            disabled={isTeacher}
-                                                            title={isTeacher ? "Cannot remove teachers" : "Remove from class"}
-                                                        >
-                                                            Remove
-                                                        </button>
+                                                    <td style={td}>{timeAgo(u.lastSeen)}</td>
+                                                </tr>
+                                            ))}
+                                            {(!live.data || live.data.length === 0) && (
+                                                <tr>
+                                                    <td style={td} colSpan={4} className={styles.dim}>
+                                                        No one active in this window.
                                                     </td>
                                                 </tr>
-                                            );
-                                        })}
-                                        {(!roster || roster.length === 0) && (
-                                            <tr><td style={td} colSpan={7} className={styles.dim}>No members yet.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                        {live.window && (
+                            <p className={styles.dim} style={{ marginTop: 6 }}>
+                                Window: {fmtMaybeDT(live.window.from)} → {fmtMaybeDT(live.window.to)}
+                            </p>
+                        )}
+                    </section>
+                )}
+
+                {/* Roster (teacher) */}
+                {isTeacher && (
+                    <section className={styles.section}>
+                        <div className={styles.headerRow}>
+                            <h3 style={{ margin: 0 }}>👥 Roster</h3>
+                            <div className={styles.growRight}>
+                                <span className={styles.dim}>Edit names or remove students</span>
                             </div>
                         </div>
-                    )}
-                </section>
 
-                <section className={styles.section}>
-                    <LineCard title="Reading minutes / day" data={m?.readingDaily || []} yKey="minutes" />
-                    <div style={{ marginTop: 12 }}>
-                        <LineCard title="Grammar average score / day" data={m?.grammarDaily || []} yKey="avg" yDomain={[0, 100]} />
-                    </div>
-                    <div style={{ marginTop: 12 }}>
-                        <LineCard title="Grammar pace (sec / question)" data={m?.grammarPaceDaily || []} yKey="secPerQ" />
-                    </div>
-                </section>
-
-                <section className={styles.card} style={{ marginTop: 12 }}>
-                    <h4 className={styles.h4}>Top weak subtopics</h4>
-                    {m?.topWeakAreas?.length ? (
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {m.topWeakAreas.map((w, i) => (
-                                <li key={i} style={{ marginBottom: 6 }}>
-                                    <strong>{w.concept}</strong> — {w.subTopic} · Avg {Math.round(w.avg)}% · {w.attempts} attempts
-                                </li>
-                            ))}
-                        </ul>
-                    ) : <p className={styles.dim}>No data yet.</p>}
-                </section>
-
-                <section className={styles.card} style={{ marginTop: 12 }}>
-                    <h4 className={styles.h4}>Notes per student</h4>
-                    {m?.notesPerStudent?.length ? (
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {m.notesPerStudent.map((r) => (
-                                <li key={r.anonId}>
-                                    <Link
-                                        href={`/classrooms/${m.classroom.id}/student/${encodeURIComponent(r.anonId)}`}
-                                        className={styles.btnSecondary}
+                        {rLoading ? (
+                            <p className={styles.dim}>Loading…</p>
+                        ) : rErr ? (
+                            <p className={styles.dim}>{rErr}</p>
+                        ) : (
+                            <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
+                                <div style={{ overflowX: "auto" }}>
+                                    <table
+                                        style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}
                                     >
-                                        <code>{r.anonId.slice(0, 8)}…</code>
-                                    </Link>{" "}
-                                    — {r.count}
-                                </li>
-                            ))}
+                                        <thead>
+                                            <tr
+                                                style={{
+                                                    background: "#f9fafb",
+                                                    borderBottom: "1px solid #e5e7eb",
+                                                }}
+                                            >
+                                                <th style={th}>Display name</th>
+                                                <th style={th}>Anon ID</th>
+                                                <th style={th}>Role</th>
+                                                <th style={th}>Reading (7d)</th>
+                                                <th style={th}>Quiz avg (7d)</th>
+                                                <th style={th}>Last seen</th>
+                                                <th style={th}>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(roster || []).map((r) => {
+                                                const isRowTeacher = (r.role || "student") === "teacher";
+                                                return (
+                                                    <tr
+                                                        key={r.anonId}
+                                                        style={{ borderBottom: "1px solid #f3f4f6" }}
+                                                    >
+                                                        <td style={td}>
+                                                            <div style={{ display: "flex", gap: 6 }}>
+                                                                <input
+                                                                    className={styles.input}
+                                                                    style={{ maxWidth: 220 }}
+                                                                    value={editMap[r.anonId] ?? ""}
+                                                                    onChange={(e) =>
+                                                                        setEditMap((prev) => ({
+                                                                            ...prev,
+                                                                            [r.anonId]: e.target.value,
+                                                                        }))
+                                                                    }
+                                                                    placeholder="e.g., Alex R."
+                                                                />
+                                                                <button
+                                                                    className={styles.btnSecondary}
+                                                                    onClick={() => saveName(r.anonId)}
+                                                                    disabled={isRowTeacher}
+                                                                    title={
+                                                                        isRowTeacher
+                                                                            ? "Teachers' names are managed elsewhere"
+                                                                            : "Save name"
+                                                                    }
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                        <td style={td}>
+                                                            <code>{r.anonId}</code>
+                                                        </td>
+                                                        <td style={td}>
+                                                            <RoleBadge role={r.role} />
+                                                        </td>
+                                                        <td style={td}>{(r.stats?.readingMin7d ?? 0)} min</td>
+                                                        <td style={td}>
+                                                            {r.stats?.quizAvgPct7d != null
+                                                                ? `${r.stats.quizAvgPct7d}%`
+                                                                : "—"}
+                                                        </td>
+                                                        <td style={td}>{fmtMaybeDT(r.stats?.lastSeen)}</td>
+                                                        <td style={td}>
+                                                            <button
+                                                                className={styles.btnDanger}
+                                                                onClick={() =>
+                                                                    openKick(
+                                                                        r.anonId,
+                                                                        editMap[r.anonId] ?? r.displayName ?? "",
+                                                                        r.role
+                                                                    )
+                                                                }
+                                                                disabled={isRowTeacher}
+                                                                title={
+                                                                    isRowTeacher
+                                                                        ? "Cannot remove teachers"
+                                                                        : "Remove from class"
+                                                                }
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {(!roster || roster.length === 0) && (
+                                                <tr>
+                                                    <td style={td} colSpan={7} className={styles.dim}>
+                                                        No members yet.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                )}
 
-                        </ul>
-                    ) : <p className={styles.dim}>No notes recorded in the range.</p>}
+                {/* Charts (everyone) */}
+                <section className={styles.section}>
+                    <LineCard
+                        title="Reading minutes / day"
+                        data={m?.readingDaily || []}
+                        yKey="minutes"
+                    />
+                    <div style={{ marginTop: 12 }}>
+                        <LineCard
+                            title="Grammar average score / day"
+                            data={m?.grammarDaily || []}
+                            yKey="avg"
+                            yDomain={[0, 100]}
+                        />
+                    </div>
+                    <div style={{ marginTop: 12 }}>
+                        <LineCard
+                            title="Grammar pace (sec / question)"
+                            data={m?.grammarPaceDaily || []}
+                            yKey="secPerQ"
+                        />
+                    </div>
                 </section>
+
+                {/* Weak areas + Notes-per-student (teacher) */}
+                {isTeacher && (
+                    <section className={styles.card} style={{ marginTop: 12 }}>
+                        <h4 className={styles.h4}>Top weak subtopics</h4>
+                        {m?.topWeakAreas?.length ? (
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                {m.topWeakAreas.map((w, i) => (
+                                    <li key={i} style={{ marginBottom: 6 }}>
+                                        <strong>{w.concept}</strong> — {w.subTopic} · Avg{" "}
+                                        {Math.round(w.avg)}% · {w.attempts} attempts
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className={styles.dim}>No data yet.</p>
+                        )}
+                    </section>
+                )}
+
+                {isTeacher && (
+                    <section className={styles.card} style={{ marginTop: 12 }}>
+                        <h4 className={styles.h4}>Notes per student</h4>
+                        {m?.notesPerStudent?.length ? (
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                {m.notesPerStudent.map((r) => (
+                                    <li key={r.anonId}>
+                                        <Link
+                                            href={`/classrooms/${m.classroom.id}/student/${encodeURIComponent(
+                                                r.anonId
+                                            )}`}
+                                            className={styles.btnSecondary}
+                                        >
+                                            <code>{r.anonId.slice(0, 8)}…</code>
+                                        </Link>{" "}
+                                        — {r.count}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className={styles.dim}>No notes recorded in the range.</p>
+                        )}
+                    </section>
+                )}
 
                 {/* Assignments table (teacher) */}
-                <section className={styles.section}>
-                    <div className={styles.headerRow}>
-                        <h3 style={{ margin: 0 }}>🗂 Assignments</h3>
-                    </div>
-                    {aLoading ? (
-                        <p className={styles.dim}>Loading…</p>
-                    ) : aErr ? (
-                        <p className={styles.dim}>
-                            {demoAssignments ? "Showing demo list." : aErr}
-                        </p>
-                    ) : (
-                        <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
-                            <div style={{ overflowX: "auto" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                                    <thead>
-                                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                                            <th style={th}>Title</th>
-                                            <th style={th}>Type</th>
-                                            <th style={th}>Start</th>
-                                            <th style={th}>Due</th>
-                                            <th style={th}>Targeted</th>
-                                            <th style={th} colSpan={5}>Counts</th>
-                                            <th style={th}>Actions</th>
-                                        </tr>
-                                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                                            <th></th><th></th><th></th><th></th><th></th>
-                                            <th style={thMini}>Assigned</th>
-                                            <th style={thMini}>Submitted</th>
-                                            <th style={thMini}>Graded</th>
-                                            <th style={thMini}>Late</th>
-                                            <th style={thMini}>Missing</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(alist || []).map(a => (
-                                            <tr key={a.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                                                <td style={td}><strong>{a.title}</strong></td>
-                                                <td style={td}>{typeLabel(a.type)}</td>
-                                                <td style={td}>{fmtMaybe(a.startAt)}</td>
-                                                <td style={td}>{fmtMaybe(a.dueDate)}</td>
-                                                <td style={td}>{a.targetedCount ?? "—"}</td>
-                                                <td style={tdCenter}>{a.counts?.ASSIGNED ?? 0}</td>
-                                                <td style={tdCenter}>{a.counts?.SUBMITTED ?? 0}</td>
-                                                <td style={tdCenter}>{a.counts?.GRADED ?? 0}</td>
-                                                <td style={tdCenter}>{a.counts?.LATE ?? 0}</td>
-                                                <td style={tdCenter}>{a.counts?.MISSING ?? 0}</td>
-                                                <td style={td}>
-                                                    <a className={styles.btnSecondary} href={`/assignments/${a.id}`} style={{ marginRight: 6 }}>View</a>
-                                                    <a className={styles.btnSecondary} href={`/api/assignments/${a.id}/export`}>Export</a>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {(!alist || alist.length === 0) && (
-                                            <tr><td style={td} colSpan={11} className={styles.dim}>No assignments yet.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                {isTeacher && (
+                    <section className={styles.section}>
+                        <div className={styles.headerRow}>
+                            <h3 style={{ margin: 0 }}>🗂 Assignments</h3>
                         </div>
-                    )}
-                </section>
+                        {aLoading ? (
+                            <p className={styles.dim}>Loading…</p>
+                        ) : aErr ? (
+                            <p className={styles.dim}>
+                                {demoAssignments ? "Showing demo list." : aErr}
+                            </p>
+                        ) : (
+                            <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
+                                <div style={{ overflowX: "auto" }}>
+                                    <table
+                                        style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}
+                                    >
+                                        <thead>
+                                            <tr
+                                                style={{
+                                                    background: "#f9fafb",
+                                                    borderBottom: "1px solid #e5e7eb",
+                                                }}
+                                            >
+                                                <th style={th}>Title</th>
+                                                <th style={th}>Type</th>
+                                                <th style={th}>Start</th>
+                                                <th style={th}>Due</th>
+                                                <th style={th}>Targeted</th>
+                                                <th style={th} colSpan={5}>
+                                                    Counts
+                                                </th>
+                                                <th style={th}>Actions</th>
+                                            </tr>
+                                            <tr
+                                                style={{
+                                                    background: "#f9fafb",
+                                                    borderBottom: "1px solid #e5e7eb",
+                                                }}
+                                            >
+                                                <th></th>
+                                                <th></th>
+                                                <th></th>
+                                                <th></th>
+                                                <th></th>
+                                                <th style={thMini}>Assigned</th>
+                                                <th style={thMini}>Submitted</th>
+                                                <th style={thMini}>Graded</th>
+                                                <th style={thMini}>Late</th>
+                                                <th style={thMini}>Missing</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(alist || []).map((a) => (
+                                                <tr
+                                                    key={a.id}
+                                                    style={{ borderBottom: "1px solid #f3f4f6" }}
+                                                >
+                                                    <td style={td}>
+                                                        <strong>{a.title}</strong>
+                                                    </td>
+                                                    <td style={td}>{typeLabel(a.type)}</td>
+                                                    <td style={td}>{fmtMaybe(a.startAt)}</td>
+                                                    <td style={td}>{fmtMaybe(a.dueDate)}</td>
+                                                    <td style={td}>{a.targetedCount ?? "—"}</td>
+                                                    <td style={tdCenter}>{a.counts?.ASSIGNED ?? 0}</td>
+                                                    <td style={tdCenter}>{a.counts?.SUBMITTED ?? 0}</td>
+                                                    <td style={tdCenter}>{a.counts?.GRADED ?? 0}</td>
+                                                    <td style={tdCenter}>{a.counts?.LATE ?? 0}</td>
+                                                    <td style={tdCenter}>{a.counts?.MISSING ?? 0}</td>
+                                                    <td style={td}>
+                                                        <a
+                                                            className={styles.btnSecondary}
+                                                            href={`/assignments/${a.id}`}
+                                                            style={{ marginRight: 6 }}
+                                                        >
+                                                            View
+                                                        </a>
+                                                        <a
+                                                            className={styles.btnSecondary}
+                                                            href={`/api/assignments/${a.id}/export`}
+                                                        >
+                                                            Export
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {(!alist || alist.length === 0) && (
+                                                <tr>
+                                                    <td style={td} colSpan={11} className={styles.dim}>
+                                                        No assignments yet.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 {kick && (
                     <ConfirmKickModal
@@ -475,7 +755,7 @@ export default function ClassroomPage() {
                         displayName={kick.displayName}
                         anonId={kick.anonId}
                         value={kick.input}
-                        onChange={(v) => setKick(prev => ({ ...prev, input: v }))}
+                        onChange={(v) => setKick((prev) => ({ ...prev, input: v }))}
                         onCancel={() => setKick(null)}
                         onConfirm={doKick}
                     />
@@ -485,6 +765,25 @@ export default function ClassroomPage() {
     );
 }
 
+function CopyCode({ code }) {
+    if (!code) return null;
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(code);
+            toast("Copied");
+        } catch {
+            toast("Copy failed", true);
+        }
+    };
+    return (
+        <span>
+            <code style={{ padding: "2px 6px", background: "#f3f4f6", borderRadius: 6 }}>{code}</code>
+            <button className={styles.btnSecondary} onClick={copy} style={{ marginLeft: 6 }}>
+                Copy
+            </button>
+        </span>
+    );
+}
 
 function timeAgo(iso) {
     if (!iso) return "—";
@@ -512,28 +811,64 @@ function RoleBadge({ role }) {
     );
 }
 
-function ConfirmKickModal({ token, displayName, anonId, value, onChange, onCancel, onConfirm }) {
+function ConfirmKickModal({
+    token,
+    displayName,
+    anonId,
+    value,
+    onChange,
+    onCancel,
+    onConfirm,
+}) {
     return (
-        <div role="dialog" aria-modal="true" aria-label="Confirm removal"
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm removal"
             style={{
-                position: "fixed", inset: 0, background: "rgba(0,0,0,.4)",
-                display: "grid", placeItems: "center", zIndex: 50
-            }}>
-            <div style={{ background: "#fff", borderRadius: 12, padding: 16, width: 460, maxWidth: "95vw", border: "1px solid #e5e7eb" }}>
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,.4)",
+                display: "grid",
+                placeItems: "center",
+                zIndex: 50,
+            }}
+        >
+            <div
+                style={{
+                    background: "#fff",
+                    borderRadius: 12,
+                    padding: 16,
+                    width: 460,
+                    maxWidth: "95vw",
+                    border: "1px solid #e5e7eb",
+                }}
+            >
                 <h3 style={{ margin: "0 0 6px" }}>Remove from class?</h3>
                 <p style={{ margin: "0 0 10px", color: "#374151" }}>
-                    You’re removing <strong>{displayName || anonId.slice(0, 8) + "…"}</strong> (<code>{anonId}</code>) from this classroom.
+                    You’re removing <strong>{displayName || anonId.slice(0, 8) + "…"}</strong>{" "}
+                    (<code>{anonId}</code>) from this classroom.
                 </p>
                 <p className="dim" style={{ margin: "0 0 12px", color: "#6b7280" }}>
-                    Raw attempt logs are kept for <strong>21 days</strong> by default (configurable in class settings).
+                    Raw attempt logs are kept for <strong>21 days</strong> by default (configurable
+                    in class settings).
                 </p>
                 <p style={{ margin: "0 0 8px" }}>
                     Type <code>{token}</code> to confirm.
                 </p>
-                <input className={styles.input} placeholder={token} value={value} onChange={(e) => onChange?.(e.target.value)} />
+                <input
+                    className={styles.input}
+                    placeholder={token}
+                    value={value}
+                    onChange={(e) => onChange?.(e.target.value)}
+                />
                 <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
-                    <button className={styles.btnSecondary} onClick={onCancel}>Cancel</button>
-                    <button className={styles.btnDanger} onClick={onConfirm}>Remove</button>
+                    <button className={styles.btnSecondary} onClick={onCancel}>
+                        Cancel
+                    </button>
+                    <button className={styles.btnDanger} onClick={onConfirm}>
+                        Remove
+                    </button>
                 </div>
             </div>
         </div>
@@ -555,40 +890,58 @@ function fmtMaybe(iso) {
     if (!iso) return "—";
     try {
         const d = new Date(iso);
-        return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "2-digit" }).format(d);
-    } catch { return iso; }
+        return new Intl.DateTimeFormat(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+        }).format(d);
+    } catch {
+        return iso;
+    }
 }
 function fmtMaybeDT(iso) {
     if (!iso) return "—";
     try {
         const d = new Date(iso);
         return new Intl.DateTimeFormat(undefined, {
-            year: "numeric", month: "short", day: "2-digit",
-            hour: "2-digit", minute: "2-digit"
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
         }).format(d);
-    } catch { return iso; }
+    } catch {
+        return iso;
+    }
 }
 
 function demoRows() {
     const now = Date.now();
     return [
         {
-            id: 5001, title: "Chapter 3 Reading", type: "BOOK",
+            id: 5001,
+            title: "Chapter 3 Reading",
+            type: "BOOK",
             startAt: new Date(now - 2 * 864e5).toISOString(),
             dueDate: new Date(now + 5 * 864e5).toISOString(),
             targetedCount: 3,
             counts: { ASSIGNED: 1, SUBMITTED: 1, GRADED: 1, LATE: 0, MISSING: 0 },
         },
         {
-            id: 5002, title: "Verb Tenses — Quiz A", type: "QUIZ",
+            id: 5002,
+            title: "Verb Tenses — Quiz A",
+            type: "QUIZ",
             startAt: new Date(now - 1 * 864e5).toISOString(),
             dueDate: new Date(now + 2 * 864e5).toISOString(),
             targetedCount: 3,
             counts: { ASSIGNED: 2, SUBMITTED: 1, GRADED: 0, LATE: 0, MISSING: 0 },
         },
         {
-            id: 5003, title: "Upload: “The Moon Landing”", type: "UPLOAD",
-            startAt: "", dueDate: "",
+            id: 5003,
+            title: "Upload: “The Moon Landing”",
+            type: "UPLOAD",
+            startAt: "",
+            dueDate: "",
             targetedCount: 2,
             counts: { ASSIGNED: 2, SUBMITTED: 0, GRADED: 0, LATE: 0, MISSING: 0 },
         },
@@ -599,10 +952,18 @@ function toast(msg, danger = false) {
     const el = document.createElement("div");
     el.textContent = msg;
     Object.assign(el.style, {
-        position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)",
-        background: danger ? "#991b1b" : "#111827", color: "#fff",
-        padding: "8px 12px", borderRadius: 8, zIndex: 9999
+        position: "fixed",
+        bottom: "20px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: danger ? "#991b1b" : "#111827",
+        color: "#fff",
+        padding: "8px 12px",
+        borderRadius: 8,
+        zIndex: 9999,
     });
     document.body.appendChild(el);
-    setTimeout(() => { if (el && el.parentNode) el.parentNode.removeChild(el); }, 1200);
+    setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, 1200);
 }

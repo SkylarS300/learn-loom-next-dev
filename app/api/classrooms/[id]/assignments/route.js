@@ -4,8 +4,8 @@ import { z } from "zod";
 import { assertTeacher, getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
 // GET: list assignments for class with basic computed counts
-export async function GET(req, { params }) {
-    const classId = Number(params?.id);
+export async function GET(req, ctx) {
+    const classId = Number((await ctx.params)?.id);
     if (!Number.isFinite(classId)) return jsonErr("Bad id", 400);
 
     const me = await getAnonId();

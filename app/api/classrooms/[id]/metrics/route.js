@@ -4,8 +4,8 @@ import prisma from "@/lib/prisma";
 
 function ymd(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10); }
 
-export async function GET(_req, { params }) {
-    const id = Number(params?.id);
+export async function GET(_req, ctx) {
+    const id = Number((await ctx.params)?.id);
     if (!Number.isFinite(id)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
 
     const cs = await cookies();
