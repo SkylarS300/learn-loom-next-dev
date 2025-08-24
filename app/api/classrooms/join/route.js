@@ -11,23 +11,24 @@ export async function POST(req) {
     const Body = z.object({
         code: z.string().trim().min(1).max(16),
         displayName: z.string().trim().max(80).optional(),
+        // Accepted for backwards-compat only. Role elevation is now done by the class owner inside the classroom.
         joinAsTeacher: z.boolean().optional(),
     });
+
     const parsed = Body.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return jsonErr("Invalid request", 400, { issues: parsed.error.issues });
+
     const rawCode = parsed.data.code || "";
     const code = rawCode.trim().toUpperCase().replace(/\s+/g, "");
     const displayName = parsed.data.displayName?.trim() || null;
-    const joinAsTeacher = !!parsed.data.joinAsTeacher;
 
     if (!code) return jsonErr("Missing code", 400);
 
-    const cls = await prisma.classroom.findUnique({ where: { code }, select: { id: true, ownerAnon: true } });
+    const cls = await prisma.classroom.findUnique({
+        where: { code },
+        select: { id: true },
+    });
     if (!cls) return jsonErr("Class not found", 404);
-
-    // Only the class owner can join as a teacher (no public escalation)
-    const role =
-        (joinAsTeacher && anonId === cls.ownerAnon) ? "teacher" : "student";
 
     // If already in roster, just update display name if provided
     const existing = await prisma.studentclassroom.findFirst({
@@ -37,14 +38,17 @@ export async function POST(req) {
 
     if (!existing) {
         await prisma.studentclassroom.create({
-            data: { classroomId: cls.id, anonId, role, displayName },
+            data: { classroomId: cls.id, anonId, role: "student", displayName },
         });
-    } else if (displayName) {
+        return jsonOk({ classroomId: cls.id, role: "student" });
+    }
+
+    if (displayName) {
         await prisma.studentclassroom.update({
             where: { id: existing.id },
             data: { displayName },
         });
     }
 
-    return jsonOk({ classroomId: cls.id, role });
+    return jsonOk({ classroomId: cls.id, role: existing.role });
 }

@@ -15,7 +15,6 @@ export default function TeacherSettingsCard() {
     // Join
     const [code, setCode] = useState("");
     const [displayName, setDisplayName] = useState("");
-    const [joinAsTeacher, setJoinAsTeacher] = useState(false);
     const [joining, setJoining] = useState(false);
     const [joinMsg, setJoinMsg] = useState("");
 
@@ -47,7 +46,7 @@ export default function TeacherSettingsCard() {
             const r = await fetch("/api/classrooms/join", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code, displayName, joinAsTeacher }),
+                body: JSON.stringify({ code, displayName }),
             });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed to join");
@@ -90,10 +89,7 @@ export default function TeacherSettingsCard() {
                         <label style={{ width: 140 }}>Your display name</label>
                         <input className={styles.input} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Visible to class" />
                     </div>
-                    <div className={styles.editRow}>
-                        <label style={{ width: 140 }}>Join as teacher</label>
-                        <input type="checkbox" checked={joinAsTeacher} onChange={e => setJoinAsTeacher(e.target.checked)} />
-                    </div>
+                    {/* Teachers are assigned by the class owner inside the classroom page */}
                     <button className={styles.btn} disabled={joining || !code.trim()}>{joining ? "Joining…" : "Join class"}</button>
                     {joinMsg && <p style={{ marginTop: 8 }} className={styles.dim}>{joinMsg}</p>}
                 </form>

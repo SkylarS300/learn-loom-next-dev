@@ -1,30 +1,13 @@
-// app/api/classrooms/[id]/roster/[anonId]/route.js
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
-// auth helper (copy of the one in GET route)
-async function requireTeacher(anonId, classroomId) {
-    const cls = await prisma.classroom.findUnique({
-        where: { id: classroomId },
-        select: { id: true, ownerAnon: true },
-    });
-    if (!cls) return { ok: false, status: 404, error: "Not found" };
-    if (cls.ownerAnon === anonId) return { ok: true, cls };
-    const teacherRow = await prisma.studentclassroom.findFirst({
-        where: { classroomId, anonId, role: "teacher" },
-        select: { id: true },
-    });
-    if (!teacherRow) return { ok: false, status: 403, error: "Forbidden" };
-    return { ok: true, cls };
-}
-
-// PATCH /api/classrooms/:id/roster/:anonId { displayName }
+// PATCH: teacher or student self can update displayName.
+//        Only the class owner can change someone's role (student/teacher).
 export async function PATCH(req, ctx) {
     const { id, anonId } = await ctx.params;
     const classId = Number(id);
     const targetAnon = String(anonId || "");
-    const classroomId = Number(params?.id);
-    if (!Number.isFinite(classroomId) || !anonId) {
+    if (!Number.isFinite(classId) || !targetAnon) {
         return Response.json({ ok: false, error: "Bad params" }, { status: 400 });
     }
 
@@ -32,52 +15,68 @@ export async function PATCH(req, ctx) {
     const me = cs.get("learnloomId")?.value;
     if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    // Allow: teachers OR the student updating their own displayName
-    let isTeacher = false;
-    const teacherCheck = await requireTeacher(me, classroomId);
-    if (teacherCheck.ok) isTeacher = true;
-    if (!isTeacher) {
-        // if not a teacher, must be the same student and a member of this class
-        if (me !== anonId) return Response.json({ ok: false, error: "Forbidden" }, { status: 403 });
-        const member = await prisma.studentclassroom.findFirst({
-            where: { classroomId, anonId: me },
-            select: { id: true, role: true },
-        });
-        if (!member) return Response.json({ ok: false, error: "Not in class" }, { status: 404 });
-        if (member.role === "teacher") {
-            // teachers' names are not managed here
-            return Response.json({ ok: false, error: "Cannot edit teacher here" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const displayName = typeof body?.displayName === "string" ? body.displayName.trim() : undefined;
+    const reqRole = typeof body?.role === "string" ? body.role.toLowerCase() : undefined;
+
+    // Load classroom + my membership + target membership
+    const [cls, mine, theirs] = await Promise.all([
+        prisma.classroom.findUnique({ where: { id: classId }, select: { ownerAnon: true } }),
+        prisma.studentclassroom.findFirst({ where: { classroomId: classId, anonId: me }, select: { role: true } }),
+        prisma.studentclassroom.findFirst({ where: { classroomId: classId, anonId: targetAnon }, select: { role: true } }),
+    ]);
+    if (!cls || !mine || !theirs) {
+        return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+
+    const isOwner = cls.ownerAnon === me;
+    const iAmTeacher = (mine.role || "student") === "teacher";
+
+    // Authorize update
+    //  - displayName: allowed if iAmTeacher OR target is me
+    //  - role: allowed only if isOwner (cannot change own role via this route)
+    if (reqRole && !isOwner) {
+        return Response.json({ ok: false, error: "Only the class owner can change roles" }, { status: 403 });
+    }
+    if ((displayName ?? "") !== "" && !(iAmTeacher || targetAnon === me)) {
+        return Response.json({ ok: false, error: "Not allowed to edit someone else's name" }, { status: 403 });
+    }
+
+    const updates = {};
+    if (displayName !== undefined) updates.displayName = displayName;
+
+    if (reqRole) {
+        const newRole = reqRole === "teacher" ? "teacher" : "student";
+        // prevent demoting last teacher (owner protection lite)
+        if (theirs.role === "teacher" && newRole === "student") {
+            const otherTeachers = await prisma.studentclassroom.count({
+                where: { classroomId: classId, role: "teacher", anonId: { not: targetAnon } },
+            });
+            if (otherTeachers === 0 && cls.ownerAnon === targetAnon) {
+                return Response.json({ ok: false, error: "Cannot demote the class owner" }, { status: 422 });
+            }
         }
+        updates.role = newRole;
     }
 
-    const { displayName } = await req.json().catch(() => ({}));
-    const cleaned = typeof displayName === "string" ? displayName.trim() : "";
-
-    const membership = await prisma.studentclassroom.findFirst({
-        where: { classroomId, anonId },
-        select: { id: true, role: true },
-    });
-    if (!membership) return Response.json({ ok: false, error: "Not in class" }, { status: 404 });
-    // allow editing display name for students only (teacher names are not managed here)
-    if (membership.role === "teacher") {
-        return Response.json({ ok: false, error: "Cannot edit teacher here" }, { status: 400 });
+    if (!Object.keys(updates).length) {
+        return Response.json({ ok: true, data: { updated: false } });
     }
 
-    const updated = await prisma.studentclassroom.update({
-        where: { id: membership.id },
-        data: { displayName: cleaned || null },
-        select: { anonId: true, displayName: true },
+    await prisma.studentclassroom.updateMany({
+        where: { classroomId: classId, anonId: targetAnon },
+        data: updates,
     });
 
-    return Response.json({ ok: true, data: updated });
+    return Response.json({ ok: true, data: { updated: true } });
 }
 
-// DELETE /api/classrooms/:id/roster/:anonId
+// DELETE: remove a student from a class (teachers only; cannot remove teachers)
 export async function DELETE(_req, ctx) {
     const { id, anonId } = await ctx.params;
     const classId = Number(id);
     const targetAnon = String(anonId || "");
-    if (!Number.isFinite(classroomId) || !anonId) {
+    if (!Number.isFinite(classId) || !targetAnon) {
         return Response.json({ ok: false, error: "Bad params" }, { status: 400 });
     }
 
@@ -85,19 +84,19 @@ export async function DELETE(_req, ctx) {
     const me = cs.get("learnloomId")?.value;
     if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const auth = await requireTeacher(me, classroomId);
-    if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+    const [mine, theirs] = await Promise.all([
+        prisma.studentclassroom.findFirst({ where: { classroomId: classId, anonId: me }, select: { role: true } }),
+        prisma.studentclassroom.findFirst({ where: { classroomId: classId, anonId: targetAnon }, select: { role: true } }),
+    ]);
 
-    // don't remove teachers with this route
-    const membership = await prisma.studentclassroom.findFirst({
-        where: { classroomId, anonId },
-        select: { id: true, role: true },
-    });
-    if (!membership) return Response.json({ ok: false, error: "Not in class" }, { status: 404 });
-    if (membership.role === "teacher") {
-        return Response.json({ ok: false, error: "Cannot remove a teacher via this action" }, { status: 400 });
+    if (!mine || !theirs) return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+    if ((mine.role || "student") !== "teacher") {
+        return Response.json({ ok: false, error: "Teachers only" }, { status: 403 });
+    }
+    if ((theirs.role || "student") === "teacher") {
+        return Response.json({ ok: false, error: "Cannot remove teachers here" }, { status: 403 });
     }
 
-    await prisma.studentclassroom.delete({ where: { id: membership.id } });
-    return Response.json({ ok: true });
+    await prisma.studentclassroom.deleteMany({ where: { classroomId: classId, anonId: targetAnon } });
+    return Response.json({ ok: true, data: { removed: true } });
 }
