@@ -18,20 +18,21 @@ async function requireTeacherByAid(anonId, aid) {
     return { ok: true, classroomId: a.classroomId };
 }
 
-// GET: detail + per-student table
-export async function GET(_req, { params }) {
-    const aid = Number(params?.aid);
-    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
+// GET: detail + per-student table (teacher-only)
+export async function GET(_req, ctx) {
+    const { aid } = await ctx.params;
+    const id = Number(aid);
+    if (!Number.isFinite(id)) return jsonErr("Bad id", 400);
 
     const me = await getAnonId();
     if (!me) return jsonErr("Unauthorized", 401);
 
-    const auth = await requireTeacherByAid(me, aid);
+    const auth = await requireTeacherByAid(me, id);
     if (!auth.ok) return jsonErr(auth.error, auth.status);
 
     const [a, roster, subs] = await Promise.all([
         prisma.assignment.findUnique({
-            where: { id: aid },
+            where: { id },
             select: {
                 id: true, classroomId: true, title: true, description: true, type: true,
                 startAt: true, dueDate: true, allowLate: true, latePenaltyPct: true, weightPoints: true,
@@ -45,10 +46,9 @@ export async function GET(_req, { params }) {
             select: { anonId: true, displayName: true },
         }),
         prisma.assignmentcompletion.findMany({
-            where: { assignmentId: aid },
+            where: { assignmentId: id },
             select: {
-                anonId: true, status: true, attemptCount: true, scorePct: true, gradedAt: true, submittedAt: true,
-                // could add more later (best score, last attempt timestamps from attemptsJson if you store them)
+                anonId: true, status: true, attemptCount: true, scorePct: true, gradedAt: true, submittedAt: true, isLate: true,
             },
         }),
     ]);
@@ -58,7 +58,6 @@ export async function GET(_req, { params }) {
     const nameMap = new Map(roster.map(r => [r.anonId || "", r.displayName || ""]));
     const subMap = new Map((subs || []).map(s => [s.anonId || "", s]));
 
-    // who is targeted?
     const targetedAll = a.targets.some(t => t.anonId == null);
     const targetedSet = targetedAll ? new Set(roster.map(r => r.anonId)) : new Set(a.targets.map(t => t.anonId));
 
@@ -80,50 +79,69 @@ export async function GET(_req, { params }) {
     return jsonOk({ assignment: a, students: table });
 }
 
-// PATCH: grade override / feedback (simple form here)
-export async function PATCH(req, { params }) {
-    const aid = Number(params?.aid);
-    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
+// PATCH: teacher grading/override
+export async function PATCH(req, ctx) {
+    const { aid } = await ctx.params;
+    const id = Number(aid);
+    if (!Number.isFinite(id)) return jsonErr("Bad id", 400);
 
     const me = await getAnonId();
     if (!me) return jsonErr("Unauthorized", 401);
 
-    const auth = await requireTeacherByAid(me, aid);
+    const auth = await requireTeacherByAid(me, id);
     if (!auth.ok) return jsonErr(auth.error, auth.status);
 
     const Body = z.object({
         anonId: z.string().min(1),
-        status: z.enum(["ASSIGNED", "SUBMITTED", "GRADED", "LATE"]).optional(),
+        status: z.enum(["ASSIGNED", "SUBMITTED", "GRADED", "LATE", "MISSING"]).optional(),
         scorePct: z.number().min(0).max(100).nullable().optional(),
         scorePoints: z.number().nullable().optional(),
         feedback: z.string().max(4000).nullable().optional(),
         isLate: z.boolean().optional(),
     });
+
     const parsed = Body.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return jsonErr("Invalid request", 400, { issues: parsed.error.issues });
+
     const { anonId, status, scorePct, scorePoints, feedback, isLate } = parsed.data;
 
+    // fetch assignment to apply late policy consistently
+    const a = await prisma.assignment.findUnique({
+        where: { id },
+        select: { allowLate: true, latePenaltyPct: true },
+    });
+    if (!a) return jsonErr("Not found", 404);
+
     const now = new Date();
+
+    // compute effective score considering late penalty if applicable
+    let effectivePct = typeof scorePct === "number" ? scorePct : undefined;
+    const isMarkedLate = isLate === true || status === "LATE";
+    if (typeof effectivePct === "number" && a.allowLate && a.latePenaltyPct != null && isMarkedLate) {
+        // apply flat percentage penalty (e.g., 10% => scorePct-10), clamp to [0,100]
+        effectivePct = Math.max(0, Math.min(100, Math.round((effectivePct - a.latePenaltyPct) * 10) / 10));
+    }
+
     const updated = await prisma.assignmentcompletion.upsert({
-        where: { anonId_assignmentId: { anonId, assignmentId: aid } },
+        where: { anonId_assignmentId: { anonId, assignmentId: id } },
         update: {
             status: status || undefined,
-            scorePct: typeof scorePct === "number" ? scorePct : undefined,
+            scorePct: typeof effectivePct === "number" ? effectivePct : undefined,
             scorePoints: typeof scorePoints === "number" ? scorePoints : undefined,
             feedback: typeof feedback === "string" ? feedback : undefined,
             isLate: typeof isLate === "boolean" ? isLate : undefined,
             gradedAt: now,
         },
         create: {
-            assignmentId: aid,
+            assignmentId: id,
             anonId,
             status: status || "GRADED",
-            scorePct: typeof scorePct === "number" ? scorePct : null,
+            scorePct: typeof effectivePct === "number" ? effectivePct : null,
             scorePoints: typeof scorePoints === "number" ? scorePoints : null,
             attemptCount: 0,
             attemptsJson: [],
             feedback: typeof feedback === "string" ? feedback : null,
-            isLate: !!isLate,
+            isLate: !!isLate || status === "LATE",
             gradedAt: now,
         },
         select: { anonId: true, status: true, scorePct: true, scorePoints: true, gradedAt: true, feedback: true, isLate: true },

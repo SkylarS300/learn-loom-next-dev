@@ -6,6 +6,15 @@ import { useParams, useSearchParams } from "next/navigation";
 import Navbar from "../../Navbar";
 import styles from "../../dashboard/Dashboard.module.css";
 
+const STATUS_TABS = ["ALL", "ASSIGNED", "SUBMITTED", "GRADED", "LATE", "MISSING"];
+const SORTS = [
+    { key: "status", label: "Status" },
+    { key: "submitted", label: "Submitted date" },
+    { key: "graded", label: "Graded date" },
+    { key: "score", label: "Score" },
+    { key: "name", label: "Name" },
+];
+
 export default function AssignmentDetailPage() {
     const { aid } = useParams();
     const id = Number(aid);
@@ -21,11 +30,21 @@ export default function AssignmentDetailPage() {
     const [saving, setSaving] = useState(false);
     const [saveErr, setSaveErr] = useState("");
 
+    // filters/search/sort
+    const [tab, setTab] = useState("ALL");
+    const [q, setQ] = useState("");
+    const [sortKey, setSortKey] = useState("status");
+    const [sortDir, setSortDir] = useState("asc");
+
     // bulk select
     const [selected, setSelected] = useState(() => new Set());
     const [bulkSaving, setBulkSaving] = useState(false);
     const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
     const [bulkScorePct, setBulkScorePct] = useState("");
+    const [bulkFeedback, setBulkFeedback] = useState("");
+
+    // details pane
+    const [showDetails, setShowDetails] = useState(false);
 
     useEffect(() => {
         let dead = false;
@@ -66,7 +85,7 @@ export default function AssignmentDetailPage() {
             scorePct: r.scorePct === "" || r.scorePct == null ? "" : String(r.scorePct),
             scorePoints: "",
             feedback: "",
-            isLate: false,
+            isLate: r.status === "LATE" ? true : false,
         });
     }
     function closeGrade() {
@@ -125,7 +144,7 @@ export default function AssignmentDetailPage() {
     }, [grading]);
 
     // ---- selection + bulk actions ----
-    const allIds = useMemo(() => rows.map(r => r.anonId), [rows]);
+    const allIds = useMemo(() => filteredAndSorted(rows, { tab, q, sortKey, sortDir }).map(r => r.anonId), [rows, tab, q, sortKey, sortDir]);
     const allSelected = selected.size > 0 && selected.size === allIds.length;
 
     function toggleRow(id) {
@@ -142,6 +161,7 @@ export default function AssignmentDetailPage() {
     function clearSelection() {
         setSelected(new Set());
         setBulkScorePct("");
+        setBulkFeedback("");
         setBulkProgress({ done: 0, total: 0 });
     }
 
@@ -157,6 +177,7 @@ export default function AssignmentDetailPage() {
             }
             scoreVal = n;
         }
+        const feedback = String(bulkFeedback || "").trim() || undefined;
 
         const ids = Array.from(selected);
         setBulkSaving(true);
@@ -171,6 +192,7 @@ export default function AssignmentDetailPage() {
                     status: kind,
                     isLate: kind === "LATE" ? true : undefined,
                     scorePct: kind === "GRADED" ? scoreVal : undefined,
+                    feedback,
                 };
                 const r = await fetch(`/api/assignments/${a.id}`, {
                     method: "PATCH",
@@ -210,6 +232,9 @@ export default function AssignmentDetailPage() {
         clearSelection();
     }
 
+    // ---- filter/search/sort helpers ----
+    const viewRows = useMemo(() => filteredAndSorted(rows, { tab, q, sortKey, sortDir }), [rows, tab, q, sortKey, sortDir]);
+
     return (
         <>
             <Navbar />
@@ -217,25 +242,105 @@ export default function AssignmentDetailPage() {
                 <a href="/dashboard" className={styles.btnSecondary}>← Back</a>
 
                 <h1 style={{ marginTop: 8, marginBottom: 6 }}>{a ? a.title : "Assignment"}</h1>
-                {a && (
-                    <p className={styles.dim} style={{ marginTop: 0 }}>
-                        {badge(a.type)} {startISO ? <> · Starts: {fmtDateTime(startISO)}</> : null}
-                        {dueISO ? <> · Due: {fmtDateTime(dueISO)}</> : null}
-                        {" · "}Allow late: {a.allowLate ? "Yes" : "No"}
-                        {a.latePenaltyPct != null ? ` (${a.latePenaltyPct}% penalty)` : ""}
-                        {a.weightPoints != null ? ` · Weight: ${a.weightPoints} pts` : ""}
-                    </p>
-                )}
 
-                <div style={{ display: "flex", gap: 8, margin: "8px 0" }}>
-                    <a href={exportHref} className={styles.btn}>Export CSV</a>
-                </div>
+                {a && (
+                    <>
+                        <p className={styles.dim} style={{ marginTop: 0 }}>
+                            {badge(a.type)} {startISO ? <> · Starts: {fmtDateTime(startISO)}</> : null}
+                            {dueISO ? <> · Due: {fmtDateTime(dueISO)}</> : null}
+                            {" · "}Allow late: {a.allowLate ? "Yes" : "No"}
+                            {a.latePenaltyPct != null ? ` (${a.latePenaltyPct}% penalty)` : ""}
+                            {a.weightPoints != null ? ` · Weight: ${a.weightPoints} pts` : ""}
+                        </p>
+
+                        <div style={{ display: "flex", gap: 8, margin: "8px 0", flexWrap: "wrap" }}>
+                            <a href={exportHref} className={styles.btn}>Export CSV</a>
+                            <button className={styles.btnSecondary} onClick={() => setShowDetails(v => !v)}>
+                                {showDetails ? "Hide details" : "Show details"}
+                            </button>
+                        </div>
+
+                        {showDetails && (
+                            <div className={styles.card} style={{ marginBottom: 10 }}>
+                                <h4 className={styles.h4} style={{ marginTop: 0 }}>Assignment details</h4>
+                                <dl style={{ display: "grid", gridTemplateColumns: "180px 1fr", rowGap: 6, columnGap: 12, margin: 0 }}>
+                                    <dt className={styles.dim}>Type</dt><dd>{a.type}</dd>
+                                    {a.type === "BOOK" && (
+                                        <>
+                                            <dt className={styles.dim}>Book</dt><dd>{a.bookId ?? "—"}</dd>
+                                            <dt className={styles.dim}>Chapter</dt><dd>{a.chapterIndex ?? "—"}</dd>
+                                        </>
+                                    )}
+                                    {a.type === "QUIZ" && (
+                                        <>
+                                            <dt className={styles.dim}>Category</dt><dd>{a.category ?? "—"}</dd>
+                                            <dt className={styles.dim}>Subtopic</dt><dd>{a.subtopic ?? "—"}</dd>
+                                        </>
+                                    )}
+                                    {a.type === "UPLOAD" && (
+                                        <>
+                                            <dt className={styles.dim}>Upload target</dt><dd>{a.uploadId ?? "—"}</dd>
+                                        </>
+                                    )}
+                                </dl>
+                            </div>
+                        )}
+                    </>
+                )}
 
                 {demo && (
                     <p className={styles.dim} style={{ marginTop: 4 }}>
                         Demo mode (<code>?demo=1</code>)
                     </p>
                 )}
+
+                {/* Filters/search/sort */}
+                <div className={styles.card} style={{ marginBottom: 10 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        {/* Tabs */}
+                        <div role="tablist" aria-label="Status filter" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {STATUS_TABS.map(s => (
+                                <button
+                                    key={s}
+                                    role="tab"
+                                    aria-selected={tab === s}
+                                    className={tab === s ? styles.btn : styles.btnSecondary}
+                                    onClick={() => setTab(s)}
+                                >
+                                    {s === "ALL" ? "All" : s[0] + s.slice(1).toLowerCase()}
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ width: 1, height: 24, background: "#e5e7eb" }} />
+                        {/* Search */}
+                        <input
+                            className={styles.input}
+                            placeholder="Search student name"
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            style={{ minWidth: 220 }}
+                        />
+                        {/* Sort */}
+                        <label className={styles.dim} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            Sort
+                            <select
+                                className={styles.input}
+                                value={`${sortKey}:${sortDir}`}
+                                onChange={(e) => {
+                                    const [k, d] = e.target.value.split(":");
+                                    setSortKey(k); setSortDir(d);
+                                }}
+                            >
+                                {SORTS.map(s => (
+                                    <option key={`${s.key}:asc`} value={`${s.key}:asc`}>{s.label} ↑</option>
+                                ))}
+                                {SORTS.map(s => (
+                                    <option key={`${s.key}:desc`} value={`${s.key}:desc`}>{s.label} ↓</option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+                </div>
 
                 {loading && <p className={styles.dim}>Loading…</p>}
                 {err && !loading && <p style={{ color: "#b91c1c" }}>{err}</p>}
@@ -247,12 +352,7 @@ export default function AssignmentDetailPage() {
                                 <thead>
                                     <tr style={trHead}>
                                         <th style={thNarrow}>
-                                            <input
-                                                type="checkbox"
-                                                aria-label="Select all"
-                                                checked={allSelected}
-                                                onChange={toggleAll}
-                                            />
+                                            <input type="checkbox" aria-label="Select all" checked={allSelected} onChange={toggleAll} />
                                         </th>
                                         <th style={th}>Student</th>
                                         <th style={th}>Anon ID</th>
@@ -265,7 +365,7 @@ export default function AssignmentDetailPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((r) => {
+                                    {viewRows.map((r) => {
                                         const isSel = selected.has(r.anonId);
                                         return (
                                             <tr key={r.anonId} style={trBody}>
@@ -290,8 +390,8 @@ export default function AssignmentDetailPage() {
                                             </tr>
                                         );
                                     })}
-                                    {rows.length === 0 && (
-                                        <tr><td style={td} colSpan={9} className={styles.dim}>No targeted students yet.</td></tr>
+                                    {viewRows.length === 0 && (
+                                        <tr><td style={td} colSpan={9} className={styles.dim}>No matching students.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -323,6 +423,17 @@ export default function AssignmentDetailPage() {
                                     value={bulkScorePct}
                                     onChange={(e) => setBulkScorePct(e.target.value)}
                                     aria-label="Bulk score percent"
+                                />
+                            </label>
+                            <label className={styles.dim} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                Feedback (optional)
+                                <input
+                                    className={styles.input}
+                                    style={{ width: 220, padding: "4px 8px" }}
+                                    value={bulkFeedback}
+                                    onChange={(e) => setBulkFeedback(e.target.value)}
+                                    placeholder="Private comment"
+                                    aria-label="Bulk feedback"
                                 />
                             </label>
                         </div>
@@ -401,6 +512,39 @@ export default function AssignmentDetailPage() {
             )}
         </>
     );
+}
+
+/* ---------- helpers ---------- */
+
+function filteredAndSorted(rows, { tab, q, sortKey, sortDir }) {
+    const qlc = q.trim().toLowerCase();
+    let r = rows.slice();
+
+    if (tab && tab !== "ALL") r = r.filter(x => (x.status || "ASSIGNED") === tab);
+    if (qlc) r = r.filter(x => (x.displayName || "").toLowerCase().includes(qlc));
+
+    const dir = sortDir === "desc" ? -1 : 1;
+    r.sort((a, b) => {
+        const av = val(a), bv = val(b);
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+    });
+    function val(x) {
+        switch (sortKey) {
+            case "status": return orderOfStatus(x.status);
+            case "score": return x.scorePct == null || x.scorePct === "" ? -Infinity : x.scorePct;
+            case "submitted": return x.submittedAt ? new Date(x.submittedAt).getTime() : -Infinity;
+            case "graded": return x.gradedAt ? new Date(x.gradedAt).getTime() : -Infinity;
+            case "name": return (x.displayName || "").toLowerCase();
+            default: return 0;
+        }
+    }
+    return r;
+}
+function orderOfStatus(s) {
+    const o = { ASSIGNED: 1, SUBMITTED: 2, LATE: 3, MISSING: 4, GRADED: 5 };
+    return o[s] ?? 99;
 }
 
 const trHead = { background: "#f9fafb", borderBottom: "1px solid #e5e7eb" };
