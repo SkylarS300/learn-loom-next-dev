@@ -291,18 +291,14 @@ export default function ClassroomPage() {
                 {loading && <p className={styles.dim}>Loading…</p>}
                 {(err || iErr) && !loading && <p style={{ color: "#b91c1c" }}>{err || iErr}</p>}
 
-                {/* Student-only: edit my display name for this class */}
-                {!isTeacher && info?.myAnonId && (
+                {/* Student-only: my assignments for this class */}
+                {!isTeacher && (
                     <section className={styles.section}>
-                        <div className={styles.card}>
-                            <h4 className={styles.h4}>My name in this class</h4>
-                            <div className={styles.editRow} style={{ marginTop: 8 }}>
-                                <input className={styles.input} style={{ maxWidth: 260 }} value={myName} onChange={e => setMyName(e.target.value)} placeholder="Visible to classmates and teacher" />
-                                <button className={styles.btn} onClick={saveMyName} disabled={mySaving} style={{ marginLeft: 8 }}>
-                                    {mySaving ? "Saving…" : "Save"}
-                                </button>
-                            </div>
+                        <div className={styles.headerRow}>
+                            <h3 style={{ margin: 0 }}>🗂 My assignments (this class)</h3>
+                            <span className={styles.dim}>Due soon & Missing</span>
                         </div>
+                        <ClassAssignmentsList classId={classId} />
                     </section>
                 )}
 
@@ -724,4 +720,90 @@ function toast(msg, danger = false) {
     Object.assign(el.style, { position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", background: danger ? "#991b1b" : "#111827", color: "#fff", padding: "8px 12px", borderRadius: 8, zIndex: 9999 });
     document.body.appendChild(el);
     setTimeout(() => { if (el && el.parentNode) el.parentNode.removeChild(el); }, 1200);
+}
+
+function ClassAssignmentsList({ classId }) {
+    const [items, setItems] = useState([]);
+    const [err, setErr] = useState("");
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let dead = false;
+        (async () => {
+            try {
+                const r = await fetch(`/api/classrooms/${classId}/assignments/me?days=30`, { cache: "no-store" });
+                const j = await r.json();
+                if (!j?.ok) throw new Error(j?.error || "Failed");
+                if (!dead) setItems(j.data || []);
+            } catch (e) {
+                if (!dead) setErr(e.message || "Failed");
+            } finally {
+                if (!dead) setLoading(false);
+            }
+        })();
+        return () => { dead = true; };
+    }, [classId]);
+
+    const dueSoon = items.filter(i => i.bucket === "DUE_SOON");
+    const missing = items.filter(i => i.bucket === "MISSING");
+
+    if (loading) return <p className={styles.dim}>Loading…</p>;
+    if (err) return <p className={styles.dim}>{err}</p>;
+
+    const Row = ({ i }) => (
+        <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
+            <td style={{ padding: "8px 12px" }}><strong>{i.title}</strong></td>
+            <td style={{ padding: "8px 12px" }}>{i.type}</td>
+            <td style={{ padding: "8px 12px" }}>{fmtMaybeDT(i.dueDate)}</td>
+            <td style={{ padding: "8px 12px" }}>
+                <a className={styles.btnSecondary} href={`/assignments/me/${i.assignmentId}`}>Open</a>
+            </td>
+        </tr>
+    );
+
+    return (
+        <div className={styles.card} style={{ padding: 0, marginTop: 8 }}>
+            <div style={{ padding: 10 }}>
+                <h4 className={styles.h4} style={{ marginTop: 0 }}>Due soon</h4>
+                <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                        <thead>
+                            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Title</th>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Type</th>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Due</th>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dueSoon.map(i => <Row key={`d${i.assignmentId}`} i={i} />)}
+                            {dueSoon.length === 0 && (
+                                <tr><td colSpan={4} className={styles.dim} style={{ padding: 12 }}>No upcoming work.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 className={styles.h4} style={{ margin: "12px 0 0" }}>Missing</h4>
+                <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                        <thead>
+                            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Title</th>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Type</th>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Due</th>
+                                <th style={{ textAlign: "left", padding: "8px 12px" }}>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {missing.map(i => <Row key={`m${i.assignmentId}`} i={i} />)}
+                            {missing.length === 0 && (
+                                <tr><td colSpan={4} className={styles.dim} style={{ padding: 12 }}>Nothing missing 🎉</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
 }

@@ -31,14 +31,19 @@ export async function GET(req) {
     const asns = await prisma.assignment.findMany({
         where: {
             classroomId: { in: classIds },
-            OR: [
-                { targets: { some: { anonId: me } } },
-                { targets: { some: { anonId: null } } }, // ALL
-            ],
-            // Show overdue OR due within horizon OR no due date
-            OR: [
-                { dueDate: null },
-                { dueDate: { lte: to } },
+            AND: [
+                {
+                    OR: [
+                        { targets: { some: { anonId: me } } },
+                        { targets: { some: { anonId: null } } }, // ALL
+                    ]
+                },
+                {
+                    OR: [
+                        { dueDate: null },
+                        { dueDate: { lte: to } },
+                    ]
+                },
             ],
         },
         orderBy: { dueDate: "asc" },

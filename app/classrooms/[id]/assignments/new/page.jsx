@@ -125,15 +125,15 @@ export default function NewAssignmentPage() {
         try {
             const body = {
                 title: title.trim(),
-                description,
+                description: description.trim(),
                 type,
                 startAt: combineDateTime(startDate, startTime),
                 dueDate: combineDateTime(dueDate, dueTime),
                 allowLate,
                 latePenaltyPct: latePenaltyPct !== "" ? Number(latePenaltyPct) : null,
                 weightPoints: weightPoints !== "" ? Number(weightPoints) : null,
-                category: type === "QUIZ" ? category || null : null,
-                subtopic: type === "QUIZ" ? subtopic || null : null,
+                category: type === "QUIZ" ? (category.trim() || null) : null,
+                subtopic: type === "QUIZ" ? (subtopic.trim() || null) : null,
                 bookId: type === "BOOK" ? (bookId === "" ? null : Number(bookId)) : null,
                 chapterIndex: type === "BOOK" ? (chapterIndex === "" ? null : Number(chapterIndex)) : null,
                 uploadId: type === "UPLOAD" ? (uploadId === "" ? null : Number(uploadId)) : null,
@@ -151,7 +151,6 @@ export default function NewAssignmentPage() {
             // Navigate straight to the new assignment's detail table
             const newId = j?.data?.assignmentId;
             router.push(newId ? `/assignments/${newId}` : `/classrooms/${classId}`);
-            router.push(`/classrooms/${classId}`);
         } catch (e) {
             setErr(e.message || "Failed to create");
         } finally {

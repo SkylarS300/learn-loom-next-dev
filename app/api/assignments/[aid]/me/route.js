@@ -3,181 +3,109 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
-// Helper: load assignment + confirm the student is in the class & targeted
-async function loadCtx(aid, anonId) {
+async function requireTargetedStudent(anonId, aid) {
     const a = await prisma.assignment.findUnique({
         where: { id: aid },
         select: {
-            id: true, classroomId: true, title: true, description: true, type: true,
+            id: true, classroomId: true, title: true, type: true,
             startAt: true, dueDate: true, allowLate: true, latePenaltyPct: true, weightPoints: true,
             category: true, subtopic: true, bookId: true, chapterIndex: true, uploadId: true,
-            classroom: { select: { id: true } },
             targets: { select: { anonId: true } },
-            createdAt: true,
         },
     });
-    if (!a) return { ok: false, error: "Not found", status: 404 };
+    if (!a) return { ok: false, status: 404, error: "Not found" };
 
-    // must be a class member (student or teacher). Teachers shouldn't use /me.
-    const member = await prisma.studentclassroom.findFirst({
+    const membership = await prisma.studentclassroom.findFirst({
         where: { classroomId: a.classroomId, anonId },
         select: { role: true },
     });
-    if (!member) return { ok: false, error: "Not in classroom", status: 403 };
-    if (member.role === "teacher") return { ok: false, error: "Teachers should not use /me", status: 403 };
+    if (!membership) return { ok: false, status: 403, error: "Forbidden" };
+    if ((membership.role || "student") === "teacher") return { ok: false, status: 403, error: "Forbidden" };
 
-    // targeted? (null anonId means "all")
-    const targetedAll = a.targets.some(t => t.anonId == null);
-    const isTargeted = targetedAll || a.targets.some(t => t.anonId === anonId);
-    if (!isTargeted) return { ok: false, error: "Not assigned to you", status: 403 };
+    const isTargeted = a.targets.some((t) => t.anonId == null || t.anonId === anonId);
+    if (!isTargeted) return { ok: false, status: 403, error: "Not targeted" };
 
     return { ok: true, a };
 }
 
-// GET: current student's view of one assignment
-export async function GET(_req, ctx) {
-    const { aid } = (await ctx)?.params ?? {};
-    const id = Number(aid);
-    if (!Number.isFinite(id)) return jsonErr("Bad id", 400);
+export async function GET(_req, { params }) {
+    const aid = Number((await params).aid);
+    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
 
     const me = await getAnonId();
     if (!me) return jsonErr("Unauthorized", 401);
 
-    const ctxLoad = await loadCtx(id, me);
-    if (!ctxLoad.ok) return jsonErr(ctxLoad.error, ctxLoad.status);
-    const a = ctxLoad.a;
+    const auth = await requireTargetedStudent(me, aid);
+    if (!auth.ok) return jsonErr(auth.error, auth.status);
 
-    const row = await prisma.assignmentcompletion.findUnique({
-        where: { anonId_assignmentId: { anonId: me, assignmentId: id } },
-        select: {
-            status: true, attemptCount: true, scorePct: true, scorePoints: true,
-            submittedAt: true, gradedAt: true, feedback: true, isLate: true,
-        },
+    const comp = await prisma.assignmentcompletion.findUnique({
+        where: { anonId_assignmentId: { anonId: me, assignmentId: aid } },
+        select: { status: true, attemptCount: true, scorePct: true, submittedAt: true, gradedAt: true, feedback: true, isLate: true },
     });
 
-    const now = new Date();
-    const due = a.dueDate ? new Date(a.dueDate) : null;
-
-    // allowed actions
-    const status = row?.status || "ASSIGNED";
-    const graded = !!row?.gradedAt;
-    const afterDue = !!(due && now > due);
-    const canSubmit = !graded && (!afterDue || a.allowLate === true);
-    const canUnsubmit = !graded && status === "SUBMITTED";
-
     return jsonOk({
-        assignment: a,
-        me: {
-            anonId: me,
-            status,
-            attemptCount: row?.attemptCount ?? 0,
-            scorePct: row?.scorePct ?? null,
-            scorePoints: row?.scorePoints ?? null,
-            submittedAt: row?.submittedAt || null,
-            gradedAt: row?.gradedAt || null,
-            feedback: row?.feedback || "",
-            isLate: !!row?.isLate,
-        },
-        permissions: { canSubmit, canUnsubmit },
+        assignment: auth.a,
+        me: comp || { status: "ASSIGNED", attemptCount: 0, scorePct: null, submittedAt: null, gradedAt: null, feedback: null, isLate: false },
     });
 }
 
-// PATCH: { action: "SUBMIT" | "UNSUBMIT" | "RESUBMIT" }
-export async function PATCH(req, ctx) {
-    const { aid } = (await ctx)?.params ?? {};
-    const id = Number(aid);
-    if (!Number.isFinite(id)) return jsonErr("Bad id", 400);
+export async function PATCH(req, { params }) {
+    const aid = Number((await params).aid);
+    if (!Number.isFinite(aid)) return jsonErr("Bad id", 400);
 
     const me = await getAnonId();
     if (!me) return jsonErr("Unauthorized", 401);
 
+    const auth = await requireTargetedStudent(me, aid);
+    if (!auth.ok) return jsonErr(auth.error, auth.status);
+
     const Body = z.object({
-        action: z.enum(["SUBMIT", "UNSUBMIT", "RESUBMIT"]),
+        action: z.enum(["submit", "unsubmit", "resubmit"]),
     });
     const parsed = Body.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return jsonErr("Invalid request", 400, { issues: parsed.error.issues });
     const { action } = parsed.data;
 
-    const ctxLoad = await loadCtx(id, me);
-    if (!ctxLoad.ok) return jsonErr(ctxLoad.error, ctxLoad.status);
-    const a = ctxLoad.a;
-
     const existing = await prisma.assignmentcompletion.findUnique({
-        where: { anonId_assignmentId: { anonId: me, assignmentId: id } },
-        select: { status: true, attemptCount: true, gradedAt: true, submittedAt: true },
+        where: { anonId_assignmentId: { anonId: me, assignmentId: aid } },
+        select: { status: true, gradedAt: true, attemptCount: true },
     });
-
-    const graded = !!existing?.gradedAt;
-
-    // guard rails
-    if ((action === "UNSUBMIT" || action === "RESUBMIT") && graded) {
-        return jsonErr("Already graded — ask your teacher to reopen", 400);
-    }
 
     const now = new Date();
-    const due = a.dueDate ? new Date(a.dueDate) : null;
-    const afterDue = !!(due && now > due);
-    if ((action === "SUBMIT" || action === "RESUBMIT") && afterDue && !a.allowLate) {
-        return jsonErr("Past due — late submissions are not allowed", 400);
-    }
+    const late = !!(auth.a.dueDate && now > new Date(auth.a.dueDate));
 
-    // compute new attempt count
-    const nextAttempts =
-        action === "RESUBMIT"
-            ? (existing?.attemptCount ?? 0) + 1
-            : (existing ? existing.attemptCount ?? 0 : 1); // first submit starts at 1
-
-    const markLate = !!(afterDue && a.allowLate);
-
-    if (action === "UNSUBMIT") {
-        const row = await prisma.assignmentcompletion.upsert({
-            where: { anonId_assignmentId: { anonId: me, assignmentId: id } },
-            update: {
-                status: "ASSIGNED",
-                submittedAt: null,
-                // keep attemptCount as-is (they already attempted)
-            },
-            create: {
-                assignmentId: id,
-                anonId: me,
-                status: "ASSIGNED",
-                attemptCount: 0,
-                attemptsJson: [],
-                scorePct: null, scorePoints: null, feedback: null,
-                isLate: false,
-                submittedAt: null, gradedAt: null,
-            },
-            select: { status: true, attemptCount: true, submittedAt: true, gradedAt: true, isLate: true, feedback: true, scorePct: true, scorePoints: true },
+    if (action === "unsubmit") {
+        if (!existing || existing.status !== "SUBMITTED") return jsonErr("Nothing to unsubmit", 400);
+        if (existing.gradedAt) return jsonErr("Already graded", 409);
+        const updated = await prisma.assignmentcompletion.update({
+            where: { anonId_assignmentId: { anonId: me, assignmentId: aid } },
+            data: { status: "ASSIGNED", submittedAt: null, isLate: false },
+            select: { status: true, submittedAt: true, gradedAt: true, attemptCount: true, scorePct: true, feedback: true, isLate: true },
         });
-        return jsonOk(row);
+        return jsonOk(updated);
     }
 
-    // SUBMIT or RESUBMIT
-    const row = await prisma.assignmentcompletion.upsert({
-        where: { anonId_assignmentId: { anonId: me, assignmentId: id } },
-        update: {
-            status: "SUBMITTED",
-            attemptCount: nextAttempts,
-            submittedAt: now,
-            isLate: markLate,
-            // DO NOT change score/gradedAt/feedback here
-        },
+    // submit or resubmit
+    const nextAttempt = (existing?.attemptCount || 0) + 1;
+    const updated = await prisma.assignmentcompletion.upsert({
+        where: { anonId_assignmentId: { anonId: me, assignmentId: aid } },
         create: {
-            assignmentId: id,
+            assignmentId: aid,
             anonId: me,
             status: "SUBMITTED",
-            attemptCount: nextAttempts,
-            attemptsJson: [],
             submittedAt: now,
-            isLate: markLate,
-            scorePct: null, scorePoints: null, feedback: null,
-            gradedAt: null,
+            isLate: late,
+            attemptCount: nextAttempt,
+            attemptsJson: [],
         },
-        select: {
-            status: true, attemptCount: true, submittedAt: true, gradedAt: true,
-            isLate: true, scorePct: true, scorePoints: true, feedback: true
+        update: {
+            status: "SUBMITTED",
+            submittedAt: now,
+            isLate: late,
+            attemptCount: nextAttempt,
         },
+        select: { status: true, submittedAt: true, gradedAt: true, attemptCount: true, scorePct: true, feedback: true, isLate: true },
     });
 
-    return jsonOk(row);
+    return jsonOk(updated);
 }
