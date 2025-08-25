@@ -7,7 +7,8 @@ import styles from "../../../../dashboard/Dashboard.module.css";
 const LineCard = dynamic(() => import("../../../../dashboard/_charts/LineCard"), { ssr: false });
 
 export default function StudentDrill({ params }) {
-    const id = Number(params?.id);
+    const { id } = await ctx.params; // ✅
+    const num = Number(id);
     const anonId = decodeURIComponent(params?.anonId || "");
     const [m, setM] = useState(null);
     const [err, setErr] = useState("");
