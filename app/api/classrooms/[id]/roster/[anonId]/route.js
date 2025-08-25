@@ -52,10 +52,21 @@ export async function PATCH(req, ctx) {
     if (!canProceed) return jsonErr("Forbidden", 403);
 
     // Make sure the membership exists
-    const membership = await prisma.studentclassroom.findFirst({
-        where: { classroomId: classId, anonId: targetAnon },
-        select: { id: true, role: true },
+    const existing = await prisma.studentclassroom.findFirst({
+        where: { classroomId: cls.id, anonId },
+        select: { id: true, classroomId: true },
     });
+    const row = existing
+        ? await prisma.studentclassroom.update({
+            where: { id: existing.id },
+            data: { displayName: displayName?.trim() || null },
+            select: { classroomId: true },
+        })
+        : await prisma.studentclassroom.create({
+            data: { classroomId: cls.id, anonId, role: "student", displayName: displayName?.trim() || null },
+            select: { classroomId: true },
+        });
+    const membership = row;
     if (!membership) return jsonErr("Not found", 404);
 
     // Prevent role changes on the owner row (if present in roster)
@@ -96,9 +107,10 @@ export async function DELETE(_req, ctx) {
     if (!membership) return jsonErr("Not found", 404);
     if ((membership.role || "student") === "teacher") return jsonErr("Cannot remove teachers", 400);
 
-    await prisma.studentclassroom.delete({
-        where: { classroomId_anonId: { classroomId: classId, anonId: targetAnon } },
+    const res = await prisma.studentclassroom.deleteMany({
+        where: { classroomId: classId, anonId: targetAnon },
     });
+    if (res.count === 0) return jsonErr("Member not found", 404);
 
     return jsonOk();
 }

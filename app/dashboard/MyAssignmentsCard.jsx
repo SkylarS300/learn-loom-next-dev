@@ -26,11 +26,13 @@ export default function MyAssignmentsCard() {
         return () => { dead = true; };
     }, []);
 
-    // Hide entirely for teacher-only accounts (API returns [])+  if (!loading && !err && items.length === 0) return null;
-    if (!loading && !err && items.length === 0) return null;
+    // Hide entirely for teacher-only accounts (API returns an empty list).
+    // IMPORTANT: Do not early-return before hooks — keep this check *after* all hooks.
 
     const dueSoon = useMemo(() => items.filter(i => i.bucket === "DUE_SOON"), [items]);
     const missing = useMemo(() => items.filter(i => i.bucket === "MISSING"), [items]);
+    if (!loading && !err && items.length === 0) return null;
+
 
     return (
         <section className={styles.card}>

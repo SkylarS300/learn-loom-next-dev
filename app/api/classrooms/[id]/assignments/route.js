@@ -99,8 +99,7 @@ export async function GET(req, ctx) {
 
 // POST: create assignment + targets
 export async function POST(req, { params }) {
-    const { id } = await ctx.params; // ✅
-    const num = Number(id);
+    const classId = Number((await params)?.id);
     if (!Number.isFinite(classId)) return jsonErr("Bad id", 400);
 
     const me = await getAnonId();

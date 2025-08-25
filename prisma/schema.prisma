@@ -142,6 +142,7 @@ model studentclassroom {
   @@index([studentId], map: "StudentClassroom_studentId_fkey")
   @@index([anonId])
   @@index([role])
+  @@unique([classroomId, anonId]) // enables where: { classroomId_anonId: { ... } }
 }
 
 model uploadedtext {
