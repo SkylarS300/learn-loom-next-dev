@@ -1,67 +1,57 @@
 // app/api/classrooms/[id]/assignments/me/route.js
+import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-import { getAnonId, jsonOk, jsonErr } from "@/app/api/_util/auth";
 
-export async function GET(req, ctx) {
-    const { id } = await ctx.params;
-    const classId = Number(id);
-    if (!Number.isFinite(classId)) return jsonErr("Bad id", 400);
+export async function GET(req, { params }) {
+    const cs = await cookies();
+    const me = cs.get("learnloomId")?.value;
+    if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const me = await getAnonId();
-    if (!me) return jsonErr("Unauthorized", 401);
+    const classId = Number(params?.id);
+    if (!Number.isFinite(classId)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
 
-    // Must be in class and not a teacher
+    // Must be a member of this classroom (student role for this feed)
     const member = await prisma.studentclassroom.findFirst({
         where: { classroomId: classId, anonId: me },
-        select: { role: true },
+        select: { role: true, classroom: { select: { name: true } } },
     });
-    if (!member) return jsonErr("Forbidden", 403);
-    if ((member.role || "student") === "teacher") return jsonErr("Forbidden", 403);
+    if (!member) return Response.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    if ((member.role || "student") === "teacher") {
+        // Teacher shouldn't see this feed
+        return Response.json({ ok: true, data: [] }, { headers: { "Cache-Control": "no-store" } });
+    }
 
     const url = new URL(req.url);
-    const horizonDays = Math.max(1, Number(url.searchParams.get("days") || 30));
     const now = new Date();
+    const horizonDays = Math.max(1, Number(url.searchParams.get("days") || 30));
     const to = new Date(now.getTime() + horizonDays * 86400000);
 
-    // class assignments targeted to me
+    // Assignments in this class targeting me (ALL or explicit)
     const asns = await prisma.assignment.findMany({
         where: {
             classroomId: classId,
-            OR: [
-                { targets: { some: { anonId: me } } },
-                { targets: { some: { anonId: null } } }, // ALL
-            ],
+            OR: [{ targets: { some: { anonId: me } } }, { targets: { some: { anonId: null } } }],
             OR: [{ dueDate: null }, { dueDate: { lte: to } }],
         },
         orderBy: { dueDate: "asc" },
         select: {
             id: true, classroomId: true, title: true, type: true, startAt: true, dueDate: true,
-            allowLate: true, latePenaltyPct: true, weightPoints: true,
-            category: true, subtopic: true, bookId: true, chapterIndex: true, uploadId: true,
+            allowLate: true, weightPoints: true, category: true, subtopic: true, bookId: true, chapterIndex: true, uploadId: true,
         },
     });
 
-    const comp = await prisma.assignmentcompletion.findMany({
-        where: { anonId: me, assignmentId: { in: asns.map((a) => a.id) } },
+    const comps = await prisma.assignmentcompletion.findMany({
+        where: { anonId: me, assignmentId: { in: asns.map(a => a.id) } },
         select: { assignmentId: true, status: true, scorePct: true, attemptCount: true, submittedAt: true, gradedAt: true, isLate: true },
     });
-    const compMap = new Map(comp.map((c) => [c.assignmentId, c]));
+    const compMap = new Map(comps.map(c => [c.assignmentId, c]));
 
-    const items = asns.map((a) => {
+    const items = asns.map(a => {
         const s = compMap.get(a.id) || null;
         const due = a.dueDate ? new Date(a.dueDate) : null;
         const status = s?.status || "ASSIGNED";
         const isMissing = due && now > due && !["SUBMITTED", "GRADED", "LATE"].includes(status);
-
-        let href = "#";
-        if (a.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex)) {
-            href = `/readingpal?bookIndex=${a.bookId}&chapterIndex=${a.chapterIndex}&from=assign:${a.id}`;
-        } else if (a.type === "QUIZ" && a.category) {
-            href = `/grammar?concept=${encodeURIComponent(a.category)}&subTopic=${encodeURIComponent(a.subtopic || "")}&start=1&from=assign:${a.id}`;
-        } else if (a.type === "UPLOAD" && Number.isInteger(a.uploadId)) {
-            href = `/uploads/${a.uploadId}?from=assign:${a.id}`;
-        }
-
+        const bucket = isMissing ? "MISSING" : (["SUBMITTED", "GRADED", "LATE"].includes(status) ? "COMPLETED" : "DUE_SOON");
         return {
             assignmentId: a.id,
             title: a.title,
@@ -71,10 +61,11 @@ export async function GET(req, ctx) {
             attemptCount: s?.attemptCount ?? 0,
             scorePct: s?.scorePct ?? "",
             isLate: s?.isLate ?? false,
-            bucket: isMissing ? "MISSING" : (["SUBMITTED", "GRADED", "LATE"].includes(status) ? "COMPLETED" : "DUE_SOON"),
-            href,
+            bucket,
+            classroomId: a.classroomId,
+            classroomName: member.classroom?.name || "Class",
         };
     });
 
-    return jsonOk(items);
+    return Response.json({ ok: true, data: items }, { headers: { "Cache-Control": "no-store" } });
 }

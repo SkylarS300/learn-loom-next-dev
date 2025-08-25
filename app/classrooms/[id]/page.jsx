@@ -756,7 +756,7 @@ function ClassAssignmentsList({ classId }) {
             <td style={{ padding: "8px 12px" }}>{i.type}</td>
             <td style={{ padding: "8px 12px" }}>{fmtMaybeDT(i.dueDate)}</td>
             <td style={{ padding: "8px 12px" }}>
-                <a className={styles.btnSecondary} href={`/assignments/me/${i.assignmentId}`}>Open</a>
+                <a className={styles.btnSecondary} href={`/assignments/${i.assignmentId}/me`}>Open</a>
             </td>
         </tr>
     );

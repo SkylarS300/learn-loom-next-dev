@@ -27,6 +27,7 @@ export default function MyAssignmentsCard() {
     }, []);
 
     // Hide entirely for teacher-only accounts (API returns [])+  if (!loading && !err && items.length === 0) return null;
+    if (!loading && !err && items.length === 0) return null;
 
     const dueSoon = useMemo(() => items.filter(i => i.bucket === "DUE_SOON"), [items]);
     const missing = useMemo(() => items.filter(i => i.bucket === "MISSING"), [items]);

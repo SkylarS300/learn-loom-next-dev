@@ -1,7 +1,7 @@
 // app/assignments/[aid]/me/page.jsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Navbar from "../../../Navbar";
 import styles from "../../../dashboard/Dashboard.module.css";
@@ -39,12 +39,12 @@ export default function AssignmentMePage() {
             const r = await fetch(`/api/assignments/${id}/me`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action }),
+                body: JSON.stringify({ action: String(action).toLowerCase() }),
             });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Failed");
             setData(prev => prev ? { ...prev, me: { ...prev.me, ...j.data } } : prev);
-            toast(action === "UNSUBMIT" ? "Unsubmitted" : "Submitted");
+            toast(String(action).toLowerCase() === "unsubmit" ? "Unsubmitted" : "Submitted");
         } catch (e) {
             toast(e.message || "Failed", true);
         } finally {
@@ -54,7 +54,16 @@ export default function AssignmentMePage() {
 
     const a = data?.assignment;
     const me = data?.me;
-    const perms = data?.permissions;
+    // Compute simple permissions client-side
+    const perms = useMemo(() => {
+        if (!a || !me) return { canSubmit: false, canUnsubmit: false };
+        const now = Date.now();
+        const afterStart = !a.startAt || new Date(a.startAt).getTime() <= now;
+        const beforeDueOrAllowed = !a.dueDate || new Date(a.dueDate).getTime() >= now || !!a.allowLate;
+        const canSubmit = me.status !== "SUBMITTED" && afterStart && beforeDueOrAllowed;
+        const canUnsubmit = me.status === "SUBMITTED" && !me.gradedAt;
+        return { canSubmit, canUnsubmit };
+    }, [a, me]);
 
     return (
         <>
@@ -100,12 +109,16 @@ export default function AssignmentMePage() {
 
                         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                             {perms?.canSubmit && me.status !== "SUBMITTED" && (
-                                <button className={styles.btn} onClick={() => act(me.status === "ASSIGNED" ? "SUBMIT" : "RESUBMIT")} disabled={saving}>
+                                <button
+                                    className={styles.btn}
+                                    onClick={() => act(me.status === "ASSIGNED" ? "submit" : "resubmit")}
+                                    disabled={saving}
+                                >
                                     {saving ? "Saving…" : me.status === "ASSIGNED" ? "Submit" : "Resubmit"}
                                 </button>
                             )}
                             {perms?.canUnsubmit && (
-                                <button className={styles.btnSecondary} onClick={() => act("UNSUBMIT")} disabled={saving}>
+                                <button className={styles.btnSecondary} onClick={() => act("unsubmit")} disabled={saving}>
                                     {saving ? "Saving…" : "Unsubmit"}
                                 </button>
                             )}
