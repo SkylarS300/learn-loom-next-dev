@@ -396,6 +396,11 @@ export default function AssignmentDetailPage() {
                                                             <MiniChip>{r.lastQuizScore != null ? `${r.lastQuizScore}%` : "—"}</MiniChip>
                                                             {r.quizAttemptedAt ? <MiniChip tone="info">{fmtShort(r.quizAttemptedAt)}</MiniChip> : null}
                                                         </div>
+                                                    ) : a?.type === "UPLOAD" ? (
+                                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                                            <MiniChip>{r.uploadTimeMs != null ? `${msToMin(r.uploadTimeMs)} min` : "—"}</MiniChip>
+                                                            {Number.isFinite(r.uploadParaIndex) ? <MiniChip tone="info">Para {r.uploadParaIndex}</MiniChip> : null}
+                                                        </div>
                                                     ) : (
                                                         <span className={styles.dim}>—</span>
                                                     )}

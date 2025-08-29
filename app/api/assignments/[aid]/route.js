@@ -66,6 +66,7 @@ export async function GET(_req, ctx) {
 
     let bookProgByAnon: Map<string, { timeMs: number; completedAt: string | null }> | null = null;
     let quizProgByAnon: Map<string, { lastScore: number | null; attemptedAt: string | null }> | null = null;
+    let uploadProgByAnon: Map<string, { timeMs: number | null; paraIndex: number | null; updatedAt: string | null }> | null = null;
 
     if (a.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex) && targetedIds.length) {
         const prog = await prisma.readingprogress.findMany({
@@ -99,6 +100,41 @@ export async function GET(_req, ctx) {
             }
         }
     }
+    if (a.type === "UPLOAD" && Number.isInteger(a.uploadId) && targetedIds.length) {
+        // Pull each student's current progress on this upload
+        try {
+            const ups = await prisma.uploadprogress.findMany({
+                where: {
+                    anonId: { in: targetedIds },
+                    uploadId: Number(a.uploadId),
+                },
+                select: { anonId: true, paraIndex: true, timeMs: true, updatedAt: true },
+            });
+            uploadProgByAnon = new Map(
+                ups.map(u => [u.anonId!, {
+                    timeMs: (u as any).timeMs ?? null,
+                    paraIndex: u.paraIndex ?? null,
+                    updatedAt: u.updatedAt?.toISOString?.() ?? null,
+                }])
+            );
+        } catch {
+            // legacy (no timeMs)
+            const ups = await prisma.uploadprogress.findMany({
+                where: {
+                    anonId: { in: targetedIds },
+                    uploadId: Number(a.uploadId),
+                },
+                select: { anonId: true, paraIndex: true, updatedAt: true },
+            });
+            uploadProgByAnon = new Map(
+                ups.map(u => [u.anonId!, {
+                    timeMs: null,
+                    paraIndex: u.paraIndex ?? null,
+                    updatedAt: u.updatedAt?.toISOString?.() ?? null,
+                }])
+            );
+        }
+    }
 
     const table = roster
         .filter(r => targetedSet.has(r.anonId))
@@ -106,6 +142,7 @@ export async function GET(_req, ctx) {
             const s = subMap.get(r.anonId) || null;
             const bp = bookProgByAnon?.get(r.anonId) || null;
             const qp = quizProgByAnon?.get(r.anonId) || null;
+            const up = uploadProgByAnon?.get(r.anonId) || null;
             return {
                 anonId: r.anonId,
                 displayName: r.displayName || "",
@@ -119,6 +156,9 @@ export async function GET(_req, ctx) {
                 chapterCompletedAt: bp?.completedAt ?? null,
                 lastQuizScore: qp?.lastScore ?? null,
                 quizAttemptedAt: qp?.attemptedAt ?? null,
+                uploadTimeMs: up?.timeMs ?? null,
+                uploadParaIndex: up?.paraIndex ?? null,
+                uploadUpdatedAt: up?.updatedAt ?? null,
             };
         });
 

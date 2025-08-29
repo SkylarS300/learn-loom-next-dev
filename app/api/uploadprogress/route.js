@@ -3,6 +3,12 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { jsonErr } from "@/app/api/_util/auth";
 
+// Guardrails (match the spirit of reading/quiz protections)
+const MIN_UPLOAD_TIME_MS = 120_000; // 2 minutes cumulative reading time
+const MIN_UPLOAD_PARA_INDEX = 3;    // or reaching at least paragraph 3
+const SLICE_MAX_MS = 60_000;        // cap per-slice increments to avoid runaway
+
+
 export async function POST(req) {
     try {
         const cookieStore = await cookies();
@@ -20,6 +26,8 @@ export async function POST(req) {
             return jsonErr("Invalid request", 422, { issues: parsed.error.issues });
         }
         const { uploadId, paraIndex = 0, charOffset = 0, deltaTimeMs = 0 } = parsed.data;
+        // cap single-slice time to keep background tabs from inflating totals
+        const dt = Math.min(SLICE_MAX_MS, Math.max(0, Number(deltaTimeMs) || 0));
 
         try {
             await prisma.uploadprogress.upsert({
@@ -28,14 +36,14 @@ export async function POST(req) {
                     paraIndex: Number(paraIndex),
                     charOffset: Number(charOffset),
                     // if schema has timeMs, increment it; if not, this throws and we fall back
-                    ...(deltaTimeMs ? { timeMs: { increment: Math.max(0, Number(deltaTimeMs)) } } : {}),
+                    ...(dt ? { timeMs: { increment: dt } } : {}),
                 },
                 create: {
                     anonId,
                     uploadId: Number(uploadId),
                     paraIndex: Number(paraIndex),
                     charOffset: Number(charOffset),
-                    ...(deltaTimeMs ? { timeMs: Math.max(0, Number(deltaTimeMs)) } : {}),
+                    ...(dt ? { timeMs: { increment: dt } } : {}),
                 },
             });
         } catch {
@@ -47,8 +55,30 @@ export async function POST(req) {
             });
         }
 
-        // Completion hook (UPLOAD)
+
+        // Pull current cumulative progress to decide whether to auto-complete
+        let prog = null;
         try {
+            prog = await prisma.uploadprogress.findUnique({
+                where: { anonId_uploadId: { anonId, uploadId: Number(uploadId) } },
+                select: { paraIndex: true, timeMs: true },
+            });
+        } catch {
+            // legacy table (no timeMs)
+            prog = await prisma.uploadprogress.findUnique({
+                where: { anonId_uploadId: { anonId, uploadId: Number(uploadId) } },
+                select: { paraIndex: true },
+            });
+        }
+        const pIdx = Number(prog?.paraIndex ?? 0);
+        const tMs = Number(prog?.timeMs ?? 0);
+        const qualifies = (tMs >= MIN_UPLOAD_TIME_MS) || (pIdx >= MIN_UPLOAD_PARA_INDEX);
+
+        // Completion hook (UPLOAD) — only if it qualifies
+        try {
+            if (!qualifies) {
+                return new Response(null, { status: 200 });
+            }
             const memberships = await prisma.studentclassroom.findMany({
                 where: { anonId, role: { not: "teacher" } },
                 select: { classroomId: true },
