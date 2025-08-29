@@ -115,7 +115,11 @@ export default function StudentAssignmentsIndex() {
                                         </tr>
                                     ))}
                                     {view.length === 0 && (
-                                        <tr><td style={td} colSpan={7} className={styles.dim}>No assignments.</td></tr>
+                                        <tr>
+                                            <td style={td} colSpan={7} className={styles.dim}>
+                                                {tab === "MISSING" ? "No missing assignments. 🎉" : "No assignments in this view."}
+                                            </td>
+                                        </tr>
                                     )}
                                 </tbody>
                             </table>

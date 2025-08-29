@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
+// Tunable guard to reduce “instant completions”
+const MIN_CHAPTER_TIME_MS = 45_000; // 45s; conservative and user-friendly
+
 export async function POST(req) {
   let body = {};
   try {
@@ -67,7 +70,15 @@ export async function POST(req) {
       },
     });
 
-    // Completion hook (BOOK)
+    // Completion hook (BOOK) — fire only when:
+    //  A) the client signals chapterCompleted === true, AND
+    //  B) cumulative time on this chapter meets a small minimum threshold
+    const meetsTime = (row?.timeMs || 0) >= MIN_CHAPTER_TIME_MS;
+    if (!chapterCompleted || !meetsTime) {
+      return NextResponse.json({ ok: true, data: row });
+    }
+
+    // If we pass both checks, sync completions for any targeted BOOK assignments.
     try {
       const memberships = await prisma.studentclassroom.findMany({
         where: { anonId, role: { not: "teacher" } },
@@ -137,7 +148,11 @@ export async function POST(req) {
         update: chapterCompleted ? { completedAt: new Date() } : {}, // legacy-safe
       });
 
-      // legacy branch: still run completion hook
+      // legacy branch: still run completion hook,
+      // but require explicit chapterCompleted (no timeMs column here)
+      if (!chapterCompleted) {
+        return NextResponse.json({ ok: true, data: row, note: "legacy-progress" });
+      }
       try {
         const memberships = await prisma.studentclassroom.findMany({
           where: { anonId, role: { not: "teacher" } },

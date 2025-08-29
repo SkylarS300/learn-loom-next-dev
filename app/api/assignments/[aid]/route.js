@@ -60,11 +60,52 @@ export async function GET(_req, ctx) {
 
     const targetedAll = a.targets.some(t => t.anonId == null);
     const targetedSet = targetedAll ? new Set(roster.map(r => r.anonId)) : new Set(a.targets.map(t => t.anonId));
+    const targetedIds = Array.from(targetedSet);
+
+    // Preload per-student progress details for this assignment
+
+    let bookProgByAnon: Map<string, { timeMs: number; completedAt: string | null }> | null = null;
+    let quizProgByAnon: Map<string, { lastScore: number | null; attemptedAt: string | null }> | null = null;
+
+    if (a.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex) && targetedIds.length) {
+        const prog = await prisma.readingprogress.findMany({
+            where: {
+                anonId: { in: targetedIds },
+                bookIndex: Number(a.bookId),
+                chapterIndex: Number(a.chapterIndex),
+            },
+            select: { anonId: true, timeMs: true, completedAt: true },
+        });
+        bookProgByAnon = new Map(
+            prog.map(p => [p.anonId!, { timeMs: p.timeMs ?? 0, completedAt: p.completedAt?.toISOString?.() ?? null }])
+        );
+    }
+    if (a.type === "QUIZ" && a.category && targetedIds.length) {
+        // Get the latest attempt per anonId (match concept + optional subtopic)
+        const attempts = await prisma.grammarprogress.findMany({
+            where: {
+                anonId: { in: targetedIds },
+                concept: a.category,
+                ...(a.subtopic ? { subTopic: a.subtopic } : {}),
+            },
+            orderBy: { createdAt: "desc" },
+            select: { anonId: true, score: true, createdAt: true },
+        });
+        // Keep only the latest per anonId
+        quizProgByAnon = new Map();
+        for (const att of attempts) {
+            if (!quizProgByAnon.has(att.anonId!)) {
+                quizProgByAnon.set(att.anonId!, { lastScore: att.score ?? null, attemptedAt: att.createdAt?.toISOString?.() ?? null });
+            }
+        }
+    }
 
     const table = roster
         .filter(r => targetedSet.has(r.anonId))
         .map(r => {
             const s = subMap.get(r.anonId) || null;
+            const bp = bookProgByAnon?.get(r.anonId) || null;
+            const qp = quizProgByAnon?.get(r.anonId) || null;
             return {
                 anonId: r.anonId,
                 displayName: r.displayName || "",
@@ -73,6 +114,11 @@ export async function GET(_req, ctx) {
                 scorePct: s?.scorePct ?? "",
                 submittedAt: s?.submittedAt || "",
                 gradedAt: s?.gradedAt || "",
+                // New progressive detail fields (optional; null-safe on UI)
+                readTimeMs: bp?.timeMs ?? null,
+                chapterCompletedAt: bp?.completedAt ?? null,
+                lastQuizScore: qp?.lastScore ?? null,
+                quizAttemptedAt: qp?.attemptedAt ?? null,
             };
         });
 

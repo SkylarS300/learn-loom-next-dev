@@ -361,6 +361,7 @@ export default function AssignmentDetailPage() {
                                         <th style={th}>Score</th>
                                         <th style={th}>Submitted</th>
                                         <th style={th}>Graded</th>
+                                        <th style={th}>Progress</th>
                                         <th style={th}>Action</th>
                                     </tr>
                                 </thead>
@@ -384,6 +385,21 @@ export default function AssignmentDetailPage() {
                                                 <td style={td}>{r.scorePct !== "" && r.scorePct != null ? `${r.scorePct}%` : "—"}</td>
                                                 <td style={td}>{fmtMaybe(r.submittedAt)}</td>
                                                 <td style={td}>{fmtMaybe(r.gradedAt)}</td>
+                                                <td style={td}>
+                                                    {a?.type === "BOOK" ? (
+                                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                                            <MiniChip>{msToMin(r.readTimeMs)} min</MiniChip>
+                                                            {r.chapterCompletedAt ? <MiniChip tone="ok">Completed</MiniChip> : null}
+                                                        </div>
+                                                    ) : a?.type === "QUIZ" ? (
+                                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                                            <MiniChip>{r.lastQuizScore != null ? `${r.lastQuizScore}%` : "—"}</MiniChip>
+                                                            {r.quizAttemptedAt ? <MiniChip tone="info">{fmtShort(r.quizAttemptedAt)}</MiniChip> : null}
+                                                        </div>
+                                                    ) : (
+                                                        <span className={styles.dim}>—</span>
+                                                    )}
+                                                </td>
                                                 <td style={td}>
                                                     <button className={styles.btnSecondary} onClick={() => openGrade(r)}>Grade</button>
                                                 </td>
@@ -601,6 +617,26 @@ function fmtMaybe(v) {
     const iso = typeof v === "string" ? v : v?.toString?.();
     return fmtDateTime(iso);
 }
+function fmtShort(iso) {
+    try {
+        const d = new Date(iso);
+        return new Intl.DateTimeFormat(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
+    } catch { return iso; }
+}
+function msToMin(ms) {
+    if (!Number.isFinite(ms)) return "0";
+    return Math.max(0, Math.round(ms / 60000));
+}
+function MiniChip({ children, tone }) {
+    const map = {
+        ok: { bg: "#ecfdf5", color: "#065f46", border: "#d1fae5" },
+        info: { bg: "#eef2ff", color: "#3730a3", border: "#e5e7eb" },
+        default: { bg: "#f3f4f6", color: "#374151", border: "#e5e7eb" },
+    };
+    const v = map[tone || "default"];
+    return <span style={{ background: v.bg, color: v.color, border: `1px solid ${v.border}`, borderRadius: 999, padding: "1px 6px", fontSize: 11 }}>{children}</span>;
+}
+
 function demoPayload() {
     const now = new Date();
     const start = new Date(now.getTime() - 2 * 86400000);
