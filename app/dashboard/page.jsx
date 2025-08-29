@@ -162,7 +162,7 @@ export default function DashboardPage() {
         </section>
 
         {/* Student assignments */}
-        <section className={styles.sectionTight}>
+        <section className={styles.sectionTight} aria-label="My assignments for students">
           <MyAssignmentsCard />
         </section>
 

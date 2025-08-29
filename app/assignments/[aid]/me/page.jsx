@@ -108,6 +108,12 @@ export default function AssignmentMePage() {
                         ) : null}
 
                         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                            {/* Consistent “Open assignment” CTA */}
+                            {a && (
+                                <a href={deepHref(a)} className={styles.btnSecondary}>
+                                    {a.type === "BOOK" ? "Open reading" : a.type === "QUIZ" ? "Open quiz" : "Open upload"}
+                                </a>
+                            )}
                             {perms?.canSubmit && me.status !== "SUBMITTED" && (
                                 <button
                                     className={styles.btn}
@@ -164,4 +170,19 @@ function toast(msg, danger = false) {
     });
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1200);
+}
+
+// Build the same deep link patterns used in the dashboard/API
+function deepHref(a) {
+    if (a?.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex)) {
+        return `/readingpal?bookIndex=${a.bookId}&chapterIndex=${a.chapterIndex}&from=assign:${a.id}`;
+    }
+    if (a?.type === "QUIZ" && a.category) {
+        const sub = a.subtopic ? `&subTopic=${encodeURIComponent(a.subtopic)}` : "";
+        return `/grammar?concept=${encodeURIComponent(a.category)}${sub}&start=1&from=assign:${a.id}`;
+    }
+    if (a?.type === "UPLOAD" && Number.isInteger(a.uploadId)) {
+        return `/uploads/${a.uploadId}?from=assign:${a.id}`;
+    }
+    return "#";
 }
