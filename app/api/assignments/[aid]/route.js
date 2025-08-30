@@ -64,9 +64,9 @@ export async function GET(_req, ctx) {
 
     // Preload per-student progress details for this assignment
 
-    let bookProgByAnon: Map<string, { timeMs: number; completedAt: string | null }> | null = null;
-    let quizProgByAnon: Map<string, { lastScore: number | null; attemptedAt: string | null }> | null = null;
-    let uploadProgByAnon: Map<string, { timeMs: number | null; paraIndex: number | null; updatedAt: string | null }> | null = null;
+    let bookProgByAnon = null;
+    let quizProgByAnon = null;
+    let uploadProgByAnon = null;
 
     if (a.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex) && targetedIds.length) {
         const prog = await prisma.readingprogress.findMany({
@@ -78,7 +78,7 @@ export async function GET(_req, ctx) {
             select: { anonId: true, timeMs: true, completedAt: true },
         });
         bookProgByAnon = new Map(
-            prog.map(p => [p.anonId!, { timeMs: p.timeMs ?? 0, completedAt: p.completedAt?.toISOString?.() ?? null }])
+            prog.map(p => [(p.anonId || ""), { timeMs: p.timeMs ?? 0, completedAt: p.completedAt?.toISOString?.() ?? null }])
         );
     }
     if (a.type === "QUIZ" && a.category && targetedIds.length) {
@@ -95,8 +95,9 @@ export async function GET(_req, ctx) {
         // Keep only the latest per anonId
         quizProgByAnon = new Map();
         for (const att of attempts) {
-            if (!quizProgByAnon.has(att.anonId!)) {
-                quizProgByAnon.set(att.anonId!, { lastScore: att.score ?? null, attemptedAt: att.createdAt?.toISOString?.() ?? null });
+            const key = att.anonId || "";
+            if (!quizProgByAnon.has(key)) {
+                quizProgByAnon.set(key, { lastScore: att.score ?? null, attemptedAt: att.createdAt?.toISOString?.() ?? null });
             }
         }
     }
@@ -111,8 +112,8 @@ export async function GET(_req, ctx) {
                 select: { anonId: true, paraIndex: true, timeMs: true, updatedAt: true },
             });
             uploadProgByAnon = new Map(
-                ups.map(u => [u.anonId!, {
-                    timeMs: (u as any).timeMs ?? null,
+                ups.map(u => [(u.anonId || ""), {
+                    timeMs: u.timeMs ?? null,
                     paraIndex: u.paraIndex ?? null,
                     updatedAt: u.updatedAt?.toISOString?.() ?? null,
                 }])
@@ -127,7 +128,7 @@ export async function GET(_req, ctx) {
                 select: { anonId: true, paraIndex: true, updatedAt: true },
             });
             uploadProgByAnon = new Map(
-                ups.map(u => [u.anonId!, {
+                ups.map(u => [(u.anonId || ""), {
                     timeMs: null,
                     paraIndex: u.paraIndex ?? null,
                     updatedAt: u.updatedAt?.toISOString?.() ?? null,

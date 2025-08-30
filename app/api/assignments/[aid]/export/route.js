@@ -60,9 +60,52 @@ export async function GET(_req, { params }) {
     const targetedAll = a.targets.some(t => t.anonId == null);
     const targetedSet = targetedAll ? new Set(roster.map(r => r.anonId)) : new Set(a.targets.map(t => t.anonId));
 
-    const headers = ["assignmentId", "anonId", "displayName", "status", "attemptCount", "bestScorePct", "lastAttemptAt", "lateApplied", "notes"];
+    // Optionally load UPLOAD progress so we can include minutes + farthest paragraph
+    let uploadByAnon = new Map();
+    if (a.type === "UPLOAD") {
+        const targeted = Array.from(targetedSet);
+        try {
+            const ups = await prisma.uploadprogress.findMany({
+                where: { anonId: { in: targeted }, uploadId: auth.a.id ? undefined : undefined }, // leave as-is; we don't know uploadId here
+            });
+        } catch { /* ignore; fallback below */ }
+    }
+    // We need the uploadId to query correctly; fetch from assignment when type=UPLOAD
+    if (a.type === "UPLOAD") {
+        const assign = await prisma.assignment.findUnique({
+            where: { id: aid },
+            select: { uploadId: true },
+        });
+        if (assign?.uploadId != null) {
+            try {
+                const ups = await prisma.uploadprogress.findMany({
+                    where: {
+                        anonId: { in: Array.from(targetedSet) },
+                        uploadId: Number(assign.uploadId),
+                    },
+                    select: { anonId: true, timeMs: true, paraIndex: true, updatedAt: true },
+                });
+                uploadByAnon = new Map(ups.map(u => [u.anonId, { timeMs: u.timeMs ?? null, paraIndex: u.paraIndex ?? null }]));
+            } catch {
+                // legacy (no timeMs)
+                const ups = await prisma.uploadprogress.findMany({
+                    where: {
+                        anonId: { in: Array.from(targetedSet) },
+                        uploadId: Number(assign.uploadId),
+                    },
+                    select: { anonId: true, paraIndex: true },
+                });
+                uploadByAnon = new Map(ups.map(u => [u.anonId, { timeMs: null, paraIndex: u.paraIndex ?? null }]));
+            }
+        }
+    }
+
+    const headers = ["assignmentId", "anonId", "displayName", "status", "attemptCount", "bestScorePct", "lastAttemptAt", "lateApplied", "uploadMinutes", "uploadPara", "notes"];
     const rows = Array.from(targetedSet).map(anonId => {
         const s = subsMap.get(anonId) || null;
+        const up = uploadByAnon.get(anonId) || null;
+        const uploadMinutes = up?.timeMs != null ? Math.max(0, Math.round((up.timeMs || 0) / 60000)) : "";
+        const uploadPara = Number.isFinite(up?.paraIndex) ? up?.paraIndex : "";
         return {
             assignmentId: a.id,
             anonId,
@@ -72,6 +115,8 @@ export async function GET(_req, { params }) {
             bestScorePct: s?.scorePct ?? "",
             lastAttemptAt: s?.gradedAt?.toISOString?.() || s?.submittedAt?.toISOString?.() || "",
             lateApplied: s?.isLate ? "1" : "0",
+            uploadMinutes,
+            uploadPara,
             notes: "",
         };
     });
