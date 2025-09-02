@@ -1,15 +1,18 @@
 // app/classrooms/[id]/student/[anonId]/page.jsx
 "use client";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Navbar from "../../../../Navbar";
 import styles from "../../../../dashboard/Dashboard.module.css";
 const LineCard = dynamic(() => import("../../../../dashboard/_charts/LineCard"), { ssr: false });
 
-export default function StudentDrill({ params }) {
-    const { id } = await ctx.params; // ✅
-    const num = Number(id);
-    const anonId = decodeURIComponent(params?.anonId || "");
+export default function StudentDrill() {
+    const params = useParams(); // { id: string, anonId: string }
+    const idParam = Array.isArray(params?.id) ? params.id[0] : params?.id;
+    const anonParam = Array.isArray(params?.anonId) ? params.anonId[0] : params?.anonId;
+    const num = Number(idParam);
+    const anonId = decodeURIComponent(anonParam || "");
     const [m, setM] = useState(null);
     const [err, setErr] = useState("");
 
