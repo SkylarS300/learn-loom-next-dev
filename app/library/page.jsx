@@ -178,6 +178,13 @@ export default function LibraryPage() {
       setLoadingMore(false);
     }
   }
+  // Normalize API payloads that might be: array | {data: array} | null
+  function toArray(maybe) {
+    if (Array.isArray(maybe)) return maybe;
+    if (maybe && Array.isArray(maybe.data)) return maybe.data;
+    return [];
+  }
+
 
   const filtered = useMemo(() => {
     const curated = books.map((b, i) => ({
@@ -191,13 +198,13 @@ export default function LibraryPage() {
     const uploadsArr = Array.isArray(uploads)
       ? uploads
       : (Array.isArray(uploads?.data) ? uploads.data : []);
-    const ups = uploadsArr.map((u) => ({
+    const ups = toArray(uploads).map((u) => ({
       kind: "upload",
       id: u.id,
       title: u.title,
       locked: !!u.locked,
     }));
-    const comm = (community || []).map((u) => ({
+    const comm = toArray(community).map((u) => ({
       id: u.id,
       title: u.title,
       locked: !!u.locked,
