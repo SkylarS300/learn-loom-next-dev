@@ -84,7 +84,7 @@ export default function AssignmentDetailPage() {
             status: r.status || "ASSIGNED",
             scorePct: r.scorePct === "" || r.scorePct == null ? "" : String(r.scorePct),
             scorePoints: "",
-            feedback: "",
+            feedback: r.feedback || "",           // ← prefill existing private comment
             isLate: r.status === "LATE" ? true : false,
         });
     }
@@ -124,6 +124,7 @@ export default function AssignmentDetailPage() {
                             status: j.data.status || grading.status,
                             scorePct: j.data.scorePct ?? row.scorePct,
                             gradedAt: j.data.gradedAt || new Date().toISOString(),
+                            feedback: j.data.feedback ?? grading.feedback ?? row.feedback, // ← keep table in sync
                         }
                         : row
                 );
@@ -211,6 +212,7 @@ export default function AssignmentDetailPage() {
                                 status: j.data.status || kind,
                                 scorePct: j.data.scorePct ?? (kind === "GRADED" ? scoreVal ?? row.scorePct : row.scorePct),
                                 gradedAt: (kind === "GRADED" ? (j.data.gradedAt || new Date().toISOString()) : row.gradedAt),
+                                feedback: j.data.feedback ?? feedback ?? row.feedback, // ← sync bulk feedback
                             }
                             : row
                     );
@@ -362,6 +364,7 @@ export default function AssignmentDetailPage() {
                                         <th style={th}>Submitted</th>
                                         <th style={th}>Graded</th>
                                         <th style={th}>Progress</th>
+                                        <th style={th}>Private comment</th> {/* ← new column */}
                                         <th style={th}>Action</th>
                                     </tr>
                                 </thead>
@@ -406,13 +409,18 @@ export default function AssignmentDetailPage() {
                                                     )}
                                                 </td>
                                                 <td style={td}>
+                                                    {r.feedback
+                                                        ? <span title={r.feedback} style={{ display: "inline-block", maxWidth: 260, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.feedback}</span>
+                                                        : <span className={styles.dim}>—</span>}
+                                                </td>
+                                                <td style={td}>
                                                     <button className={styles.btnSecondary} onClick={() => openGrade(r)}>Grade</button>
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     {viewRows.length === 0 && (
-                                        <tr><td style={td} colSpan={9} className={styles.dim}>No matching students.</td></tr>
+                                        <tr><td style={td} colSpan={11} className={styles.dim}>No matching students.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -665,9 +673,9 @@ function demoPayload() {
             createdAt: start.toISOString(),
         },
         students: [
-            { anonId: "anon_ALEX_01", displayName: "Alex", status: "GRADED", attemptCount: 2, scorePct: 88, submittedAt: now.toISOString(), gradedAt: now.toISOString() },
-            { anonId: "anon_BLAIR_02", displayName: "Blair", status: "SUBMITTED", attemptCount: 1, scorePct: 72, submittedAt: now.toISOString(), gradedAt: "" },
-            { anonId: "anon_CASEY_03", displayName: "Casey", status: "ASSIGNED", attemptCount: 0, scorePct: "", submittedAt: "", gradedAt: "" },
+            { anonId: "anon_ALEX_01", displayName: "Alex", status: "GRADED", attemptCount: 2, scorePct: 88, submittedAt: now.toISOString(), gradedAt: now.toISOString(), feedback: "Nice improvement!" },
+            { anonId: "anon_BLAIR_02", displayName: "Blair", status: "SUBMITTED", attemptCount: 1, scorePct: 72, submittedAt: now.toISOString(), gradedAt: "", feedback: "" },
+            { anonId: "anon_CASEY_03", displayName: "Casey", status: "ASSIGNED", attemptCount: 0, scorePct: "", submittedAt: "", gradedAt: "", feedback: "" },
         ],
     };
 }

@@ -1,4 +1,4 @@
-//app/assignments/page.jsx
+// app/assignments/page.jsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -99,20 +99,30 @@ export default function StudentAssignmentsIndex() {
                                 </thead>
                                 <tbody>
                                     {view.map(a => (
-                                        <tr key={a.assignmentId} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                                            <td style={td}><strong>{a.title}</strong></td>
-                                            <td style={td}>{a.classroomName}</td>
-                                            <td style={td}><Chip>{typeLabel(a.type)}</Chip></td>
-                                            <td style={td}>
-                                                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                                                    <Chip tone={toneOfStatus(a.status)}>{labelOfStatus(a.status)}</Chip>
-                                                    {a.isLate && <Chip tone="warn">Late</Chip>}
-                                                </div>
-                                            </td>
-                                            <td style={td}>{a.scorePct !== "" && a.scorePct != null ? `${a.scorePct}%` : "—"}</td>
-                                            <td style={td}>{a.dueDate ? fmtDateTime(a.dueDate) : "—"}</td>
-                                            <td style={td}><a href={a.href} className={styles.btnSecondary}>Open</a></td>
-                                        </tr>
+                                        <>
+                                            <tr key={`${a.assignmentId}-main`} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                                <td style={td}><strong>{a.title}</strong></td>
+                                                <td style={td}>{a.classroomName}</td>
+                                                <td style={td}><Chip>{typeLabel(a.type)}</Chip></td>
+                                                <td style={td}>
+                                                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                                                        <Chip tone={toneOfStatus(a.status)}>{labelOfStatus(a.status)}</Chip>
+                                                        {a.isLate && <Chip tone="warn">Late</Chip>}
+                                                    </div>
+                                                </td>
+                                                <td style={td}>{a.scorePct !== "" && a.scorePct != null ? `${a.scorePct}%` : "—"}</td>
+                                                <td style={td}>{a.dueDate ? fmtDateTime(a.dueDate) : "—"}</td>
+                                                <td style={td}><a href={a.href} className={styles.btnSecondary}>Open</a></td>
+                                            </tr>
+                                            {a.myFeedback && (
+                                                <tr key={`${a.assignmentId}-fb`} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                                    <td style={{ ...td, background: "#f9fafb" }} colSpan={7}>
+                                                        <strong>Private comment:</strong>{" "}
+                                                        <span>{a.myFeedback}</span>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
                                     ))}
                                     {view.length === 0 && (
                                         <tr>

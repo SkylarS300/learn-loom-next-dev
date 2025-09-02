@@ -233,7 +233,14 @@ export async function PATCH(req, ctx) {
             isLate: !!isLate || status === "LATE",
             gradedAt: now,
         },
-        select: { anonId: true, status: true, scorePct: true, scorePoints: true, gradedAt: true, feedback: true, isLate: true },
+        anonId: true,
+        status: true,
+        attemptCount: true,
+        scorePct: true,
+        gradedAt: true,
+        submittedAt: true,
+        isLate: true,
+        feedback: true,        // ← include private teacher comment
     });
 
     return jsonOk(updated);

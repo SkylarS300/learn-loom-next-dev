@@ -43,7 +43,16 @@ export async function GET(req, ctx) {
 
     const comps = await prisma.assignmentcompletion.findMany({
         where: { anonId: me, assignmentId: { in: asns.map(a => a.id) } },
-        select: { assignmentId: true, status: true, scorePct: true, attemptCount: true, submittedAt: true, gradedAt: true, isLate: true, feedback: true },
+        select: {
+            assignmentId: true,
+            status: true,
+            scorePct: true,
+            attemptCount: true,
+            submittedAt: true,
+            gradedAt: true,
+            isLate: true,
+            feedback: true,      // ← include my private comment
+        },
     });
     const compMap = new Map(comps.map(c => [c.assignmentId, c]));
 
@@ -62,7 +71,7 @@ export async function GET(req, ctx) {
             attemptCount: s?.attemptCount ?? 0,
             scorePct: s?.scorePct ?? "",
             isLate: s?.isLate ?? false,
-            feedback: s?.feedback ?? null, // student can now see teacher's private comment for them
+            myFeedback: s?.feedback ?? null,   // ← so student UI can show it
             bucket,
             classroomId: a.classroomId,
             classroomName: member.classroom?.name || "Class",
