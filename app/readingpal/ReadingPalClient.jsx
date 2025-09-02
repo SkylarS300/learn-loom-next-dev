@@ -131,6 +131,7 @@ export default function ReadingPalClient() {
   const postTimerRef = useRef(null);
 
   const highlightedColorRef = useRef("yellow");
+  const hlColorKey = `rpHighlightColor:${anonId || "anon"}`;
 
   // fire-and-forget ping (uses sendBeacon when available)
   function livePing(mode = "reading") {
@@ -232,17 +233,30 @@ export default function ReadingPalClient() {
 
   /* ---------- voices + prefs ---------- */
   useEffect(() => {
-    function loadVoices() {
+    async function ensureVoicesReady() {
+      const ss = window.speechSynthesis;
+      // Wait briefly for Chrome to populate voices after first interaction
+      for (let i = 0; i < 20; i++) {
+        const v = ss.getVoices();
+        if (v.length) return v;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return ss.getVoices();
+    }
+
+    async function loadVoices() {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
         toast("⚠️ Text‑to‑speech is not available in this browser.");
         return;
       }
-      const v = window.speechSynthesis.getVoices();
+      const v = await ensureVoicesReady();
       if (v.length) {
         setVoices(v);
-        setSelectedVoice(
-          v.find((vv) => vv.lang?.startsWith("en") && vv.name?.includes("Female")) || v[0]
-        );
+        // Respect stored voice if available; else pick a sensible default
+        const p = loadPrefs(anonId);
+        const byPref = p?.voiceName ? v.find((vv) => vv.name === p.voiceName) : null;
+        const fallback = v.find((vv) => vv.lang?.startsWith("en") && vv.name?.includes("Female")) || v[0];
+        setSelectedVoice(byPref || fallback || null);
       }
     }
     loadVoices();
@@ -257,6 +271,11 @@ export default function ReadingPalClient() {
       if (typeof p.volume === "number") setVolume(p.volume);
       if (typeof p.autoAdvance === "boolean") setAutoAdvance(p.autoAdvance);
     }
+    // Highlight color (polish): restore last picked color
+    try {
+      const savedColor = localStorage.getItem(hlColorKey);
+      if (savedColor) highlightedColorRef.current = savedColor;
+    } catch { }
     return () => {
       if (ss) ss.onvoiceschanged = prev || null;
     };
@@ -333,9 +352,13 @@ export default function ReadingPalClient() {
   // reselect voice by name if prefs had it
   useEffect(() => {
     const p = loadPrefs(anonId);
-    if (!p?.voiceName || !voices.length) return;
-    const found = voices.find((v) => v.name === p.voiceName);
-    if (found) setSelectedVoice(found);
+    if (!voices.length) return;
+    const prefName = p?.voiceName || selectedVoice?.name;
+    if (!prefName) return;
+    const found = voices.find((v) => v.name === prefName);
+    if (found && (!selectedVoice || selectedVoice.name !== found.name)) {
+      setSelectedVoice(found);
+    }
   }, [voices]); // eslint-disable-line
 
   /* ---------- font slider ---------- */
@@ -365,13 +388,14 @@ export default function ReadingPalClient() {
         if (textRef.current) {
           textRef.current.innerText = data.content || "";
           wrapSentences(textRef.current);
-          const key = `scroll_book_${bookIndex}_${chapterIndex}`;
-          // remove old handler (if any) before adding a new one
+          const key = `scroll_upload_${uploadId}`;
+          // Replace any previous scroll handler to avoid duplicates
           if (scrollHandlerRef.current && textRef.current) {
             textRef.current.removeEventListener("scroll", scrollHandlerRef.current);
           }
           const h = () => throttledScrollSave(key, textRef.current);
           scrollHandlerRef.current = h;
+          textRef.current.addEventListener("scroll", h);
           textRef.current.addEventListener("scroll", h);
           setTimeout(() => applySavedScroll(key, textRef.current), 80);
           if (fontSizeRef.current) {
@@ -793,6 +817,18 @@ export default function ReadingPalClient() {
     speakSentencesFrom(idx);
   }, [selectedVoice, rate, pitch, volume]); // realtime
 
+  // Resolve a fresh Voice object from the latest voices list by name (prevents stale Voice refs)
+  function resolveSelectedVoice() {
+    try {
+      const ss = window.speechSynthesis;
+      const live = (ss?.getVoices?.() || []);
+      const list = live.length ? live : voices;
+      const p = loadPrefs(anonId);
+      const prefer = p?.voiceName || selectedVoice?.name;
+      return (prefer && list.find((v) => v.name === prefer)) || selectedVoice || null;
+    } catch { return selectedVoice || null; }
+  }
+
   /* ---------- TTS core ---------- */
   function speakSentencesFrom(startIdx) {
     const spans = currentSpans();
@@ -883,7 +919,8 @@ export default function ReadingPalClient() {
       setHighlight(sentenceIndexRef.current);
 
       const u = new SpeechSynthesisUtterance(spansNow[sentenceIndexRef.current].innerText);
-      if (selectedVoice) u.voice = selectedVoice;
+      const voiceObj = resolveSelectedVoice();
+      if (voiceObj) u.voice = voiceObj;
       u.rate = rate || 1;
       u.pitch = pitch || 1;
       u.volume = volume ?? 1;
@@ -1202,11 +1239,18 @@ export default function ReadingPalClient() {
         <div>
           <label>Highlight Color</label>
           <div className={styles.colorRow}>
-            <div className={styles.swatch} style={{ backgroundColor: "red" }} />
-            <div className={styles.swatch} style={{ backgroundColor: "blue" }} />
-            <div className={styles.swatch} style={{ backgroundColor: "green" }} />
-            <div className={styles.swatch} style={{ backgroundColor: "yellow" }} />
-            <div className={styles.swatch} style={{ backgroundColor: "orange" }} />
+            {["red", "blue", "green", "yellow", "orange"].map(c => (
+              <div
+                key={c}
+                className={styles.swatch}
+                style={{ backgroundColor: c }}
+                onClick={() => {
+                  const color = window.getComputedStyle?.(event.currentTarget).backgroundColor || c;
+                  highlightedColorRef.current = color;
+                  try { localStorage.setItem(hlColorKey, color); } catch { }
+                }}
+              />
+            ))}
           </div>
         </div>
       </div>

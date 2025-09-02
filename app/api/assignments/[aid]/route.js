@@ -58,8 +58,9 @@ export async function GET(_req, ctx) {
     const nameMap = new Map(roster.map(r => [r.anonId || "", r.displayName || ""]));
     const subMap = new Map((subs || []).map(s => [s.anonId || "", s]));
 
-    const targetedAll = a.targets.some(t => t.anonId == null);
-    const targetedSet = targetedAll ? new Set(roster.map(r => r.anonId)) : new Set(a.targets.map(t => t.anonId));
+    const targets = Array.isArray(a.targets) ? a.targets : [];
+    const targetedAll = targets.some(t => t.anonId == null);
+    const targetedSet = targetedAll ? new Set((roster || []).map(r => r.anonId)) : new Set(targets.map(t => t.anonId));
     const targetedIds = Array.from(targetedSet);
 
     // Preload per-student progress details for this assignment
@@ -68,7 +69,7 @@ export async function GET(_req, ctx) {
     let quizProgByAnon = null;
     let uploadProgByAnon = null;
 
-    if (a.type === "BOOK" && Number.isInteger(a.bookId) && Number.isInteger(a.chapterIndex) && targetedIds.length) {
+    if (a.type === "BOOK" && Number.isFinite(Number(a.bookId)) && Number.isFinite(Number(a.chapterIndex)) && targetedIds.length) {
         const prog = await prisma.readingprogress.findMany({
             where: {
                 anonId: { in: targetedIds },
@@ -101,7 +102,7 @@ export async function GET(_req, ctx) {
             }
         }
     }
-    if (a.type === "UPLOAD" && Number.isInteger(a.uploadId) && targetedIds.length) {
+    if (a.type === "UPLOAD" && Number.isFinite(Number(a.uploadId)) && targetedIds.length) {
         // Pull each student's current progress on this upload
         try {
             const ups = await prisma.uploadprogress.findMany({

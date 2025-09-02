@@ -15,7 +15,8 @@ function toCSV(headers, rows) {
     return `${head}\n${body}\n`;
 }
 
-export async function GET(req, { params }) {
+export async function GET(req, ctx) {
+    const params = await ctx.params;
     const { id } = await ctx.params; // ✅
     const num = Number(id);
     if (!Number.isFinite(id)) return new Response("Bad id", { status: 400 });
