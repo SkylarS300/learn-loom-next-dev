@@ -48,7 +48,7 @@ export async function GET(_req, ctx) {
         prisma.assignmentcompletion.findMany({
             where: { assignmentId: id },
             select: {
-                anonId: true, status: true, attemptCount: true, scorePct: true, gradedAt: true, submittedAt: true, isLate: true,
+                anonId: true, status: true, attemptCount: true, scorePct: true, gradedAt: true, submittedAt: true, isLate: true, feedback: true,
             },
         }),
     ]);
@@ -153,6 +153,7 @@ export async function GET(_req, ctx) {
                 scorePct: s?.scorePct ?? "",
                 submittedAt: s?.submittedAt || "",
                 gradedAt: s?.gradedAt || "",
+                feedback: s?.feedback ?? null,
                 // New progressive detail fields (optional; null-safe on UI)
                 readTimeMs: bp?.timeMs ?? null,
                 chapterCompletedAt: bp?.completedAt ?? null,

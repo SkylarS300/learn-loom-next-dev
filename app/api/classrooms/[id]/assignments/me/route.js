@@ -1,6 +1,7 @@
 // app/api/classrooms/[id]/assignments/me/route.js
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+export const dynamic = "force-dynamic";
 
 export async function GET(req, ctx) {
     const cs = await cookies();
@@ -42,7 +43,7 @@ export async function GET(req, ctx) {
 
     const comps = await prisma.assignmentcompletion.findMany({
         where: { anonId: me, assignmentId: { in: asns.map(a => a.id) } },
-        select: { assignmentId: true, status: true, scorePct: true, attemptCount: true, submittedAt: true, gradedAt: true, isLate: true },
+        select: { assignmentId: true, status: true, scorePct: true, attemptCount: true, submittedAt: true, gradedAt: true, isLate: true, feedback: true },
     });
     const compMap = new Map(comps.map(c => [c.assignmentId, c]));
 
@@ -61,6 +62,7 @@ export async function GET(req, ctx) {
             attemptCount: s?.attemptCount ?? 0,
             scorePct: s?.scorePct ?? "",
             isLate: s?.isLate ?? false,
+            feedback: s?.feedback ?? null, // student can now see teacher's private comment for them
             bucket,
             classroomId: a.classroomId,
             classroomName: member.classroom?.name || "Class",
