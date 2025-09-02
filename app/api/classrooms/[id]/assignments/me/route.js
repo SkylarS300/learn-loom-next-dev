@@ -2,12 +2,12 @@
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
-export async function GET(req, { params }) {
+export async function GET(req, ctx) {
     const cs = await cookies();
     const me = cs.get("learnloomId")?.value;
     if (!me) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const classId = Number(params?.id);
+    const classId = Number((await ctx.params)?.id);
     if (!Number.isFinite(classId)) return Response.json({ ok: false, error: "Bad id" }, { status: 400 });
 
     // Must be a member of this classroom (student role for this feed)

@@ -187,7 +187,11 @@ export default function LibraryPage() {
       author: b.author,
       cover: coverFor(b),
     }));
-    const ups = (uploads || []).map((u) => ({
+    // Be defensive: some data sources might return null/object instead of an array
+    const uploadsArr = Array.isArray(uploads)
+      ? uploads
+      : (Array.isArray(uploads?.data) ? uploads.data : []);
+    const ups = uploadsArr.map((u) => ({
       kind: "upload",
       id: u.id,
       title: u.title,
