@@ -58,6 +58,11 @@ export default function MyAssignmentsCard() {
 }
 
 function ListBlock({ title, items, empty }) {
+    const buildHref = (a) => {
+        // If you later add deep links per type, update this.
+        // This at least guarantees a valid detail page everywhere.
+        return `/assignments/${a.assignmentId}`;
+    };
     return (
         <div>
             <h4 className={styles.h4} style={{ marginTop: 0, marginBottom: 6 }}>{title}</h4>
@@ -78,8 +83,13 @@ function ListBlock({ title, items, empty }) {
                                     <div className={styles.dim} style={{ marginTop: 2 }}>
                                         {a.classroomName} {a.dueDate ? `· Due ${fmtDateTime(a.dueDate)}` : "· No due date"}
                                     </div>
+                                    {a.feedback && (
+                                        <div style={{ marginTop: 4, fontSize: 13, background: "#f9fafb", border: "1px solid #e5e7eb", padding: "6px 8px", borderRadius: 6 }}>
+                                            <strong>Teacher comment:</strong> {a.feedback}
+                                        </div>
+                                    )}
                                 </div>
-                                <a href={a.href} className={styles.btnSecondary}>Open</a>
+                                <a href={buildHref(a)} className={styles.btnSecondary}>Open</a>
                             </div>
                         </li>
                     ))}
