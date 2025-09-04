@@ -17,32 +17,29 @@ export function middleware(req: NextRequest) {
         || pathname.startsWith("/api/")) {
         return NextResponse.next();
     }
-
-    // Robust cookie detection (once, up front)
+    // Single, robust session check
     const hasCookie = Boolean(req.cookies.get("learnloomId")?.value);
     const rawCookie = req.headers.get("cookie") || "";
     const hasSession = hasCookie || /\blearnloomId=/.test(rawCookie);
 
+
+
     if (PUBLIC_PATHS.has(pathname)) {
-        // If already logged in and you hit /login, send you to next or dashboard
+        // If already logged in and you hit /login, just go to /dashboard
         if (pathname === "/login" && hasSession) {
             const url = req.nextUrl.clone();
-            const params = new URLSearchParams(search);
-            const next = params.get("next") || "/dashboard";
-            url.pathname = next;
+            url.pathname = "/dashboard";
             url.search = "";
             return NextResponse.redirect(url);
         }
         return NextResponse.next();
     }
 
-    // Protect everything else
+    // Protect everything else (always send to plain /login)
     if (!hasSession) {
         const url = req.nextUrl.clone();
         url.pathname = "/login";
-        url.search = search
-            ? `?next=${encodeURIComponent(pathname + search)}`
-            : `?next=${encodeURIComponent(pathname)}`;
+        url.search = "";
         return NextResponse.redirect(url);
     }
 

@@ -43,14 +43,14 @@ export default function LoginClient() {
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Invalid code");
 
-            // Also set cookie on client to avoid any race before navigation
+            // Also set cookie client-side to avoid any race with middleware
             const anon = j?.data?.anonId || j?.anonId;
             if (anon) {
                 document.cookie = `learnloomId=${encodeURIComponent(anon)}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 5}; SameSite=Lax; Secure`;
             }
-            const next = searchParams.get("next") || "/dashboard";
-            await new Promise(res => setTimeout(res, 30));
-            router.replace(next);
+            // tiny delay and perform a full navigation so middleware sees the cookie
+            await new Promise((r) => setTimeout(r, 30));
+            window.location.href = "/dashboard";
         } catch (e) {
             setErr(e.message || "Login failed");
         } finally {

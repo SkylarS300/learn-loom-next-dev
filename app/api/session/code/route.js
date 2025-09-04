@@ -92,10 +92,10 @@ export async function POST(req) {
     // Create the response and SET THE COOKIE ON THAT RESPONSE
     const res = NextResponse.json({ ok: true, data: { anonId: row.anonId } }, { status: 200 });
 
-    // Decide cookie domain dynamically so dev/preview work too
+    // Use cookie domain only on production host
     const host = (req.headers.get("host") || "").toLowerCase();
-    const useDomain =
-        host.endsWith("learnloom.xyz") ? ".learnloom.xyz" : undefined; // omit for localhost/preview
+    const useDomain = host.endsWith("learnloom.xyz") ? ".learnloom.xyz" : undefined;
+
 
     //  Be explicit: domain + secure + Lax (capitalized in header) + long max-age
     res.cookies.set({

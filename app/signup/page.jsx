@@ -53,10 +53,8 @@ export default function SignupPage() {
                 document.cookie = `learnloomId=${encodeURIComponent(anon)}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 5}; SameSite=Lax; Secure`;
             }
 
-            // tiny delay avoids any race with cookie write
             await new Promise((r) => setTimeout(r, 30));
-
-            router.replace("/dashboard");
+            window.location.href = "/dashboard";
         } catch (e) {
             setErr(e.message || "Failed to log in with your new code");
             setModalOpen(false);
