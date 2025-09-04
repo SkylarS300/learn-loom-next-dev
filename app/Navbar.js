@@ -59,9 +59,13 @@ export default function Navbar() {
     try {
       localStorage.clear();
     } catch { }
-    // clear cookie client-side (server already cleared; this avoids stale UI)
+    // Best-effort client clears for both host and domain variants
     document.cookie = "learnloomId=; Max-Age=0; path=/";
-    window.location.href = "/login";
+    document.cookie = "learnloomId=; Max-Age=0; path=/; domain=.learnloom.xyz; Secure; SameSite=Lax";
+    // Optional: preserve current path as next
+    const here = window.location.pathname + window.location.search;
+    const next = encodeURIComponent(here);
+    window.location.href = `/login?next=${next}`;
   }
 
   return (

@@ -97,15 +97,17 @@ export async function POST(req) {
     const useDomain = host.endsWith("learnloom.xyz") ? ".learnloom.xyz" : undefined;
 
 
-    //  Be explicit: domain + secure + Lax (capitalized in header) + long max-age
+    //  Be explicit: domain (prod) + secure (prod) + Lax + long max-age
+    const isProd = host.endsWith("learnloom.xyz");
+    const secure = isProd; // allow non-secure cookie on localhost for dev
     res.cookies.set({
         name: "learnloomId",
         value: row.anonId,
         path: "/",
-        httpOnly: false,           // OK to leave false since you also read it client-side
-        secure: true,
-        sameSite: "lax",           // Next will serialize header as SameSite=Lax
-        ...(useDomain ? { domain: useDomain } : {}), // only set in prod
+        httpOnly: false,           // if you confirm the client must read it
+        secure,
+        sameSite: "lax",
+        ...(useDomain ? { domain: useDomain } : {}),
         maxAge: 60 * 60 * 24 * 365 * 5,
     });
 

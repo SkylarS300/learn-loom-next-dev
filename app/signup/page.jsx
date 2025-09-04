@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../Navbar";
 import CodeModal from "@/app/components/auth/CodeModal";
 
@@ -12,6 +12,7 @@ export default function SignupPage() {
     const [err, setErr] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     async function create() {
         setErr("");
@@ -47,14 +48,10 @@ export default function SignupPage() {
 
             if (!j?.ok) throw new Error(j?.error || "Login failed");
 
-            // Belt & suspenders: set the cookie client-side too (ensures it’s present before next nav)
-            const anon = j?.data?.anonId || j?.anonId;
-            if (anon) {
-                document.cookie = `learnloomId=${encodeURIComponent(anon)}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 5}; SameSite=Lax; Secure`;
-            }
-
-            await new Promise((r) => setTimeout(r, 30));
-            window.location.href = "/dashboard";
+            // Honor ?next= if valid; otherwise /dashboard
+            const next = searchParams.get("next");
+            const validNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+            window.location.href = validNext;
         } catch (e) {
             setErr(e.message || "Failed to log in with your new code");
             setModalOpen(false);

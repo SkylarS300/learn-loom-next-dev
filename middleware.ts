@@ -25,10 +25,12 @@ export function middleware(req: NextRequest) {
 
 
     if (PUBLIC_PATHS.has(pathname)) {
-        // If already logged in and you hit /login, just go to /dashboard
+        // If authed and at /login: honor ?next= if internal, else /dashboard
         if (pathname === "/login" && hasSession) {
             const url = req.nextUrl.clone();
-            url.pathname = "/dashboard";
+            const next = url.searchParams.get("next");
+            const validNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+            url.pathname = validNext;
             url.search = "";
             return NextResponse.redirect(url);
         }
@@ -38,8 +40,10 @@ export function middleware(req: NextRequest) {
     // Protect everything else (always send to plain /login)
     if (!hasSession) {
         const url = req.nextUrl.clone();
+        // Preserve original target as ?next=<encoded>
+        const dest = `${pathname}${search || ""}`;
         url.pathname = "/login";
-        url.search = "";
+        url.search = `?next=${encodeURIComponent(dest)}`;
         return NextResponse.redirect(url);
     }
 

@@ -43,14 +43,12 @@ export default function LoginClient() {
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Invalid code");
 
-            // Also set cookie client-side to avoid any race with middleware
-            const anon = j?.data?.anonId || j?.anonId;
-            if (anon) {
-                document.cookie = `learnloomId=${encodeURIComponent(anon)}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 5}; SameSite=Lax; Secure`;
-            }
-            // tiny delay and perform a full navigation so middleware sees the cookie
-            await new Promise((r) => setTimeout(r, 30));
-            window.location.href = "/dashboard";
+            // Rely on server-set cookie from the API response.
+            // Redirect to ?next= if valid, else /dashboard
+            const next = searchParams.get("next");
+            const validNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+            // full navigation so middleware evaluates cookie
+            window.location.href = validNext;
         } catch (e) {
             setErr(e.message || "Login failed");
         } finally {
