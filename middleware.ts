@@ -17,6 +17,19 @@ export function middleware(req: NextRequest) {
         || pathname.startsWith("/api/")) {
         return NextResponse.next();
     }
+
+    // --- Admin gate: require a valid admin cookie ---
+    if (pathname.startsWith("/admin")) {
+        const isAdmin = req.cookies.get("adminSession")?.value === "1";
+        if (!isAdmin) {
+            const url = req.nextUrl.clone();
+            url.pathname = "/admin/login";
+            url.search = `?next=${encodeURIComponent(pathname + (search || ""))}`;
+            return NextResponse.redirect(url);
+        }
+        return NextResponse.next();
+    }
+
     // Single, robust session check
     const hasCookie = Boolean(req.cookies.get("learnloomId")?.value);
     const rawCookie = req.headers.get("cookie") || "";

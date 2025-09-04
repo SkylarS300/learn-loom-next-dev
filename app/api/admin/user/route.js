@@ -14,10 +14,9 @@ function fail(msg, status = 400) {
  * Header: x-support-pass: <SUPPORT_PASS>
  */
 export async function GET(req) {
-    const pass = req.headers.get("x-support-pass");
-    if (!process.env.SUPPORT_PASS || pass !== process.env.SUPPORT_PASS) {
-        return fail("Unauthorized", 401);
-    }
+    const cookie = req.headers.get("cookie") || "";
+    const isAdmin = /(?:^|;\s*)adminSession=1(?:;|$)/.test(cookie);
+    if (!isAdmin) return fail("Unauthorized", 401);
 
     const { searchParams } = new URL(req.url);
     const code = (searchParams.get("code") || "").trim().toUpperCase();
