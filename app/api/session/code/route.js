@@ -1,11 +1,12 @@
 // app/api/session/code/route.js
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonOk, jsonErr } from "@/app/api/_util/auth";
+
+export const runtime = "nodejs";        // ensure Node runtime
+export const dynamic = "force-dynamic"; // avoid any caching
 
 // --- Simple optional in-memory rate limit (per IP) ---
-// Env toggles: ENABLE_CODE_RATELIMIT=true, CODE_RATE_MAX=20, CODE_RATE_WINDOW_MS=60000, CODE_RATE_BLOCK_MS=60000
-// Accept either legacy CODE_RATE_LIMIT=1 or ENABLE_CODE_RATELIMIT=true
 const ENABLE =
     process.env.ENABLE_CODE_RATELIMIT === "true" ||
     process.env.CODE_RATE_LIMIT === "1";
@@ -22,12 +23,10 @@ function getIP(req) {
 
 function normalizeCode(input = "") {
     const raw = String(input || "").toUpperCase().trim();
-    // allow users to paste with spaces or without dashes
     const compact = raw.replace(/[^A-Z0-9]/g, "");
     if (compact.length === 11) {
         return `${compact.slice(0, 4)}-${compact.slice(4, 8)}-${compact.slice(8)}`;
     }
-    // otherwise keep hyphenated format and strip weird chars
     return raw.replace(/[^A-Z0-9-]/g, "");
 }
 
@@ -37,20 +36,25 @@ async function jitter(msMin = 120, msMax = 320) {
 }
 
 export async function POST(req) {
-    const { code: rawCode } = await req.json().catch(() => ({}));
-    const code = normalizeCode(rawCode);
-
-    if (!code) {
-        return jsonErr("Missing code", 400);
+    let code;
+    try {
+        const body = await req.json().catch(() => ({}));
+        code = normalizeCode(body?.code || "");
+    } catch {
+        code = "";
     }
 
-    // Rate limit (per IP)
+    if (!code) {
+        return NextResponse.json({ ok: false, error: "Missing code" }, { status: 400 });
+    }
+
+    // Rate limit (optional)
     if (ENABLE) {
         const ip = getIP(req);
         const now = Date.now();
         const bucket = g.__codeRate.get(ip) || { tokens: MAX, resetAt: now + WINDOW_MS, blockedUntil: 0 };
         if (bucket.blockedUntil > now) {
-            return jsonErr("Too many attempts. Try again later.", 429);
+            return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
         }
         if (bucket.resetAt <= now) {
             bucket.tokens = MAX;
@@ -77,8 +81,8 @@ export async function POST(req) {
                 g.__codeRate.set(ip, bucket);
             }
         }
-        await jitter(); // slow down enumeration
-        return jsonErr("Invalid code", 404);
+        await jitter();
+        return NextResponse.json({ ok: false, error: "Invalid code" }, { status: 404 });
     }
 
     await prisma.userCode.update({
@@ -86,14 +90,17 @@ export async function POST(req) {
         data: { lastUsedAt: new Date() },
     });
 
-    // Set the session cookie
-    const cs = await cookies();
-    cs.set("learnloomId", row.anonId, {
+    // Create the response and SET THE COOKIE ON THAT RESPONSE
+    const res = NextResponse.json({ ok: true, data: { anonId: row.anonId } }, { status: 200 });
+
+    // Be explicit with cookie attributes
+    res.cookies.set("learnloomId", row.anonId, {
         path: "/",
-        httpOnly: false,
-        sameSite: "Lax",
-        maxAge: 60 * 60 * 24 * 365 * 5,
+        httpOnly: false,     // client JS can read (we rely on this as a fallback)
+        sameSite: "lax",     // lower-case per spec
+        secure: true,        // you’re on HTTPS
+        maxAge: 60 * 60 * 24 * 365 * 5, // ~5 years
     });
 
-    return jsonOk({ anonId: row.anonId });
+    return res;
 }

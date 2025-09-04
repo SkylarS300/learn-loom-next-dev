@@ -29,8 +29,7 @@ export default function SignupPage() {
     }
 
     async function finalizeLogin() {
-        // Called when QR modal is closed (user saw it).
-        // We log them in with the short code, set cookie, then go to dashboard.
+        // User closed the modal => log them in with the short code and go to dashboard
         if (!code) {
             setModalOpen(false);
             return;
@@ -40,13 +39,25 @@ export default function SignupPage() {
             const r = await fetch("/api/session/code", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                // credentials not strictly required for same-origin, but harmless:
+                credentials: "include",
                 body: JSON.stringify({ code }),
             });
             const j = await r.json();
+
             if (!j?.ok) throw new Error(j?.error || "Login failed");
-            router.push("/dashboard");
+
+            // Belt & suspenders: set the cookie client-side too (ensures it’s present before next nav)
+            const anon = j?.data?.anonId || j?.anonId;
+            if (anon) {
+                document.cookie = `learnloomId=${encodeURIComponent(anon)}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 5}; SameSite=Lax; Secure`;
+            }
+
+            // tiny delay avoids any race with cookie write
+            await new Promise((r) => setTimeout(r, 30));
+
+            router.replace("/dashboard");
         } catch (e) {
-            // If login failed, keep them here and show the error so they can try again
             setErr(e.message || "Failed to log in with your new code");
             setModalOpen(false);
         }
