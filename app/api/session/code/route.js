@@ -1,5 +1,4 @@
 // app/api/session/code/route.js
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
@@ -93,13 +92,21 @@ export async function POST(req) {
     // Create the response and SET THE COOKIE ON THAT RESPONSE
     const res = NextResponse.json({ ok: true, data: { anonId: row.anonId } }, { status: 200 });
 
-    // Be explicit with cookie attributes
-    res.cookies.set("learnloomId", row.anonId, {
+    // Decide cookie domain dynamically so dev/preview work too
+    const host = (req.headers.get("host") || "").toLowerCase();
+    const useDomain =
+        host.endsWith("learnloom.xyz") ? ".learnloom.xyz" : undefined; // omit for localhost/preview
+
+    //  Be explicit: domain + secure + Lax (capitalized in header) + long max-age
+    res.cookies.set({
+        name: "learnloomId",
+        value: row.anonId,
         path: "/",
-        httpOnly: false,     // client JS can read (we rely on this as a fallback)
-        sameSite: "lax",     // lower-case per spec
-        secure: true,        // you’re on HTTPS
-        maxAge: 60 * 60 * 24 * 365 * 5, // ~5 years
+        httpOnly: false,           // OK to leave false since you also read it client-side
+        secure: true,
+        sameSite: "lax",           // Next will serialize header as SameSite=Lax
+        ...(useDomain ? { domain: useDomain } : {}), // only set in prod
+        maxAge: 60 * 60 * 24 * 365 * 5,
     });
 
     return res;

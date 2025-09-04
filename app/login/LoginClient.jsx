@@ -31,18 +31,26 @@ export default function LoginClient() {
     }, [code]);
 
     async function submit(e) {
-        if (e) e.preventDefault(); // <-- make event optional so submit() works above
-        setErr("");
-        setLoading(true);
+        if (e) e.preventDefault();
+        setErr(""); setLoading(true);
         try {
             const r = await fetch("/api/session/code", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({ code }),
             });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Invalid code");
-            router.push("/dashboard");
+
+            // Also set cookie on client to avoid any race before navigation
+            const anon = j?.data?.anonId || j?.anonId;
+            if (anon) {
+                document.cookie = `learnloomId=${encodeURIComponent(anon)}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 5}; SameSite=Lax; Secure`;
+            }
+            const next = searchParams.get("next") || "/dashboard";
+            await new Promise(res => setTimeout(res, 30));
+            router.replace(next);
         } catch (e) {
             setErr(e.message || "Login failed");
         } finally {
