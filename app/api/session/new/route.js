@@ -1,6 +1,8 @@
 // app/api/session/new/route.js
+import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { jsonOk, jsonErr } from "@/app/api/_util/auth";
+
 export const runtime = "nodejs";        // ensure Prisma runs in Node
 export const dynamic = "force-dynamic"; // avoid static caching
 
@@ -20,13 +22,22 @@ async function mintUniqueShortCode() {
 
 export async function POST() {
     try {
-        // Signup-only: create a new anonId + shortCode, but DO NOT set cookie here.
+        // Create anonId + shortCode
         const anonId = crypto.randomUUID().replace(/-/g, "");
         const shortCode = await mintUniqueShortCode();
         await prisma.userCode.create({ data: { anonId, shortCode } });
+
+        // ✅ Set the session cookie here so the user is logged in immediately
+        const cs = await cookies();
+        cs.set("learnloomId", anonId, {
+            path: "/",
+            httpOnly: false,    // keep consistent with /api/session/code
+            sameSite: "Lax",
+            maxAge: 60 * 60 * 24 * 365 * 5,
+        });
+
         return jsonOk({ anonId, shortCode });
     } catch (e) {
-        // Always return JSON so the client never crashes on parse
         return jsonErr(e?.message || "Failed to create code", 500);
     }
 }

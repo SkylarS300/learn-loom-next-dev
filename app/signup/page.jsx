@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "../Navbar";
 import CodeModal from "@/app/components/auth/CodeModal";
 
 export default function SignupPage() {
+    const router = useRouter();
     const [code, setCode] = useState("");
     const [created, setCreated] = useState(false);
     const [err, setErr] = useState("");
@@ -14,22 +16,22 @@ export default function SignupPage() {
         setErr("");
         try {
             const r = await fetch("/api/session/new", { method: "POST" });
-            const j = await r.json();
+            const j = await r.json();                   // always JSON (server guarantees)
             if (!j?.ok) throw new Error(j?.error || "Could not create code");
             const sc = j.data?.shortCode || j.shortCode || j.code;
             setCode(sc);
             setCreated(true);
-            setModalOpen(true); // show QR modal immediately
+            setModalOpen(true);                         // optional: show QR right away
+
+            // ✅ Already logged in (cookie set by API). Send them to the dashboard.
+            router.push("/dashboard");
         } catch (e) {
             setErr(e.message || "Failed to create code");
         }
     }
 
     async function copy() {
-        try {
-            await navigator.clipboard.writeText(code);
-            alert("Code copied!");
-        } catch { }
+        try { await navigator.clipboard.writeText(code); alert("Code copied!"); } catch { }
     }
 
     // Auto-create on first load
@@ -59,40 +61,13 @@ export default function SignupPage() {
                     >
                         <div style={{ fontSize: 18, fontWeight: 700 }}>{code || "—"}</div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                                onClick={copy}
-                                style={{
-                                    padding: "8px 12px",
-                                    borderRadius: 8,
-                                    border: "1px solid #c9d7fb",
-                                    background: "#e9eefc",
-                                    color: "#0b3b9f",
-                                }}
-                            >
+                            <button onClick={copy} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #c9d7fb", background: "#e9eefc", color: "#0b3b9f" }}>
                                 Copy code
                             </button>
-                            <button
-                                onClick={() => setModalOpen(true)}
-                                style={{
-                                    padding: "8px 12px",
-                                    borderRadius: 8,
-                                    border: "1px solid #e5e7eb",
-                                    background: "#fff",
-                                    color: "#111827",
-                                }}
-                            >
+                            <button onClick={() => setModalOpen(true)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#111827" }}>
                                 Show QR
                             </button>
-                            <a
-                                href="/dashboard"
-                                style={{
-                                    padding: "8px 12px",
-                                    borderRadius: 8,
-                                    background: "#3b82f6",
-                                    color: "#fff",
-                                    textDecoration: "none",
-                                }}
-                            >
+                            <a href="/dashboard" style={{ padding: "8px 12px", borderRadius: 8, background: "#3b82f6", color: "#fff", textDecoration: "none" }}>
                                 Go to dashboard
                             </a>
                         </div>

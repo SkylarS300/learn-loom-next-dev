@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = new Set([
     "/", "/login", "/signup",
-    "/favicon.ico",
+    "/favicon.ico", "/admin/support"
 ]);
 
 export function middleware(req: NextRequest) {

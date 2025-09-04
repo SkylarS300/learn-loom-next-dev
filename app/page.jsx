@@ -42,21 +42,18 @@ export default function Home() {
             {[
               {
                 step: "1",
-                title: "Personalized Book Selection",
-                text:
-                  "Filter through a library of books tailored to your preferences, ensuring you find the perfect match for your reading goals.",
+                title: "Pick what to read",
+                text: "Choose from our starter library or bring your own text. Short sessions work great.",
               },
               {
                 step: "2",
-                title: "Choose Your Book",
-                text:
-                  "Select the book you want to explore and import it directly into Reading Pal for an interactive learning experience.",
+                title: "Read with the Pal",
+                text: "Highlight, listen along, and add quick notes. Everything is tuned for focus.",
               },
               {
                 step: "3",
-                title: "Start Reading Like Never Before",
-                text:
-                  "Dive into your book with real-time highlights, voiceovers, and personalized learning tools to enhance your reading journey.",
+                title: "Practice + track",
+                text: "Target weak spots with bite-size grammar quizzes and see gentle progress over time.",
               },
             ].map(({ step, title, text }) => (
               <div key={step} className={styles.stepCard} aria-label={`Step ${step}: ${title}`}>
@@ -86,23 +83,20 @@ export default function Home() {
           <div className={styles.featuresGrid}>
             {[
               {
-                title: "Personalized Reading Experience",
-                text:
-                  "Our platform tailors book recommendations based on your reading preferences, providing a personalized learning experience that helps you stay engaged and improve over time.",
+                title: "Reading Pal",
+                text: "Inline highlighting, optional voiceover, quick notes, and bookmarks for a smoother reading flow.",
               },
               {
-                title: "Interactive Reading Pal",
-                text:
-                  "With adjustable voiceovers, real-time text highlighting, and interactive tools, Reading Pal helps you read at your own pace while providing helpful hints and insights along the way.",
+                title: "Upload your own",
+                text: "Bring PDFs or text and use the same tools—no extra setup. Private by default.",
               },
               {
-                title: "Grammar Tool",
-                text:
-                  "Improve your writing with our built-in grammar tool. Get feedback on sentence structure, punctuation, and common grammar mistakes.",
+                title: "Smart grammar practice",
+                text: "Short drills that adapt to you. Review mistakes and build confidence without the stress.",
               },
               {
-                title: "Progress Tracking",
-                text: "Keep track of your reading and grammar progress with a save feature.",
+                title: "Private progress",
+                text: "Your ‘progress code’ is your identity—no email needed. Keep reading history on any device.",
               },
             ].map(({ title, text }) => (
               <div key={title} className={styles.featureCard}>
@@ -130,14 +124,14 @@ export default function Home() {
 
           <div className={styles.faqGrid} role="list">
             {[
-              ["How does LearnLoom recommend books?", "LearnLoom uses a filtering algorithm to recommend books based on your reading habits and preferences. The more you read and more specific you are, the better the recommendations."],
-              ["Can I upload my own books?", "Yes! You can upload PDFs, Word documents, or text files to the platform and use the Reading Pal features with your own content."],
-              ["How does the voiceover feature work?", "Reading Pal's voiceover reads aloud any selected text while highlighting the words on screen. You can adjust the speed, pitch, color of the highlights, and even the language of the voiceover."],
-              ["Is LearnLoom free to use?", "Yes, LearnLoom’s features are all completely free to use."],
-              ["How can I track my reading progress?", "You can track your reading progress through the 'Progress Tracking' feature on your dashboard."],
-              ["Can I adjust the voiceover settings in Reading Pal?", "Yes! You can adjust the speed, pitch, volume, and language of the voiceover. You can also highlight text in sync with the audio."],
-              ["What types of documents can I upload?", "You can upload PDFs, text files, and Word documents. The system will automatically convert them into readable formats for use with Reading Pal."],
-              ["Can I use the platform on mobile devices?", "No, LearnLoom is currently only available on computers."],
+              ["Do I need an email or account?", "No. You get a private progress code you can use on any device."],
+              ["Is my reading private?", "Yes. Uploads are private by default. You control sharing via codes."],
+              ["Can I upload my own text?", "Yes—PDF or text. You’ll get the same Reading Pal tools and notes."],
+              ["Does it work on phones?", "We recommend a laptop/desktop for now to keep the UI simple and focused."],
+              ["How are recommendations made?", "We surface quick suggestions based on what you practice and where you struggle."],
+              ["What’s the grammar tool like?", "Fast multiple-choice checks with hints and explanations. Great for warmups."],
+              ["Is LearnLoom free?", "Yes."],
+              ["Can I export my notes?", "Yes—use the ‘Export’ actions in the dashboard to download your notes."],
             ].map(([q, a]) => (
               <div key={q} className={styles.faqItem} role="listitem">
                 <h3 className={styles.faqQ}>{q}</h3>
