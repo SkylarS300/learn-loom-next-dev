@@ -20,6 +20,10 @@ export function middleware(req: NextRequest) {
 
     // --- Admin gate: require a valid admin cookie ---
     if (pathname.startsWith("/admin")) {
+        // allow unauthenticated access to the login and logout pages
+        if (pathname === "/admin/login" || pathname === "/admin/logout") {
+            return NextResponse.next();
+        }
         const isAdmin = req.cookies.get("adminSession")?.value === "1";
         if (!isAdmin) {
             const url = req.nextUrl.clone();
