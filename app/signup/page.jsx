@@ -1,18 +1,18 @@
 // app/signup/page.jsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../Navbar";
 import CodeModal from "@/app/components/auth/CodeModal";
 
 export default function SignupPage() {
+    const searchParams = useSearchParams();
     const [code, setCode] = useState("");
     const [created, setCreated] = useState(false);
     const [err, setErr] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const router = useRouter();
-    const searchParams = useSearchParams();
 
     async function create() {
         setErr("");
@@ -72,7 +72,7 @@ export default function SignupPage() {
     }, []);
 
     return (
-        <>
+        <Suspense fallback={null}>
             <Navbar />
             <main style={{ maxWidth: 520, margin: "24px auto", padding: 16 }}>
                 <h1>Create your progress code</h1>
@@ -145,6 +145,6 @@ export default function SignupPage() {
                 shortCode={code}
                 onClose={finalizeLogin}
             />
-        </>
+        </Suspense>
     );
 }
