@@ -6,6 +6,8 @@ import books from "../../src/content/book-content.js";
 import styles from "./readingpal.module.css";
 import NotesModal from "../components/NotesModal";
 import NotesSidePanel from "./NotesSidePanel";
+import LookupBubble from "./LookupBubble";
+
 
 /* ------- helpers ------- */
 
@@ -470,6 +472,36 @@ export default function ReadingPalClient() {
   useEffect(() => {
     const onKey = (e) => {
       const withShift = e.shiftKey;
+      // Quick dictionary: Alt + D ⇒ select current word (or first word of current sentence)
+      if ((e.key === "d" || e.key === "D") && e.altKey) {
+        e.preventDefault();
+        const sel = window.getSelection?.();
+        const selected = String(sel?.toString() || "").trim();
+        if (!selected) {
+          // Select first word of the current sentence to trigger the Lookup bubble
+          try {
+            const spans = currentSpans();
+            const idx = Math.min(sentenceIndexRef.current || 0, Math.max(spans.length - 1, 0));
+            const span = spans[idx];
+            if (span) {
+              const tn = [...span.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+              if (tn) {
+                const text = tn.textContent || "";
+                const m = text.match(/[A-Za-z][A-Za-z'-]*/);
+                if (m) {
+                  const r = document.createRange();
+                  r.setStart(tn, m.index);
+                  r.setEnd(tn, m.index + m[0].length);
+                  sel.removeAllRanges();
+                  sel.addRange(r);
+                }
+              }
+            }
+          } catch { /* noop */ }
+        }
+        // LookupBubble will react to the selection
+        return;
+      }
       switch (e.key) {
         case " ":
           e.preventDefault();
@@ -742,11 +774,55 @@ export default function ReadingPalClient() {
       const anchorText = sel || span.innerText.trim().slice(0, 160);
       openNoteAt(idx, anchorText);
     };
+
+    // Right-click (contextmenu): select the word under cursor so the Lookup bubble can appear
+    const ctxHandler = (e) => {
+      const rangeAtPoint = (node, offset) => {
+        try {
+          const r = document.createRange();
+          r.setStart(node, offset);
+          r.setEnd(node, offset);
+          // expand to word boundaries
+          const expand = () => {
+            const txt = r.startContainer.textContent || "";
+            let s = r.startOffset, eOff = r.endOffset;
+            while (s > 0 && /[A-Za-z'-]/.test(txt[s - 1])) s--;
+            while (eOff < txt.length && /[A-Za-z'-]/.test(txt[eOff])) eOff++;
+            r.setStart(r.startContainer, s);
+            r.setEnd(r.endContainer, eOff);
+          };
+          expand();
+          return r;
+        } catch { return null; }
+      };
+      try {
+        const x = e.clientX, y = e.clientY;
+        const caret = document.caretPositionFromPoint?.(x, y) || document.caretRangeFromPoint?.(x, y);
+        let node, offset;
+        if (caret) {
+          if ("offsetNode" in caret) { node = caret.offsetNode; offset = caret.offset; }
+          else { node = caret.startContainer; offset = caret.startOffset; }
+        }
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const r = rangeAtPoint(node, offset);
+          if (r) {
+            e.preventDefault();
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(r);
+            // LookupBubble listens to selectionchange and will show the bubble
+          }
+        }
+      } catch { /* noop */ }
+    };
+
     container.addEventListener("click", clickHandler);
     container.addEventListener("dblclick", dblHandler);
+    container.addEventListener("contextmenu", ctxHandler);
     return () => {
       container.removeEventListener("click", clickHandler);
       container.removeEventListener("dblclick", dblHandler);
+      container.removeEventListener("contextmenu", ctxHandler);
     };
   }, []); // handlers read from refs; no need to re-bind
 
@@ -1003,7 +1079,9 @@ export default function ReadingPalClient() {
 
       {showHint && (
         <div className={styles.hintBar} role="note">
-          <span>💡 Tip: Double-click any word (or press <kbd>N</kbd>) to add a note. Press <kbd>B</kbd> to bookmark.</span>
+          <span>
+            💡 Tip: Double-click any text (or press <kbd>N</kbd>) to add a note. Right-click a word or press <kbd>Alt</kbd>+<kbd>D</kbd> to look it up. Press <kbd>B</kbd> to bookmark.
+          </span>
           <button className={styles.hintClose} onClick={() => setShowHint(false)} aria-label="Dismiss">Got it</button>
         </div>
       )}
@@ -1052,7 +1130,7 @@ export default function ReadingPalClient() {
       )}
 
       <div className={styles.sideGrid}>
-        <div id="text" ref={textRef} className={styles.text}>
+        <div id="reading-text" ref={textRef} className={styles.text}>
           The chapter text will appear here after selecting a book from the library.
         </div>
 
@@ -1087,6 +1165,8 @@ export default function ReadingPalClient() {
         />
       </div>
 
+      {/* Selection lookup bubble & definition card */}
+      <LookupBubble targetId="reading-text" />
 
       <div className={styles.controlsRow}>
         <button className={styles.primaryBtn} onClick={startReading}>▶ Start</button>

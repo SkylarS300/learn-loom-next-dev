@@ -415,3 +415,48 @@
 .sideNoteItem {
     box-sizing: border-box;
 }
+
+/* --- Lookup bubble & card --- */
+.lookupBubble {
+    position: absolute;
+    z-index: 60;
+    background: #111827;
+    color: #fff;
+    border-radius: 999px;
+    padding: 4px 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+    user-select: none;
+}
+
+.lookupBtn {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.lookupCard {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    max-width: min(520px, 92vw);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .18);
+    z-index: 59;
+}
+
+.lookupHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.lookupList {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}

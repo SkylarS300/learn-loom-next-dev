@@ -15,6 +15,7 @@ import SavedCodesCard from "./SavedCodesCard";
 import MyAssignmentsCard from "./MyAssignmentsCard";
 import TeacherSettingsCard from "./TeacherSettingsCard";
 import MyClassesCard from "./MyClassesCard";
+import MyWordsCard from "./MyWordsCard";
 
 // Lazy-load the chart card to keep initial bundle small.
 const LineCard = dynamic(() => import("./_charts/LineCard"), {
@@ -239,6 +240,9 @@ export default function DashboardPage() {
         {/* Recent grammar mini-card */}
         <section className={styles.sectionTight}>
           <RecentGrammarCard />
+          <div style={{ height: 12 }}>
+            <MyWordsCard />
+          </div>
         </section>
 
         {/* Notes panel */}
