@@ -14,6 +14,25 @@ enum live_mode {
   UPLOAD
 }
 
+// --- New enums for vocab/adaptivity ---
+enum cefr_level {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+  UNKNOWN
+}
+
+enum vocab_source {
+  BOOK
+  UPLOAD
+  GRAMMAR
+  LOOKUP
+}
+
+
 model assignment {
   id              Int             @id @default(autoincrement())
   classroomId     Int
@@ -40,6 +59,88 @@ model assignment {
   bookId       Int? // for reading assignments: refers to index in book-content
   chapterIndex Int? // for reading assignments: refers to chapter in book
   uploadId     Int?
+}
+
+// ================================
+// Vocabulary & Encounters (ESL)
+// ================================
+
+model Word {
+  id         Int         @id @default(autoincrement())
+  lemma      String      // normalized lowercase headword
+  display    String?     // preferred display/casing
+  phonetics  String?     // e.g., IPA or provider string
+  pos        String?     // part of speech tag (coarse)
+  cefrLevel  cefr_level  @default(UNKNOWN)
+  createdAt  DateTime    @default(now())
+
+  // relations
+  encounters WordEncounter[]
+  studies    WordStudy[]
+
+  @@unique([lemma, pos])
+  @@index([cefrLevel, pos])
+}
+
+model WordEncounter {
+  id            Int          @id @default(autoincrement())
+  anonId        String
+  wordId        Int
+  source        vocab_source
+  // reading/book anchors
+  bookIndex     Int?
+  chapterIndex  Int?
+  sentenceIndex Int?
+  // upload anchor
+  uploadId      Int?
+  // grammar anchor
+  concept       String?
+  subTopic      String?
+  // context around the encounter (trimmed)
+  context       String?
+  createdAt     DateTime     @default(now())
+
+  word Word @relation(fields: [wordId], references: [id])
+
+  @@index([anonId, createdAt])
+  @@index([wordId])
+  @@index([anonId, wordId, source])
+}
+
+model WordStudy {
+  id           Int       @id @default(autoincrement())
+  anonId       String
+  wordId       Int
+  // spaced repetition fields (SM-2–like, simplified)
+  ease         Int       @default(130) // 130% starting ease
+  reps         Int       @default(0)
+  lapses       Int       @default(0)
+  intervalDays Int       @default(0)
+  nextDue      DateTime  @default(now())
+  lastResult   String?   // "Again" | "Hard" | "Good" | "Easy"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  word Word @relation(fields: [wordId], references: [id])
+
+  @@unique([anonId, wordId])
+  @@index([anonId, nextDue])
+}
+
+// ================================
+// Adaptive Grammar Ability (ELO-lite)
+// ================================
+model GrammarAbility {
+  id        Int      @id @default(autoincrement())
+  anonId    String
+  concept   String
+  subTopic  String
+  ability   Float    @default(0)  // centered around 0; higher => harder items
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([anonId, concept, subTopic])
+  @@index([updatedAt])
 }
 
 model assignmenttarget {

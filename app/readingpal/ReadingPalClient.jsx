@@ -6,6 +6,10 @@ import books from "../../src/content/book-content.js";
 import styles from "./readingpal.module.css";
 import NotesModal from "../components/NotesModal";
 import NotesSidePanel from "./NotesSidePanel";
+import VocabPanel from "./VocabPanel";
+import PronouncePractice from "./PronouncePractice";
+import { toLemma, detectPOS } from "./word-utils";
+import { analyzeCEFR } from "@/src/cefr/analyzeText";
 import LookupBubble from "./LookupBubble";
 
 
@@ -109,7 +113,9 @@ export default function ReadingPalClient() {
   const [chapterIdx, setChapterIdx] = useState(0); // for re-render & side panel props
   // sentenceIndex -> color (for note decorations)
   const noteMapRef = useRef({}); // { [idx:number]: string(hex) }
-
+  const [vocab, setVocab] = useState({ word: "", lemma: "", pos: "", cefr: "", def: "", ex: "" });
+  const [showPronounce, setShowPronounce] = useState(false);
+  const [ctx, setCtx] = useState(null); // {x,y,selection}
   const currentBookRef = useRef(null);
   const chapterIndexRef = useRef(0);
 
@@ -134,6 +140,20 @@ export default function ReadingPalClient() {
 
   const highlightedColorRef = useRef("yellow");
   const hlColorKey = `rpHighlightColor:${anonId || "anon"}`;
+
+  // close context menu on click elsewhere/escape
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (ctx) setCtx(null);
+    };
+    const onEsc = (e) => { if (e.key === "Escape") setCtx(null); };
+    document.addEventListener("click", onDocClick);
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [ctx]);
 
   // fire-and-forget ping (uses sendBeacon when available)
   function livePing(mode = "reading") {
@@ -180,6 +200,52 @@ export default function ReadingPalClient() {
       }
     } catch { }
   }, []);
+
+  // --- helpers for lookup/translate ---
+  function currentSelection() {
+    const t = window.getSelection?.().toString().trim() || "";
+    return t.replace(/\s+/g, " ").slice(0, 64);
+  }
+  async function doDefine(text) {
+    const q = text || currentSelection();
+    if (!q) return;
+    try {
+      const lemma = toLemma(q);
+      const pos = detectPOS(q);
+      const r = await fetch("/api/define", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: q })
+      });
+      const j = await r.json();
+      const def = j?.ok ? (j.definition || "") : "";
+      const ex = j?.example || "";
+      setVocab((v) => ({ ...v, word: q, lemma, pos, def, ex }));
+    } catch { /* no-op */ }
+  }
+  async function doTranslate(text) {
+    const q = text || currentSelection();
+    if (!q) return;
+    try {
+      const r = await fetch("/api/translate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: q })
+      });
+      const j = await r.json();
+      toast(j?.ok ? `ⓘ ${q} → ${j.translation}` : (j?.error || "Translate unavailable"));
+    } catch { toast("⚠️ Translate unavailable"); }
+  }
+  async function addToVocab(text) {
+    const q = text || currentSelection();
+    if (!q) return;
+    try {
+      await fetch("/api/vocab/add", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: q, lemma: toLemma(q) })
+      });
+      toast("⭐ Added to vocabulary");
+    } catch { toast("⚠️ Could not add"); }
+  }
+
 
   // ------- Server bookmark helpers (books only, not uploads) -------
   async function saveServerBookmark() {
@@ -577,6 +643,21 @@ export default function ReadingPalClient() {
             openNoteAt(idx, anchorText);
           }
           break;
+        case "d": case "D":
+          // Define selection
+          if (currentSelection()) { e.preventDefault(); doDefine(); }
+          break;
+        case "t": case "T":
+          // Translate selection
+          if (currentSelection()) { e.preventDefault(); doTranslate(); }
+          break;
+        case "g": case "G":
+          // Add to vocab
+          if (currentSelection()) { e.preventDefault(); addToVocab(); }
+          break;
+        case "p": case "P":
+          if (currentSelection()) { e.preventDefault(); setShowPronounce(true); }
+          break;
         default:
           break;
       }
@@ -656,6 +737,13 @@ export default function ReadingPalClient() {
       frag.appendChild(span);
     }
     container.appendChild(frag);
+
+
+    // lightweight CEFR annotate (non-blocking)
+    try {
+      const res = analyzeCEFR(text);
+      // (optional) you could underline >level words here
+    } catch { }
   }
 
   function currentSpans() {
@@ -773,6 +861,13 @@ export default function ReadingPalClient() {
       const sel = window.getSelection?.()?.toString().trim();
       const anchorText = sel || span.innerText.trim().slice(0, 160);
       openNoteAt(idx, anchorText);
+    };
+
+    const ctxHandler = (e) => {
+      const sel = currentSelection();
+      if (!sel) return; // let native menu if nothing selected
+      e.preventDefault();
+      setCtx({ x: e.clientX, y: e.clientY, selection: sel });
     };
 
     // Right-click (contextmenu): select the word under cursor so the Lookup bubble can appear
@@ -1134,36 +1229,46 @@ export default function ReadingPalClient() {
           The chapter text will appear here after selecting a book from the library.
         </div>
 
-        <NotesSidePanel
-          key={(uploadId ? `u-${uploadId}` : `b-${bookIndex}-c-${chapterIdx}`)}
-          uploadId={uploadId ? Number(uploadId) : null}
-          bookIndex={!uploadId && Number.isInteger(Number(bookIndex)) ? Number(bookIndex) : null}
-          chapterIndex={!uploadId ? chapterIdx : null}
-          onJump={(idx) => {
-            // jump to sentence and center it
-            const spans = Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
-            if (!spans.length) return;
-            const clamped = Math.max(0, Math.min(idx, spans.length - 1));
-            sentenceIndexRef.current = clamped;
-            setHighlight(clamped);
-            spans[clamped]?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }}
-          onChanged={(arr) => {
-            // rebuild underline decorations when notes change
-            try {
-              const map = {};
-              for (const n of (arr || [])) {
-                if (Number.isInteger(n?.sentenceIndex) && n?.color) {
-                  map[n.sentenceIndex] = n.color;
+        <div>
+          <NotesSidePanel
+            key={(uploadId ? `u-${uploadId}` : `b-${bookIndex}-c-${chapterIdx}`)}
+            uploadId={uploadId ? Number(uploadId) : null}
+            bookIndex={!uploadId && Number.isInteger(Number(bookIndex)) ? Number(bookIndex) : null}
+            chapterIndex={!uploadId ? chapterIdx : null}
+            onJump={(idx) => {
+              const spans = Array.from(textRef.current?.querySelectorAll(`.${styles.sentence}`) || []);
+              if (!spans.length) return;
+              const clamped = Math.max(0, Math.min(idx, spans.length - 1));
+              sentenceIndexRef.current = clamped;
+              setHighlight(clamped);
+              spans[clamped]?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            onChanged={(arr) => {
+              try {
+                const map = {};
+                for (const n of (arr || [])) {
+                  if (Number.isInteger(n?.sentenceIndex) && n?.color) {
+                    map[n.sentenceIndex] = n.color;
+                  }
                 }
-              }
-              noteMapRef.current = map;
-              clearNoteDecorations();
-              applyNoteDecorations(noteMapRef.current);
-            } catch { }
-          }}
-        />
+                noteMapRef.current = map;
+                clearNoteDecorations();
+                applyNoteDecorations(noteMapRef.current);
+              } catch { }
+            }}
+          />
+          <VocabPanel className={styles.vocabPanel} vocab={vocab} onAdd={() => addToVocab(vocab.word)} />
+        </div>
       </div>
+
+      {!!ctx && (
+        <div className={styles.ctxMenu} style={{ left: ctx.x, top: ctx.y }}>
+          <div className={styles.ctxItem} onClick={() => { doDefine(ctx.selection); setCtx(null); }}>Define “{ctx.selection.slice(0, 24)}”</div>
+          <div className={styles.ctxItem} onClick={() => { doTranslate(ctx.selection); setCtx(null); }}>Translate</div>
+          <div className={styles.ctxItem} onClick={() => { addToVocab(ctx.selection); setCtx(null); }}>Add to vocabulary</div>
+          <div className={styles.ctxItem} onClick={() => { setShowPronounce(true); setCtx(null); }}>Pronounce…</div>
+        </div>
+      )}
 
       {/* Selection lookup bubble & definition card */}
       <LookupBubble targetId="reading-text" />

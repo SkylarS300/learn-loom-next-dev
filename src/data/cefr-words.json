@@ -1,0 +1,79 @@
+{
+    "A1": [
+        "be",
+        "have",
+        "go",
+        "do",
+        "good",
+        "bad",
+        "book",
+        "apple",
+        "man",
+        "woman",
+        "child",
+        "day",
+        "time",
+        "like",
+        "want",
+        "need",
+        "say",
+        "see",
+        "come",
+        "make"
+    ],
+    "A2": [
+        "work",
+        "study",
+        "friend",
+        "family",
+        "because",
+        "before",
+        "after",
+        "better",
+        "best",
+        "help",
+        "learn",
+        "question",
+        "answer"
+    ],
+    "B1": [
+        "opinion",
+        "explain",
+        "improve",
+        "effort",
+        "research",
+        "discover",
+        "compare",
+        "example",
+        "although",
+        "however"
+    ],
+    "B2": [
+        "assume",
+        "approach",
+        "consider",
+        "evidence",
+        "context",
+        "effect",
+        "affect",
+        "analysis",
+        "method",
+        "feature"
+    ],
+    "C1": [
+        "notion",
+        "paradigm",
+        "approximate",
+        "interpretation",
+        "hypothesis",
+        "inference"
+    ],
+    "C2": [
+        "idiosyncratic",
+        "ephemeral",
+        "ubiquitous",
+        "serendipity",
+        "meticulous",
+        "ambivalent"
+    ]
+}
