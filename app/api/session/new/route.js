@@ -29,7 +29,9 @@ export async function POST() {
 
         // Set normalized session cookie (matches /api/session/code)
         const cs = await cookies();
-        const host = (headers().get("host") || "").toLowerCase();
+        const h = await headers();
+        const host = (h.get("host") || "").toLowerCase();
+
         const useDomain = host.endsWith("learnloom.xyz") ? ".learnloom.xyz" : undefined;
         const isProd = !!useDomain;
         const secure = isProd; // allow non-secure locally
