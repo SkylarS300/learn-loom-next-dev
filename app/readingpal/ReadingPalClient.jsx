@@ -863,94 +863,53 @@ export default function ReadingPalClient() {
       const anchorText = sel || span.innerText.trim().slice(0, 160);
       openNoteAt(idx, anchorText);
     };
-    // Right-click: select word under cursor so the Lookup bubble can use the selection.
-    const onContextMenu = (e) => {
-      // Only act inside the reading container
-      if (!container.contains(e.target)) return;
-      // Try to place a caret and expand to word
-      let range = null;
-      try {
-        if (document.caretRangeFromPoint) {
-          range = document.caretRangeFromPoint(e.clientX, e.clientY);
-        } else if (document.caretPositionFromPoint) {
-          const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-          if (pos) {
-            range = document.createRange();
-            range.setStart(pos.offsetNode, pos.offset);
-            range.collapse(true);
-          }
-        }
-      } catch { }
-      if (range) {
-        const sel = window.getSelection();
-        if (sel) {
-          sel.removeAllRanges();
-          sel.addRange(range);
-          // Expand to the word boundary when supported
-          try {
-            sel.modify?.("move", "backward", "word");
-            sel.modify?.("extend", "forward", "word");
-          } catch { }
-        }
-        // allow the browser context menu; your lookup UI can read selection on demand
-      }
-    };
-
-    const ctxHandler = (e) => {
-      const sel = currentSelection();
-      if (!sel) return; // let native menu if nothing selected
-      e.preventDefault();
-      setCtx({ x: e.clientX, y: e.clientY, selection: sel });
-    };
-
-    // Right-click (contextmenu): select the word under cursor so the Lookup bubble can appear
-    const ctxHandler = (e) => {
-      const rangeAtPoint = (node, offset) => {
+    // Unified right-click handler: select word under cursor and open our custom menu
+    const handleContextMenu = (e) => {
+      if (!container.contains(e.target)) return; // only inside reader
+      // Build a range at the click point, then expand to word boundaries
+      const makeWordRange = (x, y) => {
         try {
+          const caret =
+            document.caretPositionFromPoint?.(x, y) ||
+            document.caretRangeFromPoint?.(x, y);
+          let node, offset;
+          if (!caret) return null;
+          if ("offsetNode" in caret) { node = caret.offsetNode; offset = caret.offset; }
+          else { node = caret.startContainer; offset = caret.startOffset; }
+          if (!(node && node.nodeType === Node.TEXT_NODE)) return null;
           const r = document.createRange();
           r.setStart(node, offset);
           r.setEnd(node, offset);
-          // expand to word boundaries
-          const expand = () => {
-            const txt = r.startContainer.textContent || "";
-            let s = r.startOffset, eOff = r.endOffset;
-            while (s > 0 && /[A-Za-z'-]/.test(txt[s - 1])) s--;
-            while (eOff < txt.length && /[A-Za-z'-]/.test(txt[eOff])) eOff++;
-            r.setStart(r.startContainer, s);
-            r.setEnd(r.endContainer, eOff);
-          };
-          expand();
+          const txt = node.textContent || "";
+          let s = r.startOffset, eOff = r.endOffset;
+          while (s > 0 && /[A-Za-z'-]/.test(txt[s - 1])) s--;
+          while (eOff < txt.length && /[A-Za-z'-]/.test(txt[eOff])) eOff++;
+          r.setStart(node, s);
+          r.setEnd(node, eOff);
           return r;
         } catch { return null; }
       };
       try {
-        const x = e.clientX, y = e.clientY;
-        const caret = document.caretPositionFromPoint?.(x, y) || document.caretRangeFromPoint?.(x, y);
-        let node, offset;
-        if (caret) {
-          if ("offsetNode" in caret) { node = caret.offsetNode; offset = caret.offset; }
-          else { node = caret.startContainer; offset = caret.startOffset; }
+        const range = makeWordRange(e.clientX, e.clientY);
+        if (range) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
         }
-        if (node && node.nodeType === Node.TEXT_NODE) {
-          const r = rangeAtPoint(node, offset);
-          if (r) {
-            e.preventDefault();
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(r);
-            // LookupBubble listens to selectionchange and will show the bubble
-          }
-        }
+        const picked = currentSelection();
+        if (!picked) return; // no selection ⇒ allow native menu
+        e.preventDefault(); // show our custom menu instead
+        setCtx({ x: e.clientX, y: e.clientY, selection: picked });
       } catch { /* noop */ }
     };
 
     container.addEventListener("click", clickHandler);
     container.addEventListener("dblclick", dblHandler);
-    container.addEventListener("contextmenu", ctxHandler);
+    container.addEventListener("contextmenu", handleContextMenu);
     return () => {
       container.removeEventListener("click", clickHandler);
       container.removeEventListener("dblclick", dblHandler);
-      container.removeEventListener("contextmenu", ctxHandler);
+      container.removeEventListener("contextmenu", handleContextMenu);
     };
   }, []); // handlers read from refs; no need to re-bind
 
