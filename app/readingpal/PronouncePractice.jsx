@@ -14,6 +14,16 @@ export default function PronouncePractice({ open, text, onClose }) {
 
     useEffect(() => { if (!open) { setRecording(false); setScore(null); setMsg(""); } }, [open]);
 
+    useEffect(() => {
+        if (open && text) {
+            try {
+                const u = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(u);
+            } catch { }
+        }
+    }, [open, text]);
+
     if (!open) return null;
 
     async function start() {

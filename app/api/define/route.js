@@ -31,6 +31,19 @@ const DICT = {
     // add a few more common words as you wish…
 };
 
+function toPayload(key, hit) {
+    // Unify the shape: always return { ok, lemma, definition, defs, example, phonetic }
+    const defs = hit?.defs || [];
+    return {
+        ok: true,
+        lemma: key,
+        definition: defs[0] || "",
+        defs,
+        example: hit?.example || "",
+        phonetic: hit?.phonetic || "",
+    };
+}
+
 export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const Schema = z.object({ term: z.string().trim().min(1).max(64) });
@@ -42,15 +55,10 @@ export async function GET(req) {
     const key = raw.replace(/[^a-z'-]/g, "");
     const hit = DICT[key];
 
-    // Always respond OK (so UI can show "no definition found" gracefully)
-    return Response.json({
-        ok: true,
-        data: hit
-            ? { lemma: key, defs: hit.defs, example: hit.example, phonetic: hit.phonetic }
-            : { lemma: key, defs: [], example: "" },
-    }, {
-        headers: { "Cache-Control": "public, max-age=120, s-maxage=120" },
-    });
+    return Response.json(
+        toPayload(key, hit),
+        { headers: { "Cache-Control": "public, max-age=120, s-maxage=120" } }
+    );
 }
 
 // --- NEW: POST for richer definition via model, with graceful fallback to DICT ---
@@ -110,3 +118,20 @@ export async function POST(req) {
 
 
 export const dynamic = "force-dynamic";
+
+
+// Also accept POST { term | word }
+export async function POST(req) {
+    try {
+        const body = await req.json().catch(() => ({}));
+        const term = String(body.term || body.word || "").trim().toLowerCase();
+        if (!term) {
+            return Response.json({ ok: false, error: "Missing term" }, { status: 400 });
+        }
+        const key = term.replace(/[^a-z'-]/g, "");
+        const hit = DICT[key];
+        return Response.json(toPayload(key, hit));
+    } catch (e) {
+        return Response.json({ ok: false, error: "DEFINE_POST_FAILED" }, { status: 500 });
+    }
+}
