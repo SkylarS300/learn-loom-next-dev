@@ -863,6 +863,38 @@ export default function ReadingPalClient() {
       const anchorText = sel || span.innerText.trim().slice(0, 160);
       openNoteAt(idx, anchorText);
     };
+    // Right-click: select word under cursor so the Lookup bubble can use the selection.
+    const onContextMenu = (e) => {
+      // Only act inside the reading container
+      if (!container.contains(e.target)) return;
+      // Try to place a caret and expand to word
+      let range = null;
+      try {
+        if (document.caretRangeFromPoint) {
+          range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        } else if (document.caretPositionFromPoint) {
+          const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+          if (pos) {
+            range = document.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+          }
+        }
+      } catch { }
+      if (range) {
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+          // Expand to the word boundary when supported
+          try {
+            sel.modify?.("move", "backward", "word");
+            sel.modify?.("extend", "forward", "word");
+          } catch { }
+        }
+        // allow the browser context menu; your lookup UI can read selection on demand
+      }
+    };
 
     const ctxHandler = (e) => {
       const sel = currentSelection();
