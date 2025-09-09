@@ -462,8 +462,11 @@ export default function ReadingPalClient() {
             textRef.current.removeEventListener("scroll", scrollHandlerRef.current);
           }
           const h = () => throttledScrollSave(key, textRef.current);
+          // remove any previous handler before attaching a new one
+          if (scrollHandlerRef.current && textRef.current) {
+            textRef.current.removeEventListener("scroll", scrollHandlerRef.current);
+          }
           scrollHandlerRef.current = h;
-          textRef.current.addEventListener("scroll", h);
           textRef.current.addEventListener("scroll", h);
           setTimeout(() => applySavedScroll(key, textRef.current), 80);
           if (fontSizeRef.current) {
@@ -519,13 +522,6 @@ export default function ReadingPalClient() {
     };
     prev?.addEventListener("click", goPrev);
     next?.addEventListener("click", goNext);
-
-    // color palette
-    document.querySelectorAll(`.${styles.swatch}`).forEach((el) => {
-      el.addEventListener("click", function () {
-        highlightedColorRef.current = window.getComputedStyle(this).backgroundColor;
-      });
-    });
 
     return () => {
       prev?.removeEventListener("click", goPrev);
@@ -680,6 +676,11 @@ export default function ReadingPalClient() {
 
       const key = `scroll_book_${bookIndex}_${chapterIndex}`;
       const h = () => throttledScrollSave(key, textRef.current);
+      // remove any previous handler before attaching a new one
+      if (scrollHandlerRef.current && textRef.current) {
+        textRef.current.removeEventListener("scroll", scrollHandlerRef.current);
+      }
+      scrollHandlerRef.current = h;
       textRef.current.addEventListener("scroll", h);
       setTimeout(() => applySavedScroll(key, textRef.current), 80);
       if (fontSizeRef.current) {
@@ -1429,8 +1430,10 @@ export default function ReadingPalClient() {
                 key={c}
                 className={styles.swatch}
                 style={{ backgroundColor: c }}
-                onClick={() => {
-                  const color = window.getComputedStyle?.(event.currentTarget).backgroundColor || c;
+                role="button"
+                aria-label={`Set highlight color ${c}`}
+                onClick={(e) => {
+                  const color = window.getComputedStyle(e.currentTarget).backgroundColor || c;
                   highlightedColorRef.current = color;
                   try { localStorage.setItem(hlColorKey, color); } catch { }
                 }}
