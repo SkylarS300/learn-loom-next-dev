@@ -6,6 +6,7 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
   relationMode = "prisma" 
+    shadowDatabaseUrl  = env("SHADOW_DATABASE_URL")
 }
 
 enum live_mode {
@@ -79,6 +80,7 @@ model Word {
   studies    WordStudy[]
 
   @@unique([lemma, pos])
+  @@index([lemma])                // quick lookup when POS isn’t provided
   @@index([cefrLevel, pos])
 }
 
@@ -105,6 +107,10 @@ model WordEncounter {
   @@index([anonId, createdAt])
   @@index([wordId])
   @@index([anonId, wordId, source])
+  @@index([source, createdAt])                 // feed & reporting
+  @@index([bookIndex, chapterIndex, sentenceIndex])
+  @@index([uploadId])
+  @@index([concept, subTopic])
 }
 
 model WordStudy {
@@ -141,6 +147,7 @@ model GrammarAbility {
 
   @@unique([anonId, concept, subTopic])
   @@index([updatedAt])
+  @@index([concept, subTopic])     // quick fetch by topic for adaptive start points
 }
 
 model assignmenttarget {
