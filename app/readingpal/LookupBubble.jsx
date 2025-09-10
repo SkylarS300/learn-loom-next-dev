@@ -95,7 +95,12 @@ export default function LookupBubble({ targetId = "reading-text" }) {
             const r = await fetch(`/api/define?term=${encodeURIComponent(word)}`, { cache: "no-store" });
             const j = await r.json();
             if (!j?.ok) throw new Error(j?.error || "Lookup failed");
-            const data = j.data || { defs: [] };
+            // Support both response shapes (current top-level vs. legacy {data:{...}})
+            const data = j.data ?? {
+                defs: j.defs || [],
+                example: j.example || "",
+                phonetic: j.phonetic || "",
+            };
             setCard({ word, data });
             // Save to local recent words (for dashboard)
             try {

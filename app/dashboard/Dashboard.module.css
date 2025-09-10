@@ -8,6 +8,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
+    /* prevent overflow on small screens */
 }
 
 .growRight {
@@ -79,10 +81,26 @@
     text-decoration: none;
     border-radius: 6px;
     cursor: pointer;
+    line-height: 1.2;
+    padding: 8px 12px;
+}
+
+.btn {
+    background: #0070f3;
+    color: #fff;
+    border: none;
+}
+
+.btnSecondary {
+    background: #e9eefc;
+    color: #0b3b9f;
+    border: 1px solid #c9d7fb;
+}
+
+.btnDanger {
     background: #ef4444;
     color: #fff;
     border: none;
-    padding: 8px 12px;
 }
 
 .chips {

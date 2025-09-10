@@ -217,30 +217,12 @@ export default function DashboardPage() {
               <p>No recent upload reading.</p>
             )}
           </div>
-
-          {/* Grammar */}
-          <div className={styles.card}>
-            <h3 style={{ marginTop: 0 }}>🧠 Grammar</h3>
-            {grammar ? (
-              <>
-                <p>
-                  Last practiced: <strong>{grammar.concept}</strong>
-                  {grammar.subTopic ? ` — ${grammar.subTopic}` : ""}
-                </p>
-                <button onClick={() => (window.location.href = `/grammar`)} className={styles.btn}>
-                  Practice More
-                </button>
-              </>
-            ) : (
-              <p>No recent grammar practice.</p>
-            )}
-          </div>
         </section>
 
         {/* Recent grammar mini-card */}
         <section className={styles.sectionTight}>
           <RecentGrammarCard />
-          <div style={{ height: 12 }}>
+          <div style={{ marginTop: 12 }}>
             <MyWordsCard />
           </div>
         </section>

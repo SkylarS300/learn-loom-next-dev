@@ -47,19 +47,28 @@ function toPayload(key, hit) {
 }
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs"; // avoid any edge/runtime surprises with libs
 
 export async function GET(req) {
-    const { searchParams } = new URL(req.url);
-    const Schema = z.object({ term: z.string().trim().min(1).max(64) });
-    const parsed = Schema.safeParse({ term: searchParams.get("term") || "" });
-    if (!parsed.success) {
-        return Response.json({ ok: false, error: "Missing term" }, { status: 400 });
+    try {
+        const { searchParams } = new URL(req.url);
+        const Schema = z.object({ term: z.string().trim().min(1).max(64) });
+        const parsed = Schema.safeParse({ term: searchParams.get("term") || "" });
+        if (!parsed.success) {
+            return Response.json({ ok: false, error: "Missing term" }, { status: 400 });
+        }
+        const key = normalizeTerm(parsed.data.term);
+        const hit = DICT[key];
+        if (!hit) {
+            return Response.json({ ok: false, error: "NOT_FOUND", lemma: key }, { status: 404 });
+        }
+        return Response.json(
+            toPayload(key, hit),
+            { headers: { "Cache-Control": "public, max-age=120, s-maxage=120" } }
+        );
+    } catch (err) {
+        return Response.json({ ok: false, error: "DEFINE_GET_FAILED" }, { status: 500 });
     }
-    const key = normalizeTerm(parsed.data.term);
-    return Response.json(
-        toPayload(key, DICT[key]),
-        { headers: { "Cache-Control": "public, max-age=120, s-maxage=120" } }
-    );
 }
 
 export async function POST(req) {
@@ -68,7 +77,11 @@ export async function POST(req) {
         const raw = body.term || body.word || "";
         const key = normalizeTerm(raw);
         if (!key) return Response.json({ ok: false, error: "Missing term" }, { status: 400 });
-        return Response.json(toPayload(key, DICT[key]));
+        const hit = DICT[key];
+        if (!hit) {
+            return Response.json({ ok: false, error: "NOT_FOUND", lemma: key }, { status: 404 });
+        }
+        return Response.json(toPayload(key, hit));
     } catch {
         return Response.json({ ok: false, error: "DEFINE_POST_FAILED" }, { status: 500 });
     }

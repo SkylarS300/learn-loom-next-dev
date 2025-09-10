@@ -29,8 +29,9 @@ export async function POST() {
 
         // Set normalized session cookie (matches /api/session/code)
         const cs = await cookies();
-        const h = await headers();
-        const host = (h.get("host") || "").toLowerCase();
+        const h = headers(); // sync in App Router
+        // prefer x-forwarded-host on Vercel/proxies, fallback to host
+        const host = (h.get("x-forwarded-host") || h.get("host") || "").toLowerCase();
 
         const useDomain = host.endsWith("learnloom.xyz") ? ".learnloom.xyz" : undefined;
         const isProd = !!useDomain;
@@ -39,7 +40,7 @@ export async function POST() {
         cs.set("learnloomId", anonId, {
             path: "/",
             httpOnly: true,     // client does not need to read anonId
-            sameSite: "Lax",
+            sameSite: "lax",
             maxAge: 60 * 60 * 24 * 365 * 5,
             ...(useDomain ? { domain: useDomain } : {}),
             secure,

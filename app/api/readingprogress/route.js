@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 // Tunable guard to reduce “instant completions”
 const MIN_CHAPTER_TIME_MS = 45_000; // 45s; conservative and user-friendly
 
