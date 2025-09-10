@@ -7,17 +7,26 @@ export async function GET() {
     const c = await cookies();
     const anonId = c.get("learnloomId")?.value;
     if (!anonId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    if (!("wordstudy" in prisma)) {
-        return NextResponse.json({ ok: false, error: "Vocab storage not migrated yet" }, { status: 501 });
-    }
     try {
-        const rows = await prisma.wordstudy.findMany({
-            where: { anonId, OR: [{ dueAt: null }, { dueAt: { lte: new Date() } }] },
+        const now = new Date();
+        const rows = await prisma.wordStudy.findMany({
+            where: { anonId, OR: [{ nextDue: null }, { nextDue: { lte: now } }] },
             include: { word: true },
-            take: 20
+            take: 20,
+            orderBy: [{ nextDue: "asc" }, { updatedAt: "desc" }],
         });
-        return NextResponse.json({ ok: true, items: rows.map(r => ({ id: r.id, lemma: r.word.lemma, display: r.word.display })) });
-    } catch {
+        return NextResponse.json({
+            ok: true,
+            items: rows.map((r) => ({
+                id: r.id,
+                lemma: r.word?.lemma,
+                display: r.word?.display || r.word?.lemma,
+                pos: r.word?.pos || "",
+                nextDue: r.nextDue,
+                intervalDays: r.intervalDays ?? null,
+            })),
+        });
+    } catch (e) {
         return NextResponse.json({ ok: false, error: "Failed" }, { status: 500 });
     }
 }
