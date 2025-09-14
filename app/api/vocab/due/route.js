@@ -28,7 +28,7 @@ export async function GET() {
             const w = byId.get(r.wordId) || {};
             return { id: r.id, lemma: w.lemma, display: w.display || w.lemma, pos: w.pos || "", nextDue: r.nextDue, intervalDays: r.intervalDays ?? null };
         });
-        return NextResponse.json({ ok: true, items });
+        return NextResponse.json({ ok: true, items }, { headers: { "Cache-Control": "no-store" } });
     } catch (e) {
         // Fallback to legacy columns (dueAt, interval)
         try {
@@ -45,7 +45,7 @@ export async function GET() {
                 const w = byId.get(r.wordId) || {};
                 return { id: r.id, lemma: w.lemma, display: w.display || w.lemma, pos: w.pos || "", nextDue: r.dueAt, intervalDays: r.interval ?? null };
             });
-            return NextResponse.json({ ok: true, items, note: "legacy-due" });
+            return NextResponse.json({ ok: true, items, note: "legacy-due" }, { headers: { "Cache-Control": "no-store" } });
         } catch (e2) {
             // eslint-disable-next-line no-console
             console.error("[/api/vocab/due] failed:", e2);

@@ -48,6 +48,7 @@ function toPayload(key, hit) {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // avoid any edge/runtime surprises with libs
+export const revalidate = 0; // no caching
 
 async function fetchExternalDefinition(raw) {
     // Try several variants: as-is, no hyphens, split-on-hyphen first part, naive lemma
@@ -132,7 +133,7 @@ export async function POST(req) {
         if (!key) return Response.json({ ok: false, error: "Missing term" }, { status: 400 });
         const hit = DICT[key] || await fetchExternalDefinition(key);
         if (!hit) return Response.json({ ok: false, error: "NOT_FOUND", lemma: key }, { status: 404 });
-        return Response.json(toPayload(hit.lemma || key, hit));
+        return Response.json(toPayload(hit.lemma || key, hit), { headers: { "Cache-Control": "public, max-age=300, s-maxage=300" } });
     } catch {
         return Response.json({ ok: false, error: "DEFINE_POST_FAILED" }, { status: 500 });
     }

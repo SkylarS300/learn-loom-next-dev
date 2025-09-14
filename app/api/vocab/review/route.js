@@ -31,5 +31,5 @@ export async function POST(req) {
         data: { ease, reps: (row.reps ?? 0) + 1, intervalDays, nextDue, lastResult: rating },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
