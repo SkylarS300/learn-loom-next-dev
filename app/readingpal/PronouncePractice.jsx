@@ -11,6 +11,8 @@ export default function PronouncePractice({ open, text, onClose }) {
     const meterRef = useRef(null);
     const mediaRef = useRef(null);
     const recRef = useRef(null);
+    const recogRef = useRef(null);
+    const lastTranscriptRef = useRef("");
 
     useEffect(() => { if (!open) { setRecording(false); setScore(null); setMsg(""); } }, [open]);
 
@@ -45,6 +47,26 @@ export default function PronouncePractice({ open, text, onClose }) {
             tick();
             // minimal “recording” – we don’t need audio data for local scoring
             setMsg("Speak the word clearly…");
+
+            // Start Web Speech recognition if available
+            try {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SR) {
+                    const recog = new SR();
+                    recog.lang = "en-US";
+                    recog.interimResults = false;
+                    recog.maxAlternatives = 1;
+                    recog.onresult = (e) => {
+                        const t = e.results?.[0]?.[0]?.transcript || "";
+                        lastTranscriptRef.current = t;
+                    };
+                    recog.onerror = () => { /* ignore; we’ll still stop and score */ };
+                    recogRef.current = recog;
+                    recog.start();
+                } else {
+                    lastTranscriptRef.current = "";
+                }
+            } catch { /* no-op */ }
             setTimeout(stop, 2000);
         } catch {
             setMsg("Microphone permission denied.");
@@ -54,9 +76,11 @@ export default function PronouncePractice({ open, text, onClose }) {
         setRecording(false);
         mediaRef.current?.getTracks()?.forEach(t => t.stop());
         mediaRef.current = null;
-        const s = scorePronunciation(text || "");
+        try { recogRef.current?.stop?.(); } catch { }
+        const attempt = lastTranscriptRef.current || "";
+        const s = scorePronunciation(text || "", attempt);
         setScore(s);
-        setMsg(s.tips);
+        setMsg(attempt ? s.tips : "Couldn’t capture speech—try again, or type it.");
     }
 
     return (
@@ -79,6 +103,22 @@ export default function PronouncePractice({ open, text, onClose }) {
                     <div className={styles.subcard} style={{ marginTop: 8 }}>
                         <div><strong>Score:</strong> {Math.round(score.score * 100)} / 100</div>
                         <div className={styles.dim} style={{ marginTop: 6 }}>{msg}</div>
+                        {(!lastTranscriptRef.current) && (
+                            <div style={{ marginTop: 8 }}>
+                                <label className={styles.dim} style={{ display: "block", marginBottom: 4 }}>
+                                    Couldn’t hear you? Type what you said:
+                                </label>
+                                <input
+                                    type="text"
+                                    style={{ width: "100%", padding: 8, border: "1px solid #e5e7eb", borderRadius: 8 }}
+                                    onChange={(e) => {
+                                        const s = scorePronunciation(text || "", e.target.value);
+                                        setScore(s);
+                                        setMsg(s.tips);
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

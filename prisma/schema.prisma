@@ -126,6 +126,9 @@ model WordStudy {
   lastResult   String?   // "Again" | "Hard" | "Good" | "Easy"
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  note         String?  // personal note
+  example      String?  // learner’s own example sentence
+
 
   word Word @relation(fields: [wordId], references: [id])
 
