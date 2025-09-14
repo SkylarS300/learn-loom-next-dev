@@ -35,6 +35,8 @@ export async function GET(req) {
                 lapses: true,
                 createdAt: true,
                 updatedAt: true,
+                note: true,
+                example: true,
                 word: {
                     select: {
                         id: true,
@@ -58,8 +60,10 @@ export async function GET(req) {
             wordId: r.word.id,
             lemma: r.word.lemma,
             display: r.word.display || r.word.lemma,
-            pos: r.word.pos || null,
-            cefr: r.word.cefrLevel,
+            pos: r.word.pos && r.word.pos !== "unknown" ? r.word.pos : null,
+            cefr: r.word.cefrLevel && r.word.cefrLevel !== "UNKNOWN" ? r.word.cefrLevel : null,
+            note: r.note || null,
+            example: r.example || r.word.encounters?.[0]?.context || null,
             stats: {
                 reps: r.reps,
                 lapses: r.lapses,

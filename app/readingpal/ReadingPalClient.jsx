@@ -238,9 +238,10 @@ export default function ReadingPalClient() {
     const q = text || currentSelection();
     if (!q) return;
     try {
+      const pos = detectPOS(q) || "unknown";
       await fetch("/api/vocab/add", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word: q, lemma: toLemma(q) })
+        body: JSON.stringify({ word: q, lemma: toLemma(q), pos })
       });
       toast("⭐ Added to vocabulary");
     } catch { toast("⚠️ Could not add"); }

@@ -334,3 +334,56 @@
     border-radius: 999px;
     padding: 2px 8px;
 }
+
+/* --- Reusable modal styles (match readingpal) --- */
+.modalBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .35);
+    display: grid;
+    place-items: center;
+    z-index: 120;
+}
+
+.modalCard {
+    width: min(720px, 92vw);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+}
+
+.modalHeader {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.modalTitle {
+    margin: 0;
+}
+
+.modalCloseX {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: #6b7280;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.modalCloseX:hover,
+.modalCloseX:focus {
+    background: #f3f4f6;
+    outline: 2px solid #e5e7eb;
+    outline-offset: 2px;
+}
+
+.modalBody {
+    margin-top: 8px;
+}

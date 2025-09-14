@@ -1,29 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import styles from "./Dashboard.module.css";
 
+/* Reusable modal matching your dashboard styles */
 function Modal({ open, title, children, onClose }) {
+    useEffect(() => {
+        if (!open) return;
+        function onKey(e) { if (e.key === "Escape") onClose(); }
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [open, onClose]);
+
     if (!open) return null;
     return (
-        <div style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
-            display: "grid", placeItems: "center", zIndex: 120
-        }}
-            onClick={onClose}
-        >
-            <div
-                style={{
-                    width: "min(560px,92vw)", background: "#fff", border: "1px solid #e5e7eb",
-                    borderRadius: 12, padding: 14, boxShadow: "0 10px 30px rgba(0,0,0,.15)"
-                }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8 }}>
-                    <h4 style={{ margin: 0 }}>{title}</h4>
-                    <button className={styles.btnSecondary} onClick={onClose}>Close</button>
+        <div className={styles.modalBackdrop} onClick={onClose}>
+            <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.modalHeader}>
+                    <h3 className={styles.modalTitle}>{title}</h3>
+                    <button className={styles.modalCloseX} onClick={onClose} aria-label="Close">×</button>
                 </div>
-                <div style={{ marginTop: 8 }}>{children}</div>
+                <div className={styles.modalBody}>{children}</div>
             </div>
         </div>
     );
@@ -36,58 +33,52 @@ export default function MyWordsCard() {
     const [loading, setLoading] = useState(true);
 
     const [noteOpen, setNoteOpen] = useState(false);
-    const [noteSeed, setNoteSeed] = useState({ studyId: null, word: "", current: "", example: "" });
+    const [noteSeed, setNoteSeed] = useState({ studyId: null, word: "", note: "", example: "" });
 
+    // Initial load: try server list, fallback to local
     useEffect(() => {
-        // device list
-        try {
-            const raw = localStorage.getItem("myWordsV1");
-            const arr = JSON.parse(raw || "[]");
-            setDeviceItems(Array.isArray(arr) ? arr.slice(0, 50) : []);
-        } catch { setDeviceItems([]); }
+        let dead = false;
 
-        // server list
         (async () => {
             try {
-                setLoading(true);
                 const r = await fetch("/api/vocab/list?take=20", { cache: "no-store" });
-                const j = await r.json();
-                if (j?.ok) setServerItems(j.items || []);
-            } catch { /* no-op */ }
-            finally { setLoading(false); }
+                if (r.ok) {
+                    const j = await r.json();
+                    if (!dead && j?.ok) {
+                        setServerItems(j.items || []);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch { /* fall back */ }
+
+            // Fallback: device-local words
+            try {
+                const raw = localStorage.getItem("myWordsV1");
+                const arr = JSON.parse(raw || "[]");
+                if (!dead) setDeviceItems(Array.isArray(arr) ? arr.slice(0, 20) : []);
+            } catch { if (!dead) setDeviceItems([]); }
+            if (!dead) setLoading(false);
         })();
+
+        return () => { dead = true; };
     }, []);
 
+    // Actions
     async function del(studyId) {
         const row = serverItems.find(x => x.studyId === studyId);
         if (!row) return;
-        if (!confirm(`Remove "${row.display || row.lemma}" from your study list?`)) return;
+        if (!confirm(`Remove “${row.display || row.lemma}” from your study list?`)) return;
         try {
-            await fetch("/api/vocab/delete", {
+            const r = await fetch("/api/vocab/delete", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ wordId: row.wordId }),
+                body: JSON.stringify({ studyId }),
             });
-            setServerItems((xs) => xs.filter(x => x.studyId !== studyId));
+            if (r.ok) {
+                setServerItems(xs => xs.filter(x => x.studyId !== studyId));
+            }
         } catch { /* ignore */ }
-    }
-
-    async function review(studyId, rating) {
-        try {
-            await fetch("/api/vocab/review", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: studyId, rating }),
-            });
-            // optimistic: move the item to the end
-            setServerItems((xs) => {
-                const idx = xs.findIndex(x => x.studyId === studyId);
-                if (idx < 0) return xs;
-                const copy = xs.slice();
-                const [it] = copy.splice(idx, 1);
-                copy.push(it);
-                return copy;
-            });
-        } catch { /* no-op */ }
     }
 
     function openNote(studyId) {
@@ -96,7 +87,7 @@ export default function MyWordsCard() {
         setNoteSeed({
             studyId,
             word: row.display || row.lemma,
-            current: row.note || "",
+            note: row.note || "",
             example: row.example || "",
         });
         setNoteOpen(true);
@@ -104,24 +95,31 @@ export default function MyWordsCard() {
 
     async function saveNote() {
         try {
-            await fetch("/api/vocab/note", {
-                method: "POST", headers: { "Content-Type": "application/json" },
+            const wordId = serverItems.find(x => x.studyId === noteSeed.studyId)?.wordId;
+            const r = await fetch("/api/vocab/note", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    wordId: serverItems.find(x => x.studyId === noteSeed.studyId)?.wordId,
-                    note: noteSeed.current,
+                    wordId,
+                    note: noteSeed.note,
                     example: noteSeed.example,
                 }),
             });
-            setServerItems((xs) => xs.map(x => x.studyId === noteSeed.studyId
-                ? { ...x, note: noteSeed.current, example: noteSeed.example }
-                : x));
-            setNoteOpen(false);
-        } catch { /* no-op */ }
+            if (r.ok) {
+                setServerItems(xs =>
+                    xs.map(x =>
+                        x.studyId === noteSeed.studyId ? { ...x, note: noteSeed.note, example: noteSeed.example } : x
+                    )
+                );
+                setNoteOpen(false);
+            }
+        } catch { /* ignore */ }
     }
 
     const active = tab === "server" ? serverItems : deviceItems;
 
-    if (!active.length && tab === "device") {
+    // Empty device list view
+    if (tab === "device" && !active.length) {
         return (
             <div className={styles.card}>
                 <h4 className={styles.h4} style={{ marginTop: 0 }}>🗂️ My Words</h4>
@@ -164,15 +162,30 @@ export default function MyWordsCard() {
                                     <div className={styles.assignmentMain}>
                                         <div className={styles.titleRow}>
                                             <span className={styles.assignmentTitle}>{w.display || w.lemma}</span>
-                                            <span className={styles.typeBadge}>{w.pos || "—"} · {w.cefr}</span>
+                                            {((w.pos && w.pos !== "unknown") || (w.cefr && w.cefr !== "UNKNOWN")) && (
+                                                <span className={styles.typeBadge}>
+                                                    {w.pos && w.pos !== "unknown" ? w.pos : "—"} · {w.cefr && w.cefr !== "UNKNOWN" ? w.cefr : "—"}
+                                                </span>
+                                            )}
                                         </div>
-                                        {w.note && <div className={styles.dim} style={{ marginTop: 4 }}>{w.note}</div>}
-                                        {w.example && <div className={styles.dim} style={{ marginTop: 2 }}><em>“{w.example}”</em></div>}
+                                        {w.note && (
+                                            <div className={styles.dim} style={{ marginTop: 4 }}>
+                                                {w.note}
+                                            </div>
+                                        )}
+                                        {w.example && (
+                                            <div className={styles.dim} style={{ marginTop: 2 }}>
+                                                <em>“{w.example}”</em>
+                                            </div>
+                                        )}
+                                        {w.stats?.nextDue && (
+                                            <div className={styles.dim} style={{ marginTop: 4 }}>
+                                                Due {new Date(w.stats.nextDue).toLocaleDateString()}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className={styles.assignmentActions}>
                                         <button className={styles.btnSecondary} onClick={() => openNote(w.studyId)}>✏️ Note</button>
-                                        <button className={styles.btnSecondary} onClick={() => review(w.studyId, "good")}>Good</button>
-                                        <button className={styles.btnSecondary} onClick={() => review(w.studyId, "easy")}>Easy</button>
                                         <button className={styles.btnDanger} onClick={() => del(w.studyId)}>Delete</button>
                                     </div>
                                 </li>
@@ -214,9 +227,10 @@ export default function MyWordsCard() {
                     <span>Personal note</span>
                     <textarea
                         rows={4}
-                        value={noteSeed.current}
-                        onChange={(e) => setNoteSeed(s => ({ ...s, current: e.target.value.slice(0, 2000) }))}
-                        style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
+                        value={noteSeed.note}
+                        onChange={(e) => setNoteSeed(s => ({ ...s, note: e.target.value.slice(0, 2000) }))}
+                        className={styles.textarea}
+                        style={{ width: "100%" }}
                     />
                 </label>
                 <label style={{ display: "grid", gap: 6, marginTop: 8 }}>
@@ -225,7 +239,8 @@ export default function MyWordsCard() {
                         type="text"
                         value={noteSeed.example}
                         onChange={(e) => setNoteSeed(s => ({ ...s, example: e.target.value.slice(0, 500) }))}
-                        style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
+                        className={styles.input}
+                        style={{ width: "100%" }}
                     />
                 </label>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>

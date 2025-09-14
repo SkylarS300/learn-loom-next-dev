@@ -43,6 +43,8 @@ function toPayload(key, hit) {
         defs,
         example: hit?.example || "",
         phonetic: hit?.phonetic || "",
+        pos: hit?.pos || "",          // NEW
+        cefr: hit?.cefr || "UNKNOWN", // NEW
     };
 }
 
@@ -85,12 +87,27 @@ async function fetchExternalDefinition(raw) {
             if (!entry) continue;
             const phonetic = entry.phonetic || (entry.phonetics?.find(p => p.text)?.text) || "";
             const defs = [];
+            let coarsePos = "";
             for (const m of entry.meanings || []) {
+                if (!coarsePos && m.partOfSpeech) {
+                    const p = String(m.partOfSpeech).toLowerCase();
+                    // map to a small set of coarse tags
+                    coarsePos =
+                        p.includes("verb") ? "verb" :
+                            p.includes("noun") ? "noun" :
+                                p.includes("adj") ? "adjective" :
+                                    p.includes("adv") ? "adverb" :
+                                        p.includes("prep") ? "preposition" :
+                                            p.includes("conj") ? "conjunction" :
+                                                p.includes("pron") ? "pronoun" : p;
+                }
                 for (const d of m.definitions || []) {
                     if (d.definition) defs.push(d.definition);
                 }
             }
             if (defs.length) {
+                // naive CEFR heuristic (placeholder): you can swap for a real service later
+                const cefr = defs[0].length < 60 ? "A2" : defs[0].length < 120 ? "B1" : "B2";
                 return {
                     ok: true,
                     lemma: v,
@@ -98,6 +115,8 @@ async function fetchExternalDefinition(raw) {
                     defs,
                     example: (entry.meanings?.[0]?.definitions?.[0]?.example) || "",
                     phonetic,
+                    pos: coarsePos || "",
+                    cefr,
                 };
             }
         } catch { /* keep trying variants */ }

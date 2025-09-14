@@ -13,16 +13,23 @@ export async function POST(req) {
         const { wordId, note, example } = await req.json().catch(() => ({}));
         if (!wordId) return Response.json({ ok: false, error: "Missing wordId" }, { status: 400 });
 
-        const ws = await prisma.wordStudy.findFirst({ where: { anonId, wordId: Number(wordId) }, select: { id: true } });
+        const ws = await prisma.wordStudy.findFirst({
+            where: { anonId, wordId: Number(wordId) },
+            select: { id: true }
+        });
         if (!ws) return Response.json({ ok: false, error: "Not found" }, { status: 404 });
 
         await prisma.wordStudy.update({
             where: { id: ws.id },
-            data: { note: String(note || "").slice(0, 2000) || null, example: String(example || "").slice(0, 500) || null },
+            data: {
+                note: (note ?? "").slice(0, 2000) || null,
+                example: (example ?? "").slice(0, 500) || null,
+            },
         });
 
         return Response.json({ ok: true });
     } catch (e) {
+        console.error("[/api/vocab/note] failed", e);
         return Response.json({ ok: false, error: "NOTE_FAILED" }, { status: 500 });
     }
 }

@@ -153,6 +153,25 @@
     margin: 0;
 }
 
+/* universal close "X" for all modals in ReadingPal */
+.modalCloseX {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: #6b7280;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.modalCloseX:hover,
+.modalCloseX:focus {
+    background: #f3f4f6;
+    outline: 2px solid #e5e7eb;
+    outline-offset: 2px;
+}
+
 .label {
     display: grid;
     gap: 6px;
