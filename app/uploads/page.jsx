@@ -85,6 +85,9 @@ export default function UploadsPage() {
                                     <br />
                                     <span style={{ fontSize: "0.85rem", color: "#666" }}>
                                         Uploaded {new Date(upload.createdAt).toLocaleString()}
+                                        {upload.viewedAt && (
+                                            <> · Last viewed {new Date(upload.viewedAt).toLocaleString()}</>
+                                        )}
                                     </span>
                                 </div>
                                 <div style={{ display: "flex", gap: "0.5rem" }}>

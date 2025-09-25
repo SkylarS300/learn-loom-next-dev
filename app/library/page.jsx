@@ -28,6 +28,20 @@ function coverFor(book) {
   return `/assets/images/${file}`;
 }
 
+// humanize timestamps
+function timeAgo(d) {
+  if (!d) return null;
+  const ms = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+
 function BookCard({ idx, title, author, cover, onOpen }) {
   return (
     <button className={styles.card} onClick={() => onOpen(idx)} aria-label={`Open ${title} by ${author}`}>
@@ -41,12 +55,16 @@ function BookCard({ idx, title, author, cover, onOpen }) {
   );
 }
 
-function UploadCard({ id, title, locked, badge = "Upload", href }) {
+
+function UploadCard({ id, title, locked, badge = "Upload", href, viewedAt }) {
+  const sub = viewedAt
+    ? `Last viewed ${timeAgo(viewedAt)}`
+    : (locked ? "Unlock to read" : "Open");
   return (
     <a className={styles.card} href={href || `/uploads/${id}`} aria-label={`${locked ? "Locked upload" : "Upload"}: ${title}`}>
       <div className={styles.cardBadge}>{badge}{locked ? " • 🔒" : ""}</div>
       <div className={styles.cardTitle}>{title}</div>
-      <div className={styles.cardSub}>{locked ? "Unlock to read" : "Open"}</div>
+      <div className={styles.cardSub}>{sub}</div>
     </a>
   );
 }
@@ -62,6 +80,16 @@ export default function LibraryPage() {
   const [savedCodes, setSavedCodes] = useState([]);
   const [codesVersion, setCodesVersion] = useState(0);
   const [err, setErr] = useState("");
+
+  const [toast, setToast] = useState("");
+
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
+
 
   // tabs: All / Community / Yours
   const [tab, setTab] = useState("All");
@@ -157,7 +185,13 @@ export default function LibraryPage() {
 
   const filtered = useMemo(() => {
     const curated = books.map((b, i) => ({ kind: "book", id: i, title: b.title, author: b.author, cover: coverFor(b) }));
-    const ups = toArray(uploads).map((u) => ({ kind: "upload", id: u.id, title: u.title, locked: !!u.password }));
+    const ups = toArray(uploads).map((u) => ({
+      kind: "upload",
+      id: u.id,
+      title: u.title,
+      locked: !!u.locked,
+      viewedAt: u.viewedAt || null,
+    }));
     const comm = toArray(community).map((u) => ({
       id: u.id, title: u.title, locked: !!u.locked, visibility: u.visibility, shareCode: u.shareCode || null,
     }));
@@ -191,6 +225,26 @@ export default function LibraryPage() {
     <>
       <Navbar />
       <main className={styles.wrap}>
+        {toast && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: "fixed",
+              bottom: 16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "#111827",
+              color: "#fff",
+              padding: "8px 12px",
+              borderRadius: 8,
+              zIndex: 50
+            }}
+          >
+            {toast}
+          </div>
+        )}
+
         <div className={styles.headerRow}>
           <h1 className={styles.title}>Library</h1>
           <div className={styles.actions}>
@@ -265,6 +319,7 @@ export default function LibraryPage() {
                         body: JSON.stringify({ code }),
                       });
                       await refreshSavedCodes();
+                      setToast("Code saved");
                       setCodesVersion((v) => v + 1);
                     }}
                     aria-label="Save share code"
@@ -278,6 +333,7 @@ export default function LibraryPage() {
                         await fetch("/api/sharecode", { method: "DELETE" });
                         setSavedCodes([]);
                         setShareCode("");
+                        setToast("Codes cleared");
                         setCodesVersion((v) => v + 1);
                       }}
                       aria-label="Clear all saved codes"
@@ -298,6 +354,7 @@ export default function LibraryPage() {
                           await fetch(`/api/sharecode?code=${encodeURIComponent(c)}`, { method: "DELETE" });
                           setSavedCodes((prev) => prev.filter((x) => x !== c));
                           setShareCode("");
+                          setToast("Code removed");
                           setCodesVersion((v) => v + 1);
                         }}
                         aria-label={`Remove code ${c}`}
@@ -346,7 +403,14 @@ export default function LibraryPage() {
               <div className={styles.grid}>
                 {filtered.ups.length ? (
                   filtered.ups.map((u) => (
-                    <UploadCard key={`u-${u.id}`} id={u.id} title={u.title} locked={u.locked} />
+                    <UploadCard
+                      key={`u-${u.id}`}
+                      id={u.id}
+                      title={u.title}
+                      locked={u.locked}
+                      viewedAt={u.viewedAt}
+                    />
+
                   ))
                 ) : (
                   <p className={styles.dim}>No matches</p>
@@ -379,6 +443,7 @@ export default function LibraryPage() {
                         body: JSON.stringify({ code }),
                       });
                       await refreshSavedCodes();
+                      setToast("Code saved");
                       setCodesVersion((v) => v + 1);
                     }}
                   >
@@ -421,7 +486,13 @@ export default function LibraryPage() {
               <div className={styles.grid}>
                 {filtered.ups.length ? (
                   filtered.ups.map((u) => (
-                    <UploadCard key={`u-${u.id}`} id={u.id} title={u.title} locked={u.locked} />
+                    <UploadCard
+                      key={`u-${u.id}`}
+                      id={u.id}
+                      title={u.title}
+                      locked={u.locked}
+                      viewedAt={u.viewedAt}
+                    />
                   ))
                 ) : (
                   <p className={styles.dim}>No matches</p>

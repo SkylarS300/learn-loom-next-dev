@@ -15,6 +15,7 @@ export default function UploadReader({ upload, isOwner = false }) {
     const [shareCodeInput, setShareCodeInput] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [toast, setToast] = useState("");
 
     // resume: { paraIndex, charOffset }
     const [resume, setResume] = useState(null);
@@ -23,6 +24,13 @@ export default function UploadReader({ upload, isOwner = false }) {
     const lastTickRef = useRef(0);
     const hbRef = useRef(null);
     const paraRefs = useRef([]);
+
+    // Auto-hide toast
+    useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(""), 1800);
+        return () => clearTimeout(t);
+    }, [toast]);
 
     /* ----- on unlock load content + progress ----- */
     useEffect(() => {
@@ -242,14 +250,14 @@ export default function UploadReader({ upload, isOwner = false }) {
                     {code && (
                         <>
                             <button className={`${styles.btnSecondary} ${styles.small}`}
-                                onClick={async () => { await navigator.clipboard?.writeText(code); alert("Code copied"); }}>
+                                onClick={async () => { await navigator.clipboard?.writeText(code); setToast("Code copied"); }}>
                                 Copy
                             </button>
                             <button className={`${styles.btnSecondary} ${styles.small}`}
                                 onClick={async () => {
                                     const link = `${window.location.origin}/uploads/${upload.id}?code=${encodeURIComponent(code)}`;
                                     await navigator.clipboard?.writeText(link);
-                                    alert("Share link copied");
+                                    setToast("Share link copied");
                                 }}>
                                 Copy link
                             </button>
@@ -278,6 +286,21 @@ export default function UploadReader({ upload, isOwner = false }) {
     if (!unlocked) {
         return (
             <div className={styles.wrap}>
+                {toast && (
+                    <div role="status" aria-live="polite" style={{
+                        position: "fixed",
+                        bottom: 16,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        background: "#111827",
+                        color: "#fff",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        zIndex: 50
+                    }}>
+                        {toast}
+                    </div>
+                )}
                 <h1 className={styles.h1}>{upload.title}</h1>
                 {ownerControls}
 
@@ -348,6 +371,21 @@ export default function UploadReader({ upload, isOwner = false }) {
 
     return (
         <div className={styles.wrap}>
+            {toast && (
+                <div role="status" aria-live="polite" style={{
+                    position: "fixed",
+                    bottom: 16,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "#111827",
+                    color: "#fff",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    zIndex: 50
+                }}>
+                    {toast}
+                </div>
+            )}
             <h1 className={styles.h1}>{upload.title}</h1>
             {ownerControls}
 
