@@ -67,9 +67,10 @@ function UploadCard({ id, title, locked, badge = "Upload", href, viewedAt }) {
       <div className={styles.cardTitle}>{title}</div>
       <div className={styles.cardSub}>
         {locked ? "Unlock to read" : "Open"}
-        {when ? ` · Viewed ${when}` : ""}
+        {viewedAt ? ` · Viewed ${new Date(viewedAt).toLocaleString()}` : ""}
       </div>
-    </a>
+      {when ? ` · Viewed ${when}` : ""}
+    </a >
   );
 }
 
@@ -84,15 +85,12 @@ export default function LibraryPage() {
   const [savedCodes, setSavedCodes] = useState([]);
   const [codesVersion, setCodesVersion] = useState(0);
   const [err, setErr] = useState("");
-
-  // Tiny toast for code actions
   const [toast, setToast] = useState("");
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 1800);
     return () => clearTimeout(t);
   }, [toast]);
-
 
   useEffect(() => {
     if (!toast) return;

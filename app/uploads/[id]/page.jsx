@@ -3,13 +3,12 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import UploadReader from "./UploadReader";
 
-
-
 export default async function UploadViewPage(props) {
   const { id } = await props.params;
   const search = await props.searchParams;
   const uploadId = Number(id);
-  const cookieStore = await cookies();            //  await cookies()
+
+  const cookieStore = await cookies();
   const anonId = cookieStore.get("learnloomId")?.value;
 
   // read saved codes (JSON array)
@@ -18,30 +17,33 @@ export default async function UploadViewPage(props) {
     const raw = cookieStore.get("shareCodes")?.value;
     if (raw) savedCodes = JSON.parse(raw);
   } catch { }
-  const codeCookieSet = new Set(Array.isArray(savedCodes) ? savedCodes.map(String) : []);
+  const codeCookieSet = new Set(
+    Array.isArray(savedCodes) ? savedCodes.map((s) => String(s).toUpperCase().trim()) : []
+  );
 
   const upload = await prisma.uploadedtext.findUnique({
-    where: { id: uploadId }, // ensure number, not the raw string
+    where: { id: uploadId },
   });
 
   if (!upload) {
-    return <p>Upload not found.</p>;
+    return <p style={{ padding: 16 }}>Upload not found.</p>;
   }
 
   // Visibility enforcement
   const isOwner = !!anonId && upload.anonId === anonId;
   const shareCodeParam = (search?.code || "").toString().trim().toUpperCase();
+
   if (upload.visibility === "PRIVATE" && !isOwner) {
-    return <p>Upload not found.</p>; // hide existence
+    // Hide existence for non-owners
+    return <p style={{ padding: 16 }}>Upload not found.</p>;
   }
-  if (upload.visibility === "CODED" && !isOwner) {
-    const cookieOK = upload.shareCode && codeCookieSet.has(upload.shareCode);
-    const urlOK = upload.shareCode && shareCodeParam === upload.shareCode;
-    if (!(cookieOK || urlOK)) {
-      // allow page, but do not send content (handled below in safeUpload)
-    }
-  }
-  // PUBLIC: allowed (content may still be password-locked)
+
+  // For CODED visibility, allow page but withhold content unless code is present
+  const codeOK =
+    upload.visibility !== "CODED" ||
+    isOwner ||
+    (!!upload.shareCode && (codeCookieSet.has(upload.shareCode) || shareCodeParam === upload.shareCode));
+
   // Password enforcement (never leak content unless unlocked)
   let unlocked = false;
   if (upload.password && anonId) {
@@ -58,17 +60,18 @@ export default async function UploadViewPage(props) {
     title: upload.title,
     content: upload.password && !unlocked
       ? null
-      : (upload.visibility === "CODED" && !isOwner && !(upload.shareCode && (codeCookieSet.has(upload.shareCode) || shareCodeParam === upload.shareCode)))
+      : !codeOK
         ? null
         : upload.content,
+    // boolean flag – UploadReader treats truthy as "locked"
     password: !!upload.password,
     createdAt: upload.createdAt,
     visibility: upload.visibility,
     shareCode: upload.shareCode ?? null,
   };
+
   return <UploadReader upload={safeUpload} isOwner={isOwner} />;
 }
-
 
 export const metadata = {
   robots: { index: false, follow: false },
