@@ -1,6 +1,8 @@
 "use client";
+
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import styles from "../upload.module.css";
 
 export default function UploadReader({ upload, isOwner = false }) {
     const [unlocked, setUnlocked] = useState(!upload.password);
@@ -22,38 +24,32 @@ export default function UploadReader({ upload, isOwner = false }) {
     const hbRef = useRef(null);
     const paraRefs = useRef([]);
 
-    // Record a view + load content + fetch saved progress
+    /* ----- on unlock load content + progress ----- */
     useEffect(() => {
         if (!unlocked || !upload?.id) return;
 
-        // log a view
         fetch("/api/uploadview", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ uploadId: upload.id }),
         }).catch(() => { });
 
-        // set whatever we already have
         setUploadContent(upload.content ?? "");
 
-        // try to load saved progress
         (async () => {
             try {
                 const res = await fetch(`/api/uploadprogress?uploadId=${upload.id}`);
                 if (res.ok && res.status !== 204) {
                     const data = await res.json();
                     if (data?.paraIndex != null) {
-                        setResume({
-                            paraIndex: Number(data.paraIndex),
-                            charOffset: Number(data.charOffset ?? 0),
-                        });
+                        setResume({ paraIndex: Number(data.paraIndex), charOffset: Number(data.charOffset ?? 0) });
                     }
                 }
             } catch { }
         })();
     }, [unlocked, upload]);
 
-    // Autosave current paragraph on scroll (only when paragraph changes; debounced)
+    /* ----- autosave paragraph by scroll ----- */
     useEffect(() => {
         if (!unlocked || !uploadContent) return;
         const cont = containerRef.current;
@@ -64,7 +60,7 @@ export default function UploadReader({ upload, isOwner = false }) {
         let lastSavedIdx = -1;
 
         const saveProgress = async (pi) => {
-            if (pi === lastSavedIdx) return; // nothing new to save
+            if (pi === lastSavedIdx) return;
             lastSavedIdx = pi;
             try {
                 await fetch("/api/uploadprogress", {
@@ -72,9 +68,7 @@ export default function UploadReader({ upload, isOwner = false }) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ uploadId: upload.id, paraIndex: pi, charOffset: 0 }),
                 });
-            } catch (e) {
-                // swallow: non-critical
-            }
+            } catch { }
         };
 
         const onScroll = () => {
@@ -82,20 +76,12 @@ export default function UploadReader({ upload, isOwner = false }) {
             pending = requestAnimationFrame(() => {
                 pending = null;
                 const rectTop = cont.getBoundingClientRect().top;
-
-                // nearest paragraph to container top (with small bias)
-                let bestIdx = 0;
-                let bestDelta = Infinity;
+                let bestIdx = 0, bestDelta = Infinity;
                 paraRefs.current.forEach((el, i) => {
                     if (!el) return;
                     const d = Math.abs(el.getBoundingClientRect().top - rectTop - 20);
-                    if (d < bestDelta) {
-                        bestDelta = d;
-                        bestIdx = i;
-                    }
+                    if (d < bestDelta) { bestDelta = d; bestIdx = i; }
                 });
-
-                // debounce server write ~800ms after scroll settles
                 if (debounce) clearTimeout(debounce);
                 debounce = setTimeout(() => saveProgress(bestIdx), 800);
             });
@@ -109,8 +95,7 @@ export default function UploadReader({ upload, isOwner = false }) {
         };
     }, [unlocked, uploadContent, upload?.id]);
 
-
-    // Time heartbeat: post deltaTimeMs every ~5s; flush on hide/unload
+    /* ----- heartbeat time ----- */
     useEffect(() => {
         if (!unlocked || !uploadContent || !upload?.id) return;
         lastTickRef.current = performance.now();
@@ -122,7 +107,6 @@ export default function UploadReader({ upload, isOwner = false }) {
             } catch { }
             fetch("/api/live/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "upload" }) }).catch(() => { });
         };
-
 
         const postDelta = (ms) => {
             const delta = Math.max(0, Math.round(ms || 0));
@@ -150,14 +134,9 @@ export default function UploadReader({ upload, isOwner = false }) {
                 try {
                     navigator.sendBeacon?.(
                         "/api/uploadprogress",
-                        new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })],
-                            { type: "application/json" })
+                        new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })], { type: "application/json" })
                     );
-                    navigator.sendBeacon?.(
-                        "/api/live/ping",
-                        new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" })
-                    );
-
+                    navigator.sendBeacon?.("/api/live/ping", new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" }));
                 } catch { }
             }
         };
@@ -168,13 +147,9 @@ export default function UploadReader({ upload, isOwner = false }) {
             try {
                 navigator.sendBeacon?.(
                     "/api/uploadprogress",
-                    new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })],
-                        { type: "application/json" })
+                    new Blob([JSON.stringify({ uploadId: upload.id, deltaTimeMs: Math.max(0, Math.round(dt)) })], { type: "application/json" })
                 );
-                navigator.sendBeacon?.(
-                    "/api/live/ping",
-                    new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" })
-                );
+                navigator.sendBeacon?.("/api/live/ping", new Blob([JSON.stringify({ mode: "upload" })], { type: "application/json" }));
             } catch { }
         };
         document.addEventListener("visibilitychange", onVisibility);
@@ -191,15 +166,10 @@ export default function UploadReader({ upload, isOwner = false }) {
         if (resume?.paraIndex == null) return;
         const el = paraRefs.current[resume.paraIndex];
         if (el && containerRef.current) {
-            containerRef.current.scrollTo({
-                top: el.offsetTop - 10,
-                behavior: "smooth",
-            });
+            containerRef.current.scrollTo({ top: el.offsetTop - 10, behavior: "smooth" });
         }
-        // persist the resumed position immediately
         fetch("/api/uploadprogress", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ uploadId: upload.id, paraIndex: Number(resume.paraIndex) || 0, charOffset: 0 }),
         }).catch(() => { });
         setResume(null);
@@ -209,8 +179,7 @@ export default function UploadReader({ upload, isOwner = false }) {
         setLoading(true);
         try {
             const res = await fetch("/api/unlockupload", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
+                method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ uploadId: upload.id, password }),
             });
 
@@ -218,8 +187,6 @@ export default function UploadReader({ upload, isOwner = false }) {
                 setUnlocked(true);
                 setError("");
                 setPassword("");
-
-                // fetch full content after unlock
                 const full = await fetch(`/api/uploads/${upload.id}`);
                 if (full.ok) {
                     const data = await full.json();
@@ -227,12 +194,8 @@ export default function UploadReader({ upload, isOwner = false }) {
                 }
             } else {
                 let msg = "Incorrect password";
-                try {
-                    const j = await res.json();
-                    msg = j?.error || msg;
-                } catch {
-                    const text = await res.text();
-                    if (text) msg = text;
+                try { msg = (await res.json())?.error || msg; } catch {
+                    const text = await res.text(); if (text) msg = text;
                 }
                 setError(msg);
             }
@@ -243,81 +206,66 @@ export default function UploadReader({ upload, isOwner = false }) {
         }
     }
 
-    // ——— Owner controls (render in both locked/unlocked) ———
+    /* ----- owner controls ----- */
     const ownerControls = isOwner ? (
         <div style={{ margin: "6px 0 12px", display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div className={styles.row}>
                 <label style={{ fontWeight: 600 }}>Visibility:</label>
-                <select value={vis} onChange={(e) => setVis(e.target.value)}>
+                <select value={vis} onChange={(e) => setVis(e.target.value)} className={styles.input} style={{ maxWidth: 260 }}>
                     <option value="PRIVATE">Private (only you)</option>
                     <option value="PUBLIC">Public (listed in Community)</option>
                     <option value="CODED">Share code (not listed; show by code)</option>
                 </select>
-                <button
-                    className="cta-button small"
-                    disabled={savingVis}
+                <button className={`${styles.btn} ${styles.small}`} disabled={savingVis}
                     onClick={async () => {
                         setSavingVis(true);
                         try {
-                            const r = await fetch(`/api/uploadedtext/${upload.id}`, {
+                            const r = await fetch(`/api/uploads/${upload.id}`, {
                                 method: "PATCH",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ visibility: vis }),
                             });
                             const j = await r.json();
-                            if (j?.ok) {
-                                setVis(j.data.visibility);
-                                setCode(j.data.shareCode || "");
-                            }
-                        } finally {
-                            setSavingVis(false);
-                        }
+                            if (j?.ok) { setVis(j.data.visibility); setCode(j.data.shareCode || ""); }
+                            else if (j?.visibility) { setVis(j.visibility); setCode(j.shareCode || ""); } // direct payload
+                        } finally { setSavingVis(false); }
                     }}
-                >
-                    Save
-                </button>
+                >Save</button>
             </div>
+
             {vis === "CODED" && (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div className={styles.row}>
                     <span>
                         <strong>Share code:</strong>{" "}
                         {code ? <code>{code}</code> : <em>(will be generated on save)</em>}
                     </span>
                     {code && (
                         <>
-                            <button
-                                className="cta-button small"
-                                onClick={async () => {
-                                    await navigator.clipboard?.writeText(code);
-                                    alert("Code copied");
-                                }}
-                            >
+                            <button className={`${styles.btnSecondary} ${styles.small}`}
+                                onClick={async () => { await navigator.clipboard?.writeText(code); alert("Code copied"); }}>
                                 Copy
                             </button>
-                            <button
-                                className="cta-button small"
+                            <button className={`${styles.btnSecondary} ${styles.small}`}
                                 onClick={async () => {
                                     const link = `${window.location.origin}/uploads/${upload.id}?code=${encodeURIComponent(code)}`;
                                     await navigator.clipboard?.writeText(link);
                                     alert("Share link copied");
-                                }}
-                            >
+                                }}>
                                 Copy link
                             </button>
                         </>
                     )}
-                    <button
-                        className="cta-button small"
+                    <button className={`${styles.btnSecondary} ${styles.small}`}
                         onClick={async () => {
-                            const r = await fetch(`/api/uploadedtext/${upload.id}`, {
+                            const r = await fetch(`/api/uploads/${upload.id}`, {
                                 method: "PATCH",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ action: "regenCode" }),
                             });
                             const j = await r.json();
                             if (j?.ok) setCode(j.data.shareCode || "");
-                        }}
-                    >
+                            else if (j?.shareCode) setCode(j.shareCode || "");
+                        }}>
                         Regenerate
                     </button>
                 </div>
@@ -326,24 +274,25 @@ export default function UploadReader({ upload, isOwner = false }) {
         </div>
     ) : null;
 
+    /* ----- render ----- */
     if (!unlocked) {
         return (
-            <div className="upload-reader locked">
-                <h1>{upload.title}</h1>
+            <div className={styles.wrap}>
+                <h1 className={styles.h1}>{upload.title}</h1>
                 {ownerControls}
 
-                {/* Visitors: if CODED and content hidden, offer code save */}
                 {!isOwner && upload.visibility === "CODED" && uploadContent == null && (
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0 12px" }}>
+                    <div className={styles.banner}>
                         <input
                             value={shareCodeInput}
                             onChange={(e) => setShareCodeInput(e.target.value)}
                             placeholder="Enter share code"
-                            style={{ flex: 1, padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
+                            className={styles.input}
+                            style={{ maxWidth: 260 }}
                             aria-label="Enter share code"
                         />
                         <button
-                            className="cta-button small"
+                            className={`${styles.btnSecondary} ${styles.small}`}
                             onClick={async () => {
                                 const code = (shareCodeInput || "").trim();
                                 if (!code) return;
@@ -352,7 +301,6 @@ export default function UploadReader({ upload, isOwner = false }) {
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ code }),
                                 });
-                                // reload with ?code= to unlock this page immediately as well
                                 const url = new URL(window.location.href);
                                 url.searchParams.set("code", code);
                                 window.location.href = url.toString();
@@ -362,81 +310,60 @@ export default function UploadReader({ upload, isOwner = false }) {
                         </button>
                     </div>
                 )}
-                <p>This upload is password-protected.</p>
 
-                <div className="password-wrapper" style={{ position: "relative", display: "flex", gap: 8 }}>
-                    <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="password-input"
-                        style={{ flex: 1 }}
-                        aria-invalid={!!error}
-                        aria-describedby={error ? "upload-password-error" : undefined}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        className="eye-toggle"
-                        aria-label="toggle password visibility"
-                        style={{ display: "grid", placeItems: "center", width: 36 }}
-                    >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                <div className={styles.lockedBox}>
+                    <p>This upload is password-protected.</p>
+                    <div className={styles.row} style={{ position: "relative" }}>
+                        <input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className={styles.input}
+                            aria-invalid={!!error}
+                            aria-describedby={error ? "upload-password-error" : undefined}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((p) => !p)}
+                            className={styles.btnSecondary}
+                            aria-label="toggle password visibility"
+                            style={{ width: 40, display: "grid", placeItems: "center" }}
+                        >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                    </div>
+                    <button onClick={handleUnlock} disabled={loading} className={styles.btn} style={{ marginTop: 8 }}>
+                        {loading ? "Unlocking..." : "Unlock"}
                     </button>
+                    {error && (
+                        <p id="upload-password-error" className={styles.error} role="alert" aria-live="polite">
+                            {error}
+                        </p>
+                    )}
                 </div>
-
-                <button onClick={handleUnlock} disabled={loading} className="cta-button" style={{ marginTop: 8 }}>
-                    {loading ? "Unlocking..." : "Unlock"}
-                </button>
-
-                {error && (
-                    <p
-                        id="upload-password-error"
-                        className="error"
-                        style={{ color: "#d33", marginTop: 8 }}
-                        role="alert"
-                        aria-live="polite"
-                    >
-                        {error}
-                    </p>
-                )}            </div>
+            </div>
         );
     }
 
     return (
-        <div className="upload-reader">
-            <h1>{upload.title}</h1>
+        <div className={styles.wrap}>
+            <h1 className={styles.h1}>{upload.title}</h1>
             {ownerControls}
 
             {resume && (
-                <div className="progress-banner" style={{ margin: "0 0 10px", display: "flex", gap: 8, alignItems: "center" }}>
+                <div className={styles.banner} role="status" aria-live="polite">
                     <span>Resume where you left off?</span>
-                    <button className="cta-button small" onClick={handleResume}>Resume</button>
-                    <button className="cta-button small" onClick={() => setResume(null)}>Dismiss</button>
+                    <button className={`${styles.btnSecondary} ${styles.small}`} onClick={handleResume}>Resume</button>
+                    <button className={`${styles.btnSecondary} ${styles.small}`} onClick={() => setResume(null)}>Dismiss</button>
                 </div>
             )}
 
-            <div
-                ref={containerRef}
-                className="upload-text"
-                style={{
-                    maxHeight: 400,
-                    overflowY: "auto",
-                    padding: 16,
-                    background: "#f8f8f8",
-                    borderRadius: 8,
-                }}
-            >
+            <div ref={containerRef} className={styles.textBox}>
                 {(uploadContent ?? "")
-                    .split(/\n{2,}/g) // paragraphs separated by blank lines
+                    .split(/\n{2,}/g)
                     .map((para, i) => (
-                        <p
-                            key={i}
-                            ref={(el) => (paraRefs.current[i] = el)}
-                            data-pi={i}
-                            style={{ margin: "0 0 1rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
-                        >
+                        <p key={i} ref={(el) => (paraRefs.current[i] = el)} data-pi={i} className={styles.p}>
                             {para}
                         </p>
                     ))}

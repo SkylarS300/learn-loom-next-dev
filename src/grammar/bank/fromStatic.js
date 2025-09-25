@@ -1,6 +1,6 @@
 // Builds a normalized bank from your existing src/content/quizzes.js
 // Non-breaking: we don’t modify the legacy file or its shape.
-import legacy from "@/src/content/quizzes.js";
+import legacy from "../../content/quizzes.js";
 
 // Normalize one legacy question into a common shape
 function normalizeQ(q, idx, concept, subTopic) {
@@ -37,7 +37,7 @@ function inferDifficulty(q) {
 
 export default function buildBankFromStatic() {
     const bank = {}; // { [concept]: { [subTopic]: { easy:[], medium:[], hard:[], pool:[] } } }
-    const concepts = legacy || {};
+    const concepts = (legacy && typeof legacy === "object") ? legacy : {};
     for (const conceptKey of Object.keys(concepts)) {
         const node = concepts[conceptKey] || {};
         const subList = Array.isArray(node.subConcepts) ? node.subConcepts : [];

@@ -87,6 +87,31 @@ export default function LoginClient() {
                         {loading ? "Logging in…" : "Log in"}
                     </button>
                 </form>
+                {/* Signup / create-code CTA */}
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        marginTop: 12,
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <span style={{ color: "#6b7280", fontSize: 14 }}>Don’t have a code yet?</span>
+                    <a
+                        href="/signup"
+                        style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #c9d7fb",
+                            background: "#e9eefc",
+                            color: "#0b3b9f",
+                            textDecoration: "none",
+                        }}
+                    >
+                        Create your code
+                    </a>
+                </div>
             </main>
         </>
     );

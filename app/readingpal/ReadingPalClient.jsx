@@ -8,6 +8,7 @@ import NotesModal from "../components/NotesModal";
 import NotesSidePanel from "./NotesSidePanel";
 import VocabPanel from "./VocabPanel";
 import PronouncePractice from "./PronouncePractice";
+import SelectBookModal from "./SelectBookModal";
 import { toLemma, detectPOS } from "./word-utils";
 import { analyzeCEFR } from "@/src/cefr/analyzeText";
 import LookupBubble from "./LookupBubble";
@@ -116,6 +117,7 @@ export default function ReadingPalClient() {
   const [vocab, setVocab] = useState({ word: "", lemma: "", pos: "", cefr: "", def: "", ex: "" });
   const [showPronounce, setShowPronounce] = useState(false);
   const [ctx, setCtx] = useState(null); // {x,y,selection}
+  const [showSelectBookModal, setShowSelectBookModal] = useState(false);
   const currentBookRef = useRef(null);
   const chapterIndexRef = useRef(0);
 
@@ -486,6 +488,9 @@ export default function ReadingPalClient() {
           `${currentBookRef.current.title} by ${currentBookRef.current.author}`;
         await displayChapter(currentBookRef.current, chapterIndexRef.current); const b = getBookmark("book", bookIndex);
         if (b) setBookmark(b);
+      } else {
+        // No upload and no book specified → nudge the user with a clear modal.
+        setShowSelectBookModal(true);
       }
 
       try {
@@ -1447,6 +1452,12 @@ export default function ReadingPalClient() {
         onClose={() => setNoteOpen(false)}
         onSave={saveNote}
       />
+      {/* Select book modal */}
+      <SelectBookModal
+        open={showSelectBookModal}
+        onClose={() => setShowSelectBookModal(false)}
+      />
+
     </div>
   );
 }

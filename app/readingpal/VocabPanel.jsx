@@ -94,7 +94,7 @@ export default function VocabPanel({ vocab, onAdd, className = "" }) {
             <div className={styles.sideHeader}>
                 <h3 className={styles.h4} style={{ margin: 0 }}>Vocabulary</h3>
             </div>
-            +      {!word ? (
+            {!word ? (
                 <p className={styles.dim} style={{ marginTop: 4 }}>Select a word to see details.</p>
             ) : (
                 <>

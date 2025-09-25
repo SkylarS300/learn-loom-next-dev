@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function UploadsPage() {
-    const [uploads, setUploads] = useState([]);
+    const [uploads, setUploads] = useState([]); // can be array or {data,nextCursor}
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState(null);
     const [error, setError] = useState("");
@@ -15,42 +15,50 @@ export default function UploadsPage() {
 
     async function fetchUploads() {
         setLoading(true);
-        const res = await fetch("/api/uploadedtext");
-        if (res.ok) {
-            const data = await res.json();
-            setUploads(data);
-        } else {
-            setError("Failed to fetch uploads.");
+        try {
+            const res = await fetch("/api/uploadedtext?scope=mine");
+            if (!res.ok) throw new Error("Failed to fetch uploads.");
+            const j = await res.json();
+            // API shape is { data: [...], nextCursor }, but be defensive
+            setUploads(Array.isArray(j) ? j : (j?.data ?? []));
+        } catch (e) {
+            setError(e.message || "Failed to fetch uploads.");
+            setUploads([]);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }
 
     async function handleDelete(id) {
         if (!confirm("Are you sure you want to delete this upload?")) return;
-
         setDeletingId(id);
-        const res = await fetch("/api/uploadedtext", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id }),
-        });
-
-        if (res.ok) {
+        try {
+            const res = await fetch("/api/uploadedtext", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id }),
+            });
+            if (!res.ok) throw new Error("Failed to delete upload.");
+            // uploads is guaranteed array (we normalize on fetch)
             setUploads((prev) => prev.filter((u) => u.id !== id));
-        } else {
-            setError("Failed to delete upload.");
+        } catch (e) {
+            setError(e.message || "Failed to delete upload.");
+        } finally {
+            setDeletingId(null);
         }
-
-        setDeletingId(null);
     }
+
+    // Always render from a normalized list
+    const list = Array.isArray(uploads) ? uploads : [];
 
     return (
         <section className="upload-dashboard" style={{ maxWidth: "800px", margin: "0 auto", padding: "1rem" }}>
             <h1>📤 My Uploads</h1>
             {error && <p style={{ color: "red" }}>{error}</p>}
+
             {loading ? (
                 <p>Loading uploads...</p>
-            ) : uploads.length === 0 ? (
+            ) : list.length === 0 ? (
                 <div style={{ textAlign: "center", marginTop: "2rem", color: "#666" }}>
                     <p style={{ fontSize: "1.1rem" }}>You haven’t uploaded anything yet.</p>
                     <Link href="/uploads/new">
@@ -61,7 +69,7 @@ export default function UploadsPage() {
                 </div>
             ) : (
                 <ul style={{ listStyle: "none", padding: 0 }}>
-                    {uploads.map((upload) => (
+                    {list.map((upload) => (
                         <li
                             key={upload.id}
                             style={{

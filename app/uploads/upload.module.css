@@ -1,0 +1,105 @@
+.wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.h1 {
+    margin: 0 0 8px;
+}
+
+.banner {
+    margin: 8px 0 12px;
+    padding: 8px 10px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn {
+    background: #0070f3;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(2, 6, 23, .12);
+}
+
+.btnSecondary {
+    background: #e9eefc;
+    color: #0b3b9f;
+    border: 1px solid #c9d7fb;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.small {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font: inherit;
+}
+
+.lockedBox {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+    background: #fff;
+}
+
+.row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.textBox {
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 16px;
+    background: #f8f8f8;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    animation: fadeIn .2s ease both;
+}
+
+.p {
+    margin: 0 0 1rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.error {
+    color: #d33;
+    margin-top: 8px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
