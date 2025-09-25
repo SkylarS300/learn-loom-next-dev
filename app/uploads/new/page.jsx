@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function NewUploadPage() {
+  // ---- limits ----
+  const MAX_TXT_BYTES = 1_000_000;   // ~1 MB
+  const MAX_PDF_BYTES = 12_000_000;  // ~12 MB
   const [mode, setMode] = useState("typed"); // "typed" or "file"
   const [title, setTitle] = useState("");
   const [typedContent, setTypedContent] = useState("");
@@ -13,37 +16,89 @@ export default function NewUploadPage() {
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
+  // Defer rendering the heavy preview box to avoid blocking typing/paint
+  const [showPreview, setShowPreview] = useState(false);
 
   const router = useRouter();
+
+  // Turn on preview on the next tick only when we actually have content
+  useEffect(() => {
+    if (!fileContent) { setShowPreview(false); return; }
+    const id = setTimeout(() => setShowPreview(true), 0);
+    return () => clearTimeout(id);
+  }, [fileContent]);
 
   function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
+    // reset previous state/errors
+    setError("");
+    setFileContent("");
     setFileName(file.name);
     const reader = new FileReader();
+    // Guardrails: type + size
+    const type = file.type || "";
+    const isPdf = type === "application/pdf" || /\.pdf$/i.test(file.name);
+    const isTxt = type === "text/plain" || /\.txt$/i.test(file.name);
+    if (!isPdf && !isTxt) {
+      setError("Only PDF and TXT files are supported.");
+      return;
+    }
+    if (isPdf && file.size > MAX_PDF_BYTES) {
+      setError(`PDF is too large. Max ${Math.round(MAX_PDF_BYTES / 1_000_000)} MB.`);
+      return;
+    }
+    if (isTxt && file.size > MAX_TXT_BYTES) {
+      setError(`TXT is too large. Max ${Math.round(MAX_TXT_BYTES / 1_000_000)} MB.`);
+      return;
+    }
 
-    if (file.type === "application/pdf") {
+    if (isPdf) {
       reader.readAsArrayBuffer(file);
       reader.onload = async () => {
-        const pdfjsLib = await import("pdfjs-dist");
-        const typedarray = new Uint8Array(reader.result);
-        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-        let text = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          text += content.items.map((s) => s.str).join(" ") + "\n";
+        try {
+          // Defer heavy lib until needed
+          const pdfjs = await import("pdfjs-dist/build/pdf");
+          // If your build needs an explicit worker, uncomment the next two lines and serve worker locally:
+          // const worker = await import("pdfjs-dist/build/pdf.worker.min.js");
+          // pdfjs.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([worker.default]));
+
+          const typedarray = new Uint8Array(reader.result);
+          const pdf = await pdfjs.getDocument({ data: typedarray }).promise;
+          let text = "";
+          // Soft cap large PDFs to keep UI responsive (still succeeds; just warns)
+          const MAX_PAGES_TO_PARSE = 150;
+          const pages = Math.min(pdf.numPages, MAX_PAGES_TO_PARSE);
+          for (let i = 1; i <= pages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map((s) => s.str).join(" ") + "\n";
+          }
+          if (pdf.numPages > MAX_PAGES_TO_PARSE) {
+            text += `\n\n[Truncated at ${MAX_PAGES_TO_PARSE} pages for performance]`;
+          }
+          setFileContent(text.trim());
+        } catch (err) {
+          console.error(err);
+          setError("Could not read PDF. Try exporting as a text-based PDF or upload a TXT file.");
         }
-        setFileContent(text.trim());
       };
-    } else if (file.type === "text/plain") {
+    } else if (isTxt) {
       reader.readAsText(file);
       reader.onload = () => {
-        setFileContent(reader.result.trim());
+        try {
+          // Enforce size again after read (belt & suspenders)
+          const txt = String(reader.result || "");
+          if (new Blob([txt]).size > MAX_TXT_BYTES) {
+            setError(`TXT is too large. Max ${Math.round(MAX_TXT_BYTES / 1_000_000)} MB.`);
+            return;
+          }
+          setFileContent(txt.trim());
+        } catch {
+          setError("Could not read TXT file.");
+        }
       };
-    } else {
-      setError("Only PDF and TXT files are supported.");
     }
   }
 
@@ -53,6 +108,16 @@ export default function NewUploadPage() {
     setLoading(true);
 
     const content = mode === "typed" ? typedContent : fileContent;
+    if (!title.trim()) {
+      setLoading(false);
+      setError("Please enter a title.");
+      return;
+    }
+    if (!content || !content.trim()) {
+      setLoading(false);
+      setError(mode === "typed" ? "Please add some content." : "Please select a valid file.");
+      return;
+    }
 
     const res = await fetch("/api/uploadedtext", {
       method: "POST",
@@ -118,10 +183,15 @@ export default function NewUploadPage() {
           <>
             <label>
               Upload a .txt or .pdf file:
-              <input type="file" accept=".txt,.pdf" onChange={handleFileUpload} required />
+              <input
+                type="file"
+                accept=".txt,application/pdf"
+                onChange={handleFileUpload}
+                required
+              />
             </label>
             {fileName && <p>📄 <strong>{fileName}</strong> selected</p>}
-            {fileContent && (
+            {fileContent && showPreview && (
               <pre
                 style={{
                   background: "#f9f9f9",

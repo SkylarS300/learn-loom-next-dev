@@ -46,7 +46,7 @@ function BookCard({ idx, title, author, cover, onOpen }) {
   return (
     <button className={styles.card} onClick={() => onOpen(idx)} aria-label={`Open ${title} by ${author}`}>
       <div className={styles.coverWrap}>
-        <img src={cover} alt={`${title} cover`} className={styles.cover} />
+        <img src={cover} alt={`${title} cover`} className={styles.cover} loading="lazy" />
       </div>
       <div className={styles.cardBadge}>Book</div>
       <div className={styles.cardTitle}>{title}</div>
@@ -57,6 +57,7 @@ function BookCard({ idx, title, author, cover, onOpen }) {
 
 
 function UploadCard({ id, title, locked, badge = "Upload", href, viewedAt }) {
+  const when = viewedAt ? timeAgo(new Date(viewedAt)) : null;
   const sub = viewedAt
     ? `Last viewed ${timeAgo(viewedAt)}`
     : (locked ? "Unlock to read" : "Open");
@@ -64,7 +65,10 @@ function UploadCard({ id, title, locked, badge = "Upload", href, viewedAt }) {
     <a className={styles.card} href={href || `/uploads/${id}`} aria-label={`${locked ? "Locked upload" : "Upload"}: ${title}`}>
       <div className={styles.cardBadge}>{badge}{locked ? " • 🔒" : ""}</div>
       <div className={styles.cardTitle}>{title}</div>
-      <div className={styles.cardSub}>{sub}</div>
+      <div className={styles.cardSub}>
+        {locked ? "Unlock to read" : "Open"}
+        {when ? ` · Viewed ${when}` : ""}
+      </div>
     </a>
   );
 }
@@ -81,7 +85,13 @@ export default function LibraryPage() {
   const [codesVersion, setCodesVersion] = useState(0);
   const [err, setErr] = useState("");
 
+  // Tiny toast for code actions
   const [toast, setToast] = useState("");
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
 
   useEffect(() => {
@@ -183,13 +193,22 @@ export default function LibraryPage() {
 
   const toArray = (maybe) => (Array.isArray(maybe) ? maybe : Array.isArray(maybe?.data) ? maybe.data : []);
 
+  const timeAgo = (d) => {
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 60) return `${Math.floor(s)}s ago`;
+    const m = s / 60; if (m < 60) return `${Math.floor(m)}m ago`;
+    const h = m / 60; if (h < 24) return `${Math.floor(h)}h ago`;
+    const dd = h / 24; if (dd < 7) return `${Math.floor(dd)}d ago`;
+    return d.toLocaleDateString();
+  };
+
   const filtered = useMemo(() => {
     const curated = books.map((b, i) => ({ kind: "book", id: i, title: b.title, author: b.author, cover: coverFor(b) }));
     const ups = toArray(uploads).map((u) => ({
       kind: "upload",
       id: u.id,
       title: u.title,
-      locked: !!u.locked,
+      locked: !!(u.locked ?? u.password),
       viewedAt: u.viewedAt || null,
     }));
     const comm = toArray(community).map((u) => ({
@@ -502,6 +521,26 @@ export default function LibraryPage() {
           )}
         </div>
       </main>
+      {/* tiny toast */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#111827",
+            color: "#fff",
+            padding: "8px 12px",
+            borderRadius: 8,
+            zIndex: 50
+          }}
+        >
+          {toast}
+        </div>
+      )}
     </>
   );
 }

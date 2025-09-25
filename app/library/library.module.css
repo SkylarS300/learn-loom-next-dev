@@ -87,6 +87,17 @@
     border-color: #e2e8f0;
 }
 
+.card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .35), 0 10px 24px rgba(2, 6, 23, .08);
+    border-color: #bfdbfe;
+}
+
+.btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, .35);
+}
+
 .cardBadge {
     font-size: 12px;
     background: #f1f5ff;
