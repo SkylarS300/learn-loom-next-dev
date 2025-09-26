@@ -28,6 +28,21 @@ function hexToRgba(hex = "#FDE047", a = 0.45) {
   } catch { return "rgba(253,224,71,0.45)"; }
 }
 
+function isTypingTarget(el) {
+  if (!el) return false;
+  const tag = (el.tagName || "").toUpperCase();
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    el.isContentEditable === true ||
+    !!el.closest?.('[role="textbox"]') ||
+    // Treat common form controls as “typing” to avoid stealing Space
+    tag === "SELECT" ||
+    tag === "BUTTON"
+  );
+}
+
+
 function saveBookmark({ type, id, chapterIndex, scrollY }) {
   const key = `bookmark-${type}-${id}`;
   localStorage.setItem(
@@ -156,6 +171,22 @@ export default function ReadingPalClient() {
       window.removeEventListener("keydown", onEsc);
     };
   }, [ctx]);
+
+  // Keep our paused flag in sync with the real speech engine (handles tab switches, etc.)
+  useEffect(() => {
+    const sync = () => {
+      try { isPausedRef.current = window.speechSynthesis?.paused || false; } catch { }
+    };
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("focus", sync);
+    window.addEventListener("pageshow", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("focus", sync);
+      window.removeEventListener("pageshow", sync);
+    };
+  }, []);
+
 
   // fire-and-forget ping (uses sendBeacon when available)
   function livePing(mode = "reading") {
@@ -539,6 +570,14 @@ export default function ReadingPalClient() {
   /* ---------- keyboard ---------- */
   useEffect(() => {
     const onKey = (e) => {
+      // 1) Don’t steal keys while the user is typing or a modal is open
+      const active = document.activeElement;
+      if (isTypingTarget(active)) return;
+      if (noteOpen || showSelectBookModal) return;
+
+      // 2) Don’t handle repeated keydown for Space (prevents rapid flicker)
+      if (e.code === "Space" && e.repeat) return;
+
       const withShift = e.shiftKey;
       // Quick dictionary: Alt + D ⇒ select current word (or first word of current sentence)
       if ((e.key === "d" || e.key === "D") && e.altKey) {
@@ -666,7 +705,7 @@ export default function ReadingPalClient() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [noteOpen, showSelectBookModal]);
 
   /* ---------- display chapter ---------- */
   async function displayChapter(book, chapterIndex) {
@@ -960,10 +999,18 @@ export default function ReadingPalClient() {
     }
   }
   function resumeReading() {
-    if (isPausedRef.current && speechSynthesis.paused) {
+    // Normal path: resume a paused utterance
+    if (speechSynthesis.paused) {
       speechSynthesis.resume();
       isPausedRef.current = false;
       lastTickRef.current = performance.now();
+      return;
+    }
+    // Recover if the engine lost our utterance (some browsers do this)
+    if (!readingRef.current && !utteranceRef.current) {
+      const idx = Number.isInteger(sentenceIndexRef.current) ? sentenceIndexRef.current : 0;
+      setHighlight(idx);
+      speakSentencesFrom(idx);
     }
   }
   function startReading() {
