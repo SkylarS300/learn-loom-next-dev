@@ -1,11 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./Navbar.module.css";
 import CodeModal from "./components/auth/CodeModal";
 
 export default function Navbar() {
+  // ---- Deduplicate: only one Navbar instance should render at a time ----
+  const [hidden, setHidden] = useState(false);
+  const isPrimaryRef = useRef(false);
+  useEffect(() => {
+    // If another Navbar already mounted, hide this one
+    if (typeof window !== "undefined") {
+      if (window.__LL_NAVBAR_MOUNTED) {
+        setHidden(true);
+      } else {
+        window.__LL_NAVBAR_MOUNTED = true;
+        isPrimaryRef.current = true;
+      }
+    }
+    return () => {
+      // release the flag if this was the primary
+      if (typeof window !== "undefined" && isPrimaryRef.current) {
+        window.__LL_NAVBAR_MOUNTED = false;
+      }
+    };
+  }, []);
+  if (hidden) return null;
+
   const [me, setMe] = useState({ anonId: null, shortCode: null, loading: true });
   const [showQR, setShowQR] = useState(false);
 
@@ -69,7 +91,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className={styles.navbar}>
+    <header className={styles.navbar} role="navigation" data-role="site-navbar">
       <div className={styles.inner}>
         <a className={styles.logoLink} href="/">
           <img

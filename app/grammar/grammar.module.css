@@ -1,40 +1,16 @@
 /* Compact sidebar & clean cards; vanilla CSS */
 
-/* -------- Layout (moved from globals) -------- */
-.columns {
-    display: flex;
+/* -------- Centered single column layout -------- */
+.singleColumn {
     max-width: 1200px;
     margin: 40px auto;
     padding: 0 20px;
-    gap: 40px;
-    align-items: flex-start;
-}
-
-.sidebar {
-    position: sticky;
-    top: 84px;
-    /* sits beneath your navbar */
-    max-height: calc(100vh - 100px);
-    overflow: auto;
-    padding-right: 8px;
-
-    flex: 1;
-    min-width: 240px;
-    max-width: 300px;
-    font-family: 'Poppins', sans-serif;
-}
-
-.sidebarHeading {
-    margin: 12px 0 6px;
-    font-size: 16px;
-    font-weight: 700;
 }
 
 .sidebarLink {
-    display: block;
+    display: inline-block;
     font-family: 'Poppins', sans-serif;
-    font-size: 15px;
-    margin-bottom: 6px;
+    font-size: 14px;
     color: #1f4ad3;
     text-decoration: none;
     transition: all 0.2s ease;
@@ -43,11 +19,14 @@
 .sidebarLink:hover {
     text-decoration: underline;
     color: #3e4fbb;
-    transform: translateX(2px);
+}
+
+.dotSep {
+    opacity: .4;
+    margin: 0 8px;
 }
 
 .content {
-    flex: 2.5;
     background: #ffffff;
     padding: 40px;
     border-radius: 14px;
@@ -86,6 +65,78 @@
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     margin-top: 12px;
 }
+
+
+/* Inline rec pills */
+.sectionHeader {
+    margin-top: 14px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.recGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.recCard {
+    text-align: left;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    transition: transform .08s ease, box-shadow .08s ease, border-color .08s ease;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.recCard:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .06);
+    border-color: #e2e8f0;
+}
+
+.recTitleBlock {
+    display: grid;
+    gap: 2px;
+}
+
+.recCardMain {
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.recCardSub {
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.recCardReason {
+    color: #4b5563;
+    font-size: 13px;
+    margin-top: 6px;
+}
+
+.recCardCta {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #0b3b9f;
+    background: #e9eefc;
+    border: 1px solid #c9d7fb;
+    border-radius: 9999px;
+    padding: 6px 10px;
+}
+
+.quickLinksRow {
+    margin-top: 8px;
+}
+
 
 .recTitle {
     font-weight: 700;
@@ -272,18 +323,6 @@
 
 /* -------- Responsive -------- */
 @media (max-width: 768px) {
-    .columns {
-        flex-direction: column;
-        padding: 20px;
-    }
-
-    .sidebar {
-        position: static;
-        max-height: none;
-        width: 100%;
-        margin-bottom: 30px;
-    }
-
     .content {
         width: 100%;
         padding: 24px;

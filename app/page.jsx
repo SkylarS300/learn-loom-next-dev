@@ -1,5 +1,4 @@
 // app/page.jsx
-import Navbar from "./Navbar.js";
 import Image from "next/image";
 import demoGif from "../public/assets/images/videoforindexhtml.gif";
 import styles from "./home.module.css";
@@ -7,8 +6,6 @@ import styles from "./home.module.css";
 export default function Home() {
   return (
     <div>
-      <Navbar />
-
       <main className={styles.wrap}>
         {/* HERO */}
         <section className={`${styles.hero} ${styles.fadeUp}`} style={{ "--ad": "0s" }}>

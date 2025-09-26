@@ -7,7 +7,6 @@ import NotesPanel from "./NotesPanel";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import books from "@/src/content/book-content.js";
 import { track } from "@/lib/rum";
-import Navbar from "../Navbar";
 import CodeLoginCard from "./CodeLoginCard";
 import ConfirmClearModal from "./ConfirmClearModal";
 import CodeModal from "../components/auth/CodeModal";
@@ -133,7 +132,6 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Navbar />
       <main className={styles.main}>
         {/* Header row */}
         <div className={styles.headerRow}>

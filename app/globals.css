@@ -51,6 +51,22 @@ body {
   padding: 0 30px;
 }
 
+
+/* ============================================================
+   Quiz Focus Mode (set by GrammarClient on <body data-quizmode="1">)
+   - Hide the navbar
+   - Reduce outer padding for more space
+   ============================================================ */
+/* Focus mode: hide navbar while a quiz is running */
+body[data-quizmode="1"] header {
+  display: none !important;
+}
+
+body[data-quizmode="1"] {
+  padding: 0;
+  /* remove gutters */
+}
+
 h1 {
   font-size: 40px;
   margin: 0;

@@ -2,7 +2,10 @@
     width: 100%;
     background: #fff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, .05);
-    padding: 16px 40px;
+    padding: 12px 32px;
+    position: sticky;
+    top: 0;
+    z-index: 40;
 }
 
 .inner {
@@ -45,6 +48,14 @@
 
 .navLinks li a:hover {
     color: #788cfc;
+}
+
+
+/* keyboard users */
+.navLinks li a:focus-visible {
+    outline: 2px solid #788cfc;
+    outline-offset: 2px;
+    border-radius: 6px;
 }
 
 /* Mobile */
