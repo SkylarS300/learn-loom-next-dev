@@ -1,3 +1,4 @@
+// src/grammar/buildQuiz.js
 import bank from "./bank/index";
 
 // Fisher–Yates shuffle (pure)
@@ -18,13 +19,13 @@ function shuffle(arr, seed = null) {
 
 // Ensure a topic node always has expected buckets (non-destructive init)
 function ensureBuckets(node) {
+    if (!node) return { easy: [], medium: [], hard: [], pool: [] };
     if (!node.pool) node.pool = [];
     if (!node.easy) node.easy = [];
     if (!node.medium) node.medium = [];
     if (!node.hard) node.hard = [];
     return node;
 }
-
 
 // ---- Local miss history (client-only, privacy-first) ----
 const MISS_KEY = "grammarMistakesV1";
@@ -40,13 +41,15 @@ function loadMistakes() {
             const prompt = rest.join("|"); // prompt may include |
             return { concept, subTopic, prompt, count: v?.count ?? 1, last: v?.last ?? 0 };
         });
-    } catch { return []; }
+    } catch {
+        return [];
+    }
 }
 
 function pickWeakFromPool(pool, concept, subTopic, wantN) {
     if (!wantN || wantN <= 0) return [];
     const mistakes = loadMistakes()
-        .filter(m => m.concept === concept && m.subTopic === subTopic)
+        .filter((m) => m.concept === concept && m.subTopic === subTopic)
         .sort((a, b) => (b.count - a.count) || (b.last - a.last));
     const chosen = [];
     const usedIdx = new Set();
@@ -64,7 +67,6 @@ function pickWeakFromPool(pool, concept, subTopic, wantN) {
     }
     return chosen;
 }
-
 
 // Deterministically shuffle choices and remap the correct answer index
 function shuffleChoices(q, seedBase) {
@@ -117,13 +119,12 @@ function sanitizeMCQ(q) {
     return { kind: "mcq", prompt, choices, answerIndex, ...(explanation ? { explanation } : {}) };
 }
 
-
 function fixArticleAnswer(q) {
     if (!q || q.kind !== "mcq" || !Array.isArray(q.choices)) return q;
     if (!/___\s*\w+/.test(q.prompt || "")) return q;
     // Only act if both 'a' and 'an' are present
-    const idxA = q.choices.findIndex(c => String(c).toLowerCase() === "a");
-    const idxAn = q.choices.findIndex(c => String(c).toLowerCase() === "an");
+    const idxA = q.choices.findIndex((c) => String(c).toLowerCase() === "a");
+    const idxAn = q.choices.findIndex((c) => String(c).toLowerCase() === "an");
     if (idxA === -1 || idxAn === -1) return q;
     const m = (q.prompt || "").match(/___\s*([A-Za-z-]+)/);
     if (!m) return q;
@@ -138,7 +139,110 @@ function fixArticleAnswer(q) {
     return q;
 }
 
+/* ------------------- New helpers for robust lookup & fallback ------------------- */
 
+const MIN_FOR_SUB = 5;       // try to reach at least this many from the chosen subtopic
+const DEFAULT_COUNT = 10;    // default quiz length
+
+// Case/spacing tolerant key lookup
+function findKey(obj, key) {
+    if (!obj || !key) return null;
+    const target = String(key).trim().toLowerCase();
+    for (const k of Object.keys(obj)) {
+        if (String(k).trim().toLowerCase() === target) return k;
+    }
+    return null;
+}
+
+function safeArray(a) {
+    return Array.isArray(a) ? a : [];
+}
+
+function flattenBuckets(node) {
+    if (!node) return [];
+    const n = ensureBuckets(node);
+    return [].concat(safeArray(n.pool), safeArray(n.easy), safeArray(n.medium), safeArray(n.hard));
+}
+
+// Pull from a node honoring difficulty, optionally generating items to meet a target
+function collectFromNode(node, {
+    difficulty = "mixed",
+    count = DEFAULT_COUNT,
+    allowShort = false,
+    seed = null,
+    mutateCache = true, // keep previous behavior of caching generated items
+} = {}) {
+    if (!node) return [];
+    const n = ensureBuckets(node);
+
+    let pool = [];
+    if (difficulty === "mixed") {
+        pool = n.pool.slice();
+    } else {
+        pool = safeArray(n[difficulty]).slice();
+    }
+
+    // Generate if needed and possible
+    if (typeof n.gen === "function") {
+        const need = Math.max(0, count - pool.length);
+        if (need > 0) {
+            const generated = n.gen(need) || [];
+            const safeGen = generated.map(sanitizeMCQ).filter(Boolean);
+            pool.push(...safeGen);
+            if (mutateCache) {
+                // Also keep bank caches updated for future sessions
+                n.pool.push(...safeGen);
+                const bucketName = difficulty === "mixed" ? "easy" : difficulty;
+                n[bucketName].push(...safeGen);
+            }
+        }
+    }
+
+    // Filter by kind unless allowShort and sanitize
+    pool = (pool || [])
+        .filter((q) => (allowShort ? true : q.kind !== "short"))
+        .map(sanitizeMCQ)
+        .filter(Boolean);
+
+    // Dedupe by prompt (case-insensitive)
+    pool = uniqueBy(pool, (q) => (q.prompt || "").trim().toLowerCase());
+
+    // Deterministic content order before later splits
+    return shuffle(pool, seed);
+}
+
+function conceptWidePool(conceptMap, {
+    difficulty = "mixed",
+    count = DEFAULT_COUNT,
+    allowShort = false,
+    seed = null,
+} = {}) {
+    if (!conceptMap) return [];
+    const parts = [];
+    for (const sub of Object.keys(conceptMap)) {
+        const node = conceptMap[sub];
+        // light-touch: try to collect up to a small target per sub to diversify
+        const want = Math.max(2, Math.ceil(count / 3));
+        parts.push(...collectFromNode(node, { difficulty, count: want, allowShort, seed, mutateCache: false }));
+    }
+    const merged = uniqueBy(parts, (q) => (q.prompt || "").trim().toLowerCase());
+    return shuffle(merged, seed);
+}
+
+function globalPool(bk, {
+    difficulty = "mixed",
+    count = DEFAULT_COUNT,
+    allowShort = false,
+    seed = null,
+} = {}) {
+    if (!bk) return [];
+    const parts = [];
+    for (const concept of Object.keys(bk)) {
+        parts.push(...conceptWidePool(bk[concept], { difficulty, count: Math.max(2, Math.ceil(count / 4)), allowShort, seed }));
+    }
+    const merged = uniqueBy(parts, (q) => (q.prompt || "").trim().toLowerCase());
+    return shuffle(merged, seed);
+}
 
 /**
  * Build a quiz from the bank.
@@ -155,70 +259,73 @@ export function buildQuiz({
     concept,
     subTopic,
     difficulty = "mixed",
-    count = 10,
+    count = DEFAULT_COUNT,
     seed = null,
     allowShort = false,
 }) {
-    let node = bank?.[concept]?.[subTopic]; if (!node) {
-        return { concept, subTopic, items: [] };
-    }
-    node = ensureBuckets(node);
-
     // Normalize inputs
-    count = Math.max(1, Math.min(30, Number(count) || 10));
+    count = Math.max(1, Math.min(30, Number(count) || DEFAULT_COUNT));
     if (seed != null && !Number.isFinite(seed)) seed = null;
 
-    let pool = [];
-    if (difficulty === "mixed") {
-        pool = node.pool.slice();
-    } else {
-        pool = (node[difficulty] || []).slice();
+    // Resolve concept/subTopic with case-insensitive keys
+    const conceptKey = findKey(bank, concept);
+    if (!conceptKey) {
+        return { concept, subTopic, items: [] };
     }
+    const conceptMap = bank[conceptKey] || {};
+    const subKey = subTopic ? findKey(conceptMap, subTopic) : null;
 
-    // Include dynamic generator output if available and pool is small
-    if (typeof node.gen === "function") {
-        const need = Math.max(0, count - pool.length);
-        if (need > 0) {
-            const generated = node.gen(need);
-            const safeGen = (generated || [])
-                .map(sanitizeMCQ)
-                .filter(Boolean);
-            pool.push(...safeGen);
-            // Also keep bank caches updated for future sessions
-            node.pool.push(...safeGen);
-            const bucketName = (difficulty === "mixed" ? "easy" : difficulty);
-            node[bucketName].push(...safeGen);
+    let candidates = [];
+
+    if (subKey) {
+        // Primary: requested subtopic
+        const node = conceptMap[subKey];
+        const primary = collectFromNode(node, { difficulty, count, allowShort, seed });
+        candidates = primary.slice();
+
+        // If the subtopic pool is still thin, widen to concept
+        if (candidates.length < Math.min(MIN_FOR_SUB, count)) {
+            const widened = conceptWidePool(conceptMap, { difficulty, count, allowShort, seed });
+            candidates = uniqueBy([...candidates, ...widened], (q) => (q.prompt || "").trim().toLowerCase());
         }
+    } else {
+        // No subtopic provided → start concept-wide
+        candidates = conceptWidePool(conceptMap, { difficulty, count, allowShort, seed });
     }
 
-    // Filter by kind unless allowShort and sanitize
-    pool = (pool || [])
-        .filter(q => allowShort ? true : q.kind !== "short")
-        .map(sanitizeMCQ)
-        .filter(Boolean);
+    // If still not enough, widen globally
+    if (candidates.length < Math.min(MIN_FOR_SUB, count)) {
+        const global = globalPool(bank, { difficulty, count, allowShort, seed });
+        candidates = uniqueBy([...candidates, ...global], (q) => (q.prompt || "").trim().toLowerCase());
+    }
 
-    // Dedupe by prompt (case-insensitive) to reduce repeats
-    pool = uniqueBy(pool, q => (q.prompt || "").trim().toLowerCase());
+    // Final trim to requested count (but keep at least 1)
+    candidates = candidates.slice(0, Math.max(1, Math.min(count, candidates.length)));
+
+    if (!candidates.length) return { concept, subTopic, items: [] };
 
     // --- Smart bias: pull ~40% from recent misses (if available) ---
     const targetWeak = Math.max(1, Math.floor(count * 0.4));
-    const weak = pickWeakFromPool(pool, concept, subTopic, targetWeak);
-    const weakIdx = new Set(weak.map(w => w.idx));
+    const weak = pickWeakFromPool(candidates, concept, subTopic, targetWeak);
+    const weakIdx = new Set(weak.map((w) => w.idx));
     const remainder = [];
-    for (let i = 0; i < pool.length; i++) {
-        if (!weakIdx.has(i)) remainder.push(pool[i]);
+    for (let i = 0; i < candidates.length; i++) {
+        if (!weakIdx.has(i)) remainder.push(candidates[i]);
     }
     const remainderPick = shuffle(remainder, seed).slice(0, Math.max(0, count - weak.length));
-    const items = [...weak.map(w => w.item), ...remainderPick].slice(0, count);
+    const items = [...weak.map((w) => w.item), ...remainderPick].slice(0, count);
     if (!items.length) return { concept, subTopic, items: [] };
+
     // First fix obvious a/an mistakes, then deterministically shuffle choices
     const normalized = items.map((q, i) =>
         shuffleChoices(
             fixArticleAnswer(q),
-            seed == null ? (i + 1) : (seed + i + 1)
-        ));
+            seed == null ? i + 1 : seed + i + 1
+        )
+    );
 
     return { concept, subTopic, items: normalized };
 }
 
+// Keep prior default export to avoid breaking imports elsewhere
 export default bank;
