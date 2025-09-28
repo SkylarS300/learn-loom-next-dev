@@ -1,5 +1,5 @@
 // scripts/gen-icons.js
-import sharp from "sharp";
+const sharp = require("sharp");
 import fs from "fs";
 
 const sizes = [16, 32, 180, 192, 512]; // typical favicon & PWA sizes

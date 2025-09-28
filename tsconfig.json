@@ -35,7 +35,8 @@
     "**/*.ts",
     "**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "scripts/gen-icons.cjs"
   ],
   "exclude": [
     "node_modules"
