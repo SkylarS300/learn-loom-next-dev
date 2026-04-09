@@ -155,7 +155,7 @@ export default function Home() {
 
         <footer className={styles.siteFooter}>
           <p>
-            © 2025 Skylar Schulsohn. All rights reserved. LearnLoom™ is a trademark of Skylar Schulsohn.
+            © 2025 Skylar. All rights reserved. LearnLoom™ is a trademark of Skylar S.
             For educational use only. No part of this project may be reproduced without permission.
           </p>
         </footer>
