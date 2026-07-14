@@ -29,7 +29,7 @@ export async function POST() {
 
         // Set normalized session cookie (matches /api/session/code)
         const cs = await cookies();
-        const h = headers(); // sync in App Router
+        const h = await headers();
         // prefer x-forwarded-host on Vercel/proxies, fallback to host
         const host = (h.get("x-forwarded-host") || h.get("host") || "").toLowerCase();
 

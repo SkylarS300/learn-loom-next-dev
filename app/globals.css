@@ -31,6 +31,75 @@
       Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji");
   --font-mono: var(--font-geist-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace);
+
+  /* --- Accessibility / display preferences (see /settings, PreferenceApplier) ---
+     Set as inline styles on <html> at runtime; these are just the un-set defaults. */
+  --ll-font-scale: 1;
+  --ll-highlight-color: yellow;
+
+  /* Card/box surfaces, borders, and muted text — used by chrome (nav) and
+     content boxes (help/settings) so they repaint correctly per theme,
+     instead of only body text/background doing so. */
+  --ll-surface: #f9fafb;
+  --ll-surface-border: #e5e7eb;
+  --ll-muted: #6b7280;
+}
+
+/* =============================================================================
+   1b. THEMES
+   -----------------------------------------------------------------------------
+   Applied via data-theme="dark" | "high-contrast" on <html> by PreferenceApplier.
+   Only affects surfaces that read --background/--foreground (body, links, and a
+   few base elements below) — components with their own hardcoded inline colors
+   (many exist across the app; see the accessibility audit notes) won't repaint
+   yet. Flagged as follow-up work, not silently glossed over.
+   ============================================================================= */
+[data-theme="dark"] {
+  --background: #0f1115;
+  --foreground: #e8eaed;
+  --ll-surface: #1a1d23;
+  --ll-surface-border: #2a2e37;
+  --ll-muted: #9aa0aa;
+}
+
+[data-theme="dark"] p {
+  color: #b7bcc4;
+}
+
+[data-theme="dark"] a {
+  color: #9db4ff;
+}
+
+[data-theme="high-contrast"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --ll-surface: #000000;
+  --ll-surface-border: #ffffff;
+  --ll-muted: #ffffff;
+}
+
+[data-theme="high-contrast"] p {
+  color: #ffffff;
+}
+
+[data-theme="high-contrast"] a {
+  color: #ffff00;
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   1c. DYSLEXIA-FRIENDLY FONT
+   -----------------------------------------------------------------------------
+   Not a bundled dyslexia-specific typeface (that would mean licensing/loading an
+   external webfont) — this swaps to a widely-available, more legible sans-serif
+   stack and widens letter/word spacing, both of which are commonly recommended,
+   low-risk adjustments. Labelled accordingly in the settings UI.
+   ============================================================================= */
+[data-dyslexia-font="1"] body {
+  font-family: Verdana, Tahoma, "Trebuchet MS", var(--font-sans);
+  letter-spacing: 0.02em;
+  word-spacing: 0.05em;
+  line-height: 1.7;
 }
 
 /* =============================================================================
@@ -40,13 +109,16 @@
    ============================================================================= */
 html {
   scroll-behavior: smooth;
+  /* Base 16px, scaled by the saved preference (default 1 = no change). */
+  font-size: calc(16px * var(--ll-font-scale, 1));
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), 'Roboto', sans-serif;
-  font-size: 17px;
+  font-size: 1.0625rem;
+  /* was 17px; 17/16 = 1.0625rem so default appearance is unchanged */
   margin: 0;
   padding: 0 30px;
 }
@@ -68,22 +140,26 @@ body[data-quizmode="1"] {
 }
 
 h1 {
-  font-size: 40px;
+  font-size: 2.5rem;
+  /* was 40px */
   margin: 0;
 }
 
 h2 {
-  font-size: 28px;
+  font-size: 1.75rem;
+  /* was 28px */
   margin: 0;
 }
 
 h3 {
-  font-size: 20px;
+  font-size: 1.25rem;
+  /* was 20px */
   margin: 0;
 }
 
 p {
-  font-size: 16px;
+  font-size: 1rem;
+  /* was 16px */
   color: #666;
   line-height: 1.6;
   margin: 0 0 1em 0;

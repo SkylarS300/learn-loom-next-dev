@@ -93,6 +93,7 @@ export default function Navbar() {
           <li><Link href="/readingpal">Reading Pal</Link></li>
           <li><Link href="/grammar">Study Grammar</Link></li>
           <li><Link href="/help">Help</Link></li>
+          <li><Link href="/settings">Settings</Link></li>
           <li><a href="#features">Features</a></li>
           <li><a href="#faq">FAQ</a></li>
           <li><Link href="/dashboard">Dashboard</Link></li>

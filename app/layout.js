@@ -4,6 +4,7 @@ import "./globals.css";
 // import Provider from "./SessionProvider"; Not needed anymore
 import Navbar from "./Navbar";
 import OnboardingModal from "./components/OnboardingModal";
+import PreferenceApplier from "./components/PreferenceApplier";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +30,8 @@ export default function RootLayout({ children }) {
         {children}
         {/* First-visit "how to use LearnLoom" walkthrough; see /help for the full guide */}
         <OnboardingModal />
+        {/* Applies saved accessibility/display preferences (see /settings) */}
+        <PreferenceApplier />
       </body>
     </html>
   );

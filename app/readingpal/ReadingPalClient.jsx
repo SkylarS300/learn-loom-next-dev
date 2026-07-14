@@ -373,10 +373,16 @@ export default function ReadingPalClient() {
       if (typeof p.volume === "number") setVolume(p.volume);
       if (typeof p.autoAdvance === "boolean") setAutoAdvance(p.autoAdvance);
     }
-    // Highlight color (polish): restore last picked color
+    // Highlight color (polish): restore last picked color for this book,
+    // falling back to the site-wide default set on /settings, if any.
     try {
       const savedColor = localStorage.getItem(hlColorKey);
-      if (savedColor) highlightedColorRef.current = savedColor;
+      if (savedColor) {
+        highlightedColorRef.current = savedColor;
+      } else {
+        const globalDefault = document.documentElement.style.getPropertyValue("--ll-highlight-color");
+        if (globalDefault) highlightedColorRef.current = globalDefault.trim();
+      }
     } catch { }
     return () => {
       if (ss) ss.onvoiceschanged = prev || null;
