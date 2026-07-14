@@ -484,3 +484,24 @@ model UserCode {
 
   @@index([anonId])
 }
+
+// ================================
+// Accessibility / display preferences
+// ================================
+model preference {
+  anonId         String   @id
+  // Percentage scale applied to base site text size (80-200). 100 = default.
+  fontScale      Int      @default(100)
+  theme          preference_theme @default(LIGHT)
+  dyslexiaFont   Boolean  @default(false)
+  // Hex color or CSS color keyword used for Reading Pal's spoken-sentence highlight.
+  highlightColor String   @default("yellow")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+enum preference_theme {
+  LIGHT
+  DARK
+  HIGH_CONTRAST
+}

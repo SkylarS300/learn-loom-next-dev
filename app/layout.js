@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 // import Provider from "./SessionProvider"; Not needed anymore
 import Navbar from "./Navbar";
+import OnboardingModal from "./components/OnboardingModal";
+import PreferenceApplier from "./components/PreferenceApplier";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,6 +28,10 @@ export default function RootLayout({ children }) {
         {/* Global navbar; hidden automatically during quiz focus mode */}
         <Navbar />
         {children}
+        {/* First-visit "how to use LearnLoom" walkthrough; see /help for the full guide */}
+        <OnboardingModal />
+        {/* Applies saved accessibility/display preferences (see /settings) */}
+        <PreferenceApplier />
       </body>
     </html>
   );

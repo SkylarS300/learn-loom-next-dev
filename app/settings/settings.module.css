@@ -1,0 +1,115 @@
+.wrap {
+  max-width: 640px;
+  margin: 32px auto 64px;
+  padding: 0 16px;
+}
+
+.intro {
+  color: var(--ll-muted);
+}
+
+.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.section {
+  margin: 28px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--ll-surface-border);
+}
+
+.section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.range {
+  width: 100%;
+  max-width: 360px;
+}
+
+.options {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--foreground);
+}
+
+.hint {
+  color: var(--ll-muted);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.swatches {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 2px solid #e5e7eb;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.swatchActive {
+  border-color: #111827;
+  box-shadow: 0 0 0 2px #fff inset;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.saveBtn {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.savedNote {
+  color: #059669;
+  font-weight: 600;
+  font-size: 14px;
+}
