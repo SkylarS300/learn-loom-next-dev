@@ -1,0 +1,450 @@
+diff --git a/app/Navbar.js b/app/Navbar.js
+index 7a872ea..4cd972b 100644
+--- a/app/Navbar.js
++++ b/app/Navbar.js
+@@ -92,6 +92,7 @@ export default function Navbar() {
+           <li><Link href="/library">Library</Link></li>
+           <li><Link href="/readingpal">Reading Pal</Link></li>
+           <li><Link href="/grammar">Study Grammar</Link></li>
++          <li><Link href="/help">Help</Link></li>
+           <li><a href="#features">Features</a></li>
+           <li><a href="#faq">FAQ</a></li>
+           <li><Link href="/dashboard">Dashboard</Link></li>
+diff --git a/app/components/OnboardingModal.jsx b/app/components/OnboardingModal.jsx
+new file mode 100644
+index 0000000..47714fc
+--- /dev/null
++++ b/app/components/OnboardingModal.jsx
+@@ -0,0 +1,181 @@
++"use client";
++
++import { useEffect, useRef, useState } from "react";
++import { usePathname } from "next/navigation";
++import Link from "next/link";
++
++const STORAGE_KEY = "learnloom_onboarding_dismissed_v1";
++
++// Routes where a first-visit walkthrough would be unhelpful or out of place:
++// admin tooling, the guide page itself (redundant), and focused reading/quiz views.
++const SKIP_PREFIXES = ["/admin", "/help"];
++
++export default function OnboardingModal() {
++    const [open, setOpen] = useState(false);
++    const pathname = usePathname();
++    const dialogRef = useRef(null);
++    const closeBtnRef = useRef(null);
++
++    useEffect(() => {
++        if (SKIP_PREFIXES.some((p) => pathname?.startsWith(p))) return;
++        try {
++            if (!localStorage.getItem(STORAGE_KEY)) {
++                setOpen(true);
++            }
++        } catch {
++            // localStorage unavailable (e.g. private browsing edge cases) — skip onboarding
++            // rather than risk showing it on every page load.
++        }
++        // Only check on mount / pathname change into an eligible route.
++        // eslint-disable-next-line react-hooks/exhaustive-deps
++    }, [pathname]);
++
++    useEffect(() => {
++        if (open) closeBtnRef.current?.focus();
++    }, [open]);
++
++    useEffect(() => {
++        function onKey(e) {
++            if (e.key === "Escape") dismiss();
++        }
++        if (open) document.addEventListener("keydown", onKey);
++        return () => document.removeEventListener("keydown", onKey);
++        // eslint-disable-next-line react-hooks/exhaustive-deps
++    }, [open]);
++
++    function dismiss() {
++        try {
++            localStorage.setItem(STORAGE_KEY, "1");
++        } catch {
++            // ignore — worst case the modal reappears next visit
++        }
++        setOpen(false);
++    }
++
++    if (!open) return null;
++
++    return (
++        <div
++            role="dialog"
++            aria-modal="true"
++            aria-labelledby="onboarding-title"
++            ref={dialogRef}
++            onClick={(e) => {
++                if (e.target === dialogRef.current) dismiss();
++            }}
++            style={backdrop}
++        >
++            <div style={panel}>
++                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
++                    <h2 id="onboarding-title" style={{ margin: 0, flex: 1, fontSize: 24 }}>
++                        Welcome to LearnLoom
++                    </h2>
++                    <button
++                        ref={closeBtnRef}
++                        onClick={dismiss}
++                        aria-label="Close welcome guide"
++                        style={closeBtn}
++                    >
++                        ×
++                    </button>
++                </div>
++
++                <p style={{ marginTop: 8, color: "#4b5563" }}>
++                    A quick look at what you can do here. This won&apos;t show again after you close it —
++                    you can revisit it anytime from <strong>Help</strong> in the navigation bar.
++                </p>
++
++                <ul style={list}>
++                    <li>
++                        <strong>Library</strong> — browse books by genre, level, and topic to find something
++                        that fits you.
++                    </li>
++                    <li>
++                        <strong>Reading Pal</strong> — read with text-to-speech, sentence highlighting,
++                        adjustable font size and colors.
++                    </li>
++                    <li>
++                        <strong>Study Grammar</strong> — practice with instant, explained feedback, not just
++                        right/wrong.
++                    </li>
++                    <li>
++                        <strong>Your code</strong> — LearnLoom doesn&apos;t ask for your name or email. A short
++                        code (shown in the nav bar once you start) is how your progress is saved and how you
++                        log back in on any device.
++                    </li>
++                </ul>
++
++                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
++                    <Link href="/help" style={secondaryBtn} onClick={dismiss}>
++                        View full guide
++                    </Link>
++                    <button onClick={dismiss} style={primaryBtn}>
++                        Got it, let&apos;s start
++                    </button>
++                </div>
++            </div>
++        </div>
++    );
++}
++
++const backdrop = {
++    position: "fixed",
++    inset: 0,
++    background: "rgba(0,0,0,.35)",
++    display: "flex",
++    alignItems: "center",
++    justifyContent: "center",
++    zIndex: 1000,
++    padding: 16,
++};
++
++const panel = {
++    width: "min(560px, 96vw)",
++    maxHeight: "90vh",
++    overflowY: "auto",
++    background: "#fff",
++    border: "1px solid #e5e7eb",
++    borderRadius: 12,
++    boxShadow: "0 16px 28px rgba(0,0,0,.18)",
++    padding: 20,
++};
++
++const list = {
++    margin: "12px 0",
++    paddingLeft: 20,
++    color: "#374151",
++    lineHeight: 1.6,
++    display: "grid",
++    gap: 8,
++};
++
++const closeBtn = {
++    background: "transparent",
++    border: "none",
++    fontSize: 24,
++    lineHeight: 1,
++    cursor: "pointer",
++    color: "#6b7280",
++    padding: 4,
++};
++
++const primaryBtn = {
++    background: "#3b82f6",
++    color: "#fff",
++    border: "none",
++    padding: "8px 16px",
++    borderRadius: 8,
++    cursor: "pointer",
++    fontSize: 14,
++};
++
++const secondaryBtn = {
++    background: "#e9eefc",
++    color: "#0b3b9f",
++    border: "1px solid #c9d7fb",
++    padding: "8px 16px",
++    borderRadius: 8,
++    cursor: "pointer",
++    fontSize: 14,
++    textDecoration: "none",
++};
+diff --git a/app/help/help.module.css b/app/help/help.module.css
+new file mode 100644
+index 0000000..355855a
+--- /dev/null
++++ b/app/help/help.module.css
+@@ -0,0 +1,65 @@
++.wrap {
++  max-width: 760px;
++  margin: 32px auto 64px;
++  padding: 0 16px;
++}
++
++.intro {
++  color: #4b5563;
++  font-size: 17px;
++  margin-top: 8px;
++}
++
++.toc {
++  margin: 24px 0 32px;
++  padding: 16px;
++  background: #f9fafb;
++  border: 1px solid #e5e7eb;
++  border-radius: 12px;
++}
++
++.toc ul {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px 16px;
++}
++
++.toc a {
++  font-weight: 600;
++}
++
++.section {
++  margin: 32px 0;
++  padding-top: 8px;
++  border-top: 1px solid #f0f1f3;
++}
++
++.section:first-of-type {
++  border-top: none;
++}
++
++.section h2 {
++  margin-bottom: 8px;
++}
++
++.section ul {
++  color: #374151;
++  line-height: 1.6;
++  padding-left: 20px;
++  margin: 0 0 1em 0;
++}
++
++.sectionLink {
++  display: inline-block;
++  margin-top: 4px;
++  font-weight: 600;
++}
++
++@media (max-width: 640px) {
++  .wrap {
++    margin-top: 20px;
++  }
++}
+diff --git a/app/help/page.jsx b/app/help/page.jsx
+new file mode 100644
+index 0000000..6e388d6
+--- /dev/null
++++ b/app/help/page.jsx
+@@ -0,0 +1,140 @@
++// app/help/page.jsx (SERVER)
++import Link from "next/link";
++import styles from "./help.module.css";
++
++export const metadata = {
++    title: "How to use LearnLoom",
++    description: "A guide to LearnLoom's library, Reading Pal, grammar practice, and privacy model.",
++};
++
++const sections = [
++    {
++        id: "library",
++        title: "Library",
++        body: (
++            <>
++                <p>
++                    The Library is where you find something to read. Browse by genre, reading level, or
++                    subject matter until something looks interesting — there&apos;s no ranking or grading
++                    happening here, just a way to find a good fit.
++                </p>
++                <p>
++                    Once you find a book, open it directly into Reading Pal.
++                </p>
++            </>
++        ),
++        link: { href: "/library", label: "Go to Library" },
++    },
++    {
++        id: "readingpal",
++        title: "Reading Pal",
++        body: (
++            <>
++                <p>Reading Pal is built to make dense text easier to work through. While reading you can:</p>
++                <ul>
++                    <li>Have the text read aloud, with the current sentence highlighted as it&apos;s spoken.</li>
++                    <li>Adjust font size and highlight color to whatever&apos;s comfortable for you.</li>
++                    <li>Jump between sentences, pause and resume, or pick up right where you left off.</li>
++                    <li>Leave notes or bookmarks anchored to specific sentences.</li>
++                </ul>
++                <p>
++                    You can also upload your own text (a PDF or pasted text) if you want to read something
++                    that isn&apos;t in the Library.
++                </p>
++            </>
++        ),
++        link: { href: "/readingpal", label: "Open Reading Pal" },
++    },
++    {
++        id: "grammar",
++        title: "Study Grammar",
++        body: (
++            <>
++                <p>
++                    Grammar practice is organized into short quizzes by topic — sentence structure,
++                    punctuation, and more. Every question comes with an explanation, whether you get it
++                    right or wrong, so you&apos;re not just guessing until something sticks.
++                </p>
++                <p>Your scores are tracked so you can see which topics could use more practice.</p>
++            </>
++        ),
++        link: { href: "/grammar", label: "Start a grammar quiz" },
++    },
++    {
++        id: "code-and-privacy",
++        title: "Your code, and how privacy works here",
++        body: (
++            <>
++                <p>
++                    LearnLoom doesn&apos;t ask for your name, email, or any other personal information to use
++                    it. Instead, when you first visit, you get a short anonymous code (something like{" "}
++                    <code>AB12-XY34-9K</code>). That code is how your reading progress, notes, and quiz
++                    scores are saved.
++                </p>
++                <p>
++                    <strong>Keep your code somewhere safe</strong> — it&apos;s the only way to get back to your
++                    progress on another device, and it can&apos;t be recovered if it&apos;s lost. You can copy it
++                    or show a QR code for it anytime from the navigation bar.
++                </p>
++            </>
++        ),
++    },
++    {
++        id: "dashboard",
++        title: "Dashboard",
++        body: (
++            <p>
++                Your Dashboard is a home base: recent reading progress, grammar quiz history, saved notes,
++                and — if a teacher has set them — any assigned work.
++            </p>
++        ),
++        link: { href: "/dashboard", label: "Go to Dashboard" },
++    },
++    {
++        id: "accessibility",
++        title: "Accessibility",
++        body: (
++            <p>
++                Reading Pal&apos;s font size, highlight color, and text-to-speech controls are there to make
++                reading work for you, not the other way around — there&apos;s no “right” way to use them.
++                They&apos;re currently set per reading session; if you&apos;d like these preferences to carry
++                across the whole site, let us know — it&apos;s something we&apos;re looking to add.
++            </p>
++        ),
++    },
++];
++
++export default function HelpPage() {
++    return (
++        <main className={styles.wrap}>
++            <h1>How to use LearnLoom</h1>
++            <p className={styles.intro}>
++                LearnLoom is a reading and grammar practice tool built to make challenging texts more
++                approachable and grammar practice less intimidating. Here&apos;s what&apos;s here and how to
++                use it — no need to ask a teacher first.
++            </p>
++
++            <nav aria-label="Guide sections" className={styles.toc}>
++                <ul>
++                    {sections.map((s) => (
++                        <li key={s.id}>
++                            <a href={`#${s.id}`}>{s.title}</a>
++                        </li>
++                    ))}
++                </ul>
++            </nav>
++
++            {sections.map((s) => (
++                <section key={s.id} id={s.id} className={styles.section} aria-labelledby={`${s.id}-heading`}>
++                    <h2 id={`${s.id}-heading`}>{s.title}</h2>
++                    {s.body}
++                    {s.link && (
++                        <Link href={s.link.href} className={styles.sectionLink}>
++                            {s.link.label} →
++                        </Link>
++                    )}
++                </section>
++            ))}
++        </main>
++    );
++}
+diff --git a/app/layout.js b/app/layout.js
+index 3ed55e0..d082228 100644
+--- a/app/layout.js
++++ b/app/layout.js
+@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
+ import "./globals.css";
+ // import Provider from "./SessionProvider"; Not needed anymore
+ import Navbar from "./Navbar";
++import OnboardingModal from "./components/OnboardingModal";
+ 
+ const geistSans = Geist({
+   variable: "--font-geist-sans",
+@@ -26,6 +27,8 @@ export default function RootLayout({ children }) {
+         {/* Global navbar; hidden automatically during quiz focus mode */}
+         <Navbar />
+         {children}
++        {/* First-visit "how to use LearnLoom" walkthrough; see /help for the full guide */}
++        <OnboardingModal />
+       </body>
+     </html>
+   );
+diff --git a/middleware.ts b/middleware.ts
+index 295309a..22ee958 100644
+--- a/middleware.ts
++++ b/middleware.ts
+@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
+ 
+ // Public routes that never require auth:
+ const PUBLIC_PATHS = new Set([
+-    "/", "/login", "/signup",
++    "/", "/login", "/signup", "/help",
+     "/favicon.ico", "/admin/support"
+ ]);
+ 

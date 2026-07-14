@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 // Public routes that never require auth:
 const PUBLIC_PATHS = new Set([
-    "/", "/login", "/signup",
+    "/", "/login", "/signup", "/help",
     "/favicon.ico", "/admin/support"
 ]);
 
