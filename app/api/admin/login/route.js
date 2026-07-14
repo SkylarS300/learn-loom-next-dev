@@ -1,20 +1,24 @@
 // app/api/admin/login/route.js
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Constant-time string compare, so response timing can't leak how many
+// leading characters of SUPPORT_PASS a guess got right.
 function tsc(a = "", b = "") {
-    // time-safe compare
     const la = Buffer.from(String(a));
     const lb = Buffer.from(String(b));
+    // Note: bailing out early on length mismatch is a (much smaller) timing
+    // leak in itself, but comparing buffers of different lengths would throw.
     if (la.length !== lb.length) return false;
-    return crypto.subtle ? la.every((v, i) => v === lb[i]) : la.equals(lb);
+    return timingSafeEqual(la, lb);
 }
 
 export async function POST(req) {
     const { pass } = await req.json().catch(() => ({}));
-    const ok = !!process.env.SUPPORT_PASS && String(pass || "") === String(process.env.SUPPORT_PASS);
+    const ok = !!process.env.SUPPORT_PASS && tsc(pass, process.env.SUPPORT_PASS);
     if (!ok) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
     const res = NextResponse.json({ ok: true });

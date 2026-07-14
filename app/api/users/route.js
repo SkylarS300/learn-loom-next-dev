@@ -1,63 +1,27 @@
 // app/api/users/route.js
-import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+//
+// Disabled: this route (and the `user` email/password/name/grade model it
+// reads/writes) is not used by LearnLoom's actual auth flow, which is
+// anonymous-code based (see app/api/session/*). Leaving it live meant:
+//   - POST could create real accounts with PII the product isn't supposed
+//     to collect (email, first/last name, grade).
+//   - GET returned every account's name/email/grade with no auth check.
+//
+// Disabled here rather than deleted so the underlying `user` table/data
+// (if any exists in a given environment) isn't touched. If this system is
+// intentionally being revived (e.g. for teacher accounts), it needs real
+// authentication on GET and a product decision about PII collection first.
 
-
-export async function POST(request) {
-  try {
-    const { email, password, firstName, lastName, grade, role } = await request.json().catch(() => ({}));
-
-    if (!email || !password || !firstName || !lastName || !role) {
-      return Response.json({ ok: false, error: "Missing required fields" }, { status: 400 });
-    }
-
-    const emailNorm = String(email).trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
-      return new Response("Invalid email", { status: 422 });
-    }
-    if (String(password).length < 8) {
-      return new Response("Password too short", { status: 422 });
-    }
-
-    const existing = await prisma.user.findUnique({ where: { email: emailNorm } });
-    if (existing) {
-      return Response.json({ ok: false, error: "Email already in use" }, { status: 409 });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const gradeNum = Number.isFinite(parseInt(grade, 10)) ? parseInt(grade, 10) : null;
-
-
-    const user = await prisma.user.create({
-      data: {
-        email: emailNorm,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        grade: gradeNum,
-        role: role.toUpperCase() === "TEACHER" ? "TEACHER" : "STUDENT",
-      },
-    });
-
-    const { password: _pw, ...safeUser } = user;
-    return Response.json({ ok: true, data: safeUser });
-  } catch (error) {
-    console.error("Signup error:", error.message, error.stack);
-    return Response.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-
+export async function POST() {
+  return Response.json(
+    { ok: false, error: "This endpoint is disabled." },
+    { status: 410 }
+  );
 }
 
 export async function GET() {
-  try {
-    // Expose only non-sensitive fields
-    const users = await prisma.user.findMany({
-      select: { id: true, email: true, firstName: true, lastName: true, grade: true, role: true, createdAt: true, updatedAt: true },
-      orderBy: { id: "asc" },
-    });
-    return Response.json({ ok: true, data: users });
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    return Response.json({ ok: false, error: "Failed to fetch users" }, { status: 500 });
-  }
+  return Response.json(
+    { ok: false, error: "This endpoint is disabled." },
+    { status: 410 }
+  );
 }

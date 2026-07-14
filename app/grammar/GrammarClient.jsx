@@ -17,23 +17,6 @@ export default function GrammarClient() {
         console.log("[GrammarClient] mounted", { hasBank: !!bank, concepts: bank ? Object.keys(bank).length : 0 });
     }, []);
 
-    if (!bank || typeof bank !== "object") {
-        return (
-            <main style={{ maxWidth: 620, margin: "32px auto", padding: 16 }}>
-                <h1>Grammar unavailable</h1>
-                <p className={styles.dim}>The question bank didn’t load.</p>
-                <ul className={styles.dim}>
-                    <li>
-                        Check <code>src/grammar/bank/fromStatic.js</code> import path (<code>../../content/quizzes.js</code>).
-                    </li>
-                    <li>
-                        Confirm <code>src/content/quizzes.js</code> exists and exports an object.
-                    </li>
-                </ul>
-            </main>
-        );
-    }
-
     // ---------------- recommendations ----------------
     const search = useSearchParams();
     const [recs, setRecs] = useState([]);
@@ -880,6 +863,26 @@ export default function GrammarClient() {
                     onSave={saveGrammarNote}
                     initialType="grammar"
                 />
+            </main>
+        );
+    }
+
+    // Bank failed to load — bail out to a friendly error state.
+    // (Checked here, after all hooks above have run, so hook order/count
+    // stays identical across renders — see React's Rules of Hooks.)
+    if (!bank || typeof bank !== "object") {
+        return (
+            <main style={{ maxWidth: 620, margin: "32px auto", padding: 16 }}>
+                <h1>Grammar unavailable</h1>
+                <p className={styles.dim}>The question bank didn’t load.</p>
+                <ul className={styles.dim}>
+                    <li>
+                        Check <code>src/grammar/bank/fromStatic.js</code> import path (<code>../../content/quizzes.js</code>).
+                    </li>
+                    <li>
+                        Confirm <code>src/content/quizzes.js</code> exists and exports an object.
+                    </li>
+                </ul>
             </main>
         );
     }

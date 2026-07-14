@@ -131,7 +131,9 @@ function toast(msg) {
     background: "#111827", color: "#fff", padding: "8px 12px", borderRadius: 8, zIndex: 9999,
   });
   document.body.appendChild(el);
-  setTimeout(() => { el.parentNode && el.parentNode.removeChild(el); }, 1200);
+  setTimeout(() => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+  }, 1200);
 }
 
 const btnPrimary = { background: "#3b82f6", color: "#fff", border: "none", padding: "8px 12px", borderRadius: 8, textDecoration: "none", cursor: "pointer" };
