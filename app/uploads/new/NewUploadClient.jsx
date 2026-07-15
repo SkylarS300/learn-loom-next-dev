@@ -177,7 +177,7 @@ export default function NewUploadClient() {
 
             <style jsx>{`
         .active-tab { font-weight: bold; background: #0070f3; color: white; border: none; padding: 0.5rem 1rem; margin-right: 0.5rem; border-radius: 6px; cursor: pointer; }
-        button:not(.active-tab) { background: #eee; border: 1px solid #ccc; padding: 0.5rem 1rem; margin-right: 0.5rem; border-radius: 6px; cursor: pointer; }
+        button:not(.active-tab) { background: var(--ll-surface); color: var(--foreground); border: 1px solid var(--ll-surface-border); padding: 0.5rem 1rem; margin-right: 0.5rem; border-radius: 6px; cursor: pointer; }
         form { display: flex; flex-direction: column; gap: 1rem; }
         input, textarea { width: 100%; padding: 0.5rem; font-size: 1rem; }
         label { font-weight: 500; }
